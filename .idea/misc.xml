@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="Pipenv (matcher)" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="Pipenv (matcher)" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="uv (matcher)" project-jdk-type="Python SDK" />
 </project>
