@@ -1,0 +1,15 @@
+# Netbox plugin configuration
+
+# Plugin name must match the module name
+plugin_name = "matcher_netbox_plugin"
+
+# Plugin type (currently only DataSource is supported)
+plugin_type = "DataSource"
+
+# Plugin-specific configuration
+api_url = "https://netbox.example.com/api"
+api_token = "abcdef123456"
+
+# Additional configuration options
+timeout_seconds = 30
+max_retries = 3
