@@ -1,8 +1,9 @@
 import asyncio
-import sys
+from pathlib import Path
 
-from csaf_matcher.common.logging import configure_logging, get_logger
-from csaf_matcher.manager.base import BaseManager
+from dina.cachedb.database import CacheDB
+from dina.common.logging import configure_logging, get_logger
+from dina.manager.base import BaseManager
 
 # Configure logging
 configure_logging()
@@ -10,7 +11,7 @@ configure_logging()
 logger = get_logger(__name__)
 
 
-class CSAFManager(BaseManager):
+class AssetManager(BaseManager):
     """
     Asset Manager implementation.
 
@@ -21,17 +22,19 @@ class CSAFManager(BaseManager):
         """
         Initialize the Asset Manager.
         """
-        super().__init__()
+        cache_db = CacheDB()
+        super().__init__(cache_db, Path("./assets/plugin_configs/"))
         # TODO: Initialize connections to asset databases and the cache database.
         # TODO: Find the appropriate transformer plugins.
 
 
-async def run_csaf_manager():
+async def run_asset_manager():
     """Run the Asset Manager."""
     # Create and initialize the Asset Manager
-    asset_manager = CSAFManager()
+    asset_manager = AssetManager()
 
     try:
+        await asset_manager.setup()
         # Run the Asset Manager pipeline
         await asset_manager.run()
 
@@ -40,17 +43,20 @@ async def run_csaf_manager():
         logger.error(f"Asset Manager failed: {str(e)}")
         raise
     finally:
-        # TODO: Do cleanup
-        pass
+        await asset_manager.cleanup()
 
 
 def main():
     """Entry point for the Asset Manager."""
     try:
         # Run the Asset Manager
-        asyncio.run(run_csaf_manager())
+        asyncio.run(run_asset_manager())
     except KeyboardInterrupt:
         logger.info("Asset Manager stopped by user")
     except Exception as e:
         logger.error(f"Asset Manager failed: {str(e)}")
-        sys.exit(1)
+        raise
+
+
+if __name__ == "__main__":
+    main()

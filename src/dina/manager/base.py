@@ -8,15 +8,15 @@ that fetch data, transform it, and preprocess it using plugins.
 from __future__ import annotations
 
 import asyncio
-import importlib
 import logging
 import tomllib
 from abc import ABC, abstractmethod
+from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Any, Dict, List, Union
 
-from csaf_matcher.cachedb.database import CacheDB
-from csaf_matcher.cachedb.model import Asset, CsafDocument
+from dina.cachedb.database import CacheDB
+from dina.cachedb.model import Asset, CsafDocument
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -61,50 +61,32 @@ class BaseManager(ABC):
                 with open(config_file, "rb") as f:
                     config_data = tomllib.load(f)
 
+                data_source = config_data["DataSource"]
                 # Extract plugin information
-                plugin_name = config_data.get("plugin_name")
-                plugin_type = config_data.get("plugin_type")
+                plugin_name = data_source.get("plugin_name")
 
-                if not plugin_name or not plugin_type:
+                if not plugin_name:
                     logger.error(
                         f"Missing required fields in plugin configuration: {config_file}"
                     )
                     continue
 
-                # Currently only support DataSource plugins
-                if plugin_type != "DataSource":
-                    logger.warning(
-                        f"Unsupported plugin type '{plugin_type}' in {config_file}, skipping"
-                    )
-                    continue
-
                 # Import the plugin module
                 try:
-                    module = importlib.import_module(plugin_name)
-                except ImportError as e:
+                    loaded_plugins = [
+                        plugin.load()
+                        for plugin in entry_points(
+                            group="dina.plugins", name="datasource"
+                        )
+                    ]
+                    assert len(loaded_plugins) == 1
+                    loaded_plugin = loaded_plugins[0]
+                except KeyError as e:
                     logger.error(f"Failed to import plugin module '{plugin_name}': {e}")
                     continue
 
-                # Find the plugin class (a subclass of DataSourcePlugin)
-                plugin_class = None
-                for attr_name in dir(module):
-                    attr = getattr(module, attr_name)
-                    if (
-                        isinstance(attr, type)
-                        and issubclass(attr, DataSourcePlugin)
-                        and attr is not DataSourcePlugin
-                    ):
-                        plugin_class = attr
-                        break
-
-                if not plugin_class:
-                    logger.error(
-                        f"No DataSourcePlugin subclass found in module '{plugin_name}'"
-                    )
-                    continue
-
                 # Initialize the plugin with the configuration
-                plugin_instance = plugin_class(config=config_data)
+                plugin_instance = loaded_plugin(config=config_data)
                 plugins.append(plugin_instance)
 
                 logger.info(f"Successfully loaded plugin: {plugin_name}")

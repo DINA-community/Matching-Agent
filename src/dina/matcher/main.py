@@ -1,7 +1,6 @@
 import asyncio
-import sys
 
-from csaf_matcher.common import configure_logging, get_logger
+from dina.common.logging import configure_logging, get_logger
 
 # Configure logging
 configure_logging()
@@ -45,4 +44,8 @@ def main():
         logger.info("Matcher stopped by user")
     except Exception as e:
         logger.error(f"Matcher failed: {str(e)}")
-        sys.exit(1)
+        raise
+
+
+if __name__ == "__main__":
+    main()

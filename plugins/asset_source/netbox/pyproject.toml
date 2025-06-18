@@ -1,5 +1,5 @@
 [project]
-name = "matcher_netbox_plugin"
+name = "dina.matcher.netbox"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -8,15 +8,19 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
-    "csaf_matcher",
+    "dina.matcher",
 ]
 
-[project.scripts]
-netbox = "netbox:main"
+[tool.hatch.build.targets.wheel]
+packages = ["src/dina"]
+
+# A datasource plugin must specify the correct DataSource class as an entry-point.
+[project.entry-points."dina.plugins"]
+datasource = "dina.plugins.netbox.netbox:NetboxDataSource"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.uv.sources]
-csaf_matcher = { workspace = true }
+"dina.matcher" = { workspace = true }

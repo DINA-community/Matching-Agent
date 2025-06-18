@@ -4,8 +4,8 @@ requires-python = ">=3.13"
 
 [manifest]
 members = [
-    "csaf-matcher",
-    "matcher-netbox-plugin",
+    "dina-matcher",
+    "dina-matcher-netbox",
 ]
 
 [[package]]
@@ -119,16 +119,21 @@ wheels = [
 ]
 
 [[package]]
-name = "csaf-matcher"
+name = "dina-matcher"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
     { name = "asyncpg" },
     { name = "colorlog" },
+    { name = "dina-matcher-netbox" },
     { name = "hatchling" },
-    { name = "matcher-netbox-plugin" },
     { name = "sqlalchemy", extra = ["asyncio"] },
+]
+
+[package.optional-dependencies]
+netbox = [
+    { name = "dina-matcher-netbox" },
 ]
 
 [package.dev-dependencies]
@@ -143,10 +148,12 @@ requires-dist = [
     { name = "aiohttp", specifier = ">=3.12.13" },
     { name = "asyncpg", specifier = ">=0.30.0" },
     { name = "colorlog", specifier = ">=6.9.0" },
+    { name = "dina-matcher-netbox", editable = "plugins/asset_source/netbox" },
+    { name = "dina-matcher-netbox", marker = "extra == 'netbox'", editable = "plugins/asset_source/netbox" },
     { name = "hatchling", specifier = ">=1.27.0" },
-    { name = "matcher-netbox-plugin", editable = "plugins/asset_source/netbox" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.0" },
 ]
+provides-extras = ["netbox"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -154,6 +161,17 @@ dev = [
     { name = "pre-commit", specifier = ">=4.2.0" },
     { name = "ruff", specifier = ">=0.11.13" },
 ]
+
+[[package]]
+name = "dina-matcher-netbox"
+version = "0.1.0"
+source = { editable = "plugins/asset_source/netbox" }
+dependencies = [
+    { name = "dina-matcher" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "dina-matcher", editable = "." }]
 
 [[package]]
 name = "distlib"
@@ -272,17 +290,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/f1/70/7703c29685631f5a7
 wheels = [
     { url = "https://files.pythonhosted.org/packages/76/c6/c88e154df9c4e1a2a66ccf0005a88dfb2650c1dffb6f5ce603dfbd452ce3/idna-3.10-py3-none-any.whl", hash = "sha256:946d195a0d259cbba61165e88e65941f16e9b36ea6ddb97f00452bae8b1287d3", size = 70442, upload-time = "2024-09-15T18:07:37.964Z" },
 ]
-
-[[package]]
-name = "matcher-netbox-plugin"
-version = "0.1.0"
-source = { editable = "plugins/asset_source/netbox" }
-dependencies = [
-    { name = "csaf-matcher" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "csaf-matcher", editable = "." }]
 
 [[package]]
 name = "multidict"

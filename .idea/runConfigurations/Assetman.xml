@@ -10,7 +10,7 @@
       </map>
     </option>
     <option name="runType" value="MODULE" />
-    <option name="scriptOrModule" value="assetman" />
+    <option name="scriptOrModule" value="dina.assetman.main" />
     <option name="uvArgs">
       <list />
     </option>

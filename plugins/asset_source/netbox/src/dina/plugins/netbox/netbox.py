@@ -2,8 +2,8 @@ import asyncio
 import logging
 from typing import List
 
-from csaf_matcher.cachedb.model import Asset
-from csaf_matcher.manager.base import DataSourcePlugin
+from dina.cachedb.model import Asset
+from dina.manager.base import DataSourcePlugin
 
 logger = logging.getLogger(__name__)
 
@@ -12,8 +12,12 @@ class NetboxDataSource(DataSourcePlugin):
     def __init__(self, config=None):
         super().__init__(config)
         # Extract configuration values
-        self.api_url = self.config.get("api_url", "")
-        self.api_token = self.config.get("api_token", "")
+        try:
+            netbox = self.config["DataSource"]["Netbox"]
+            self.api_url = netbox["api_url"]
+            self.api_token = netbox["api_token"]
+        except KeyError:
+            raise KeyError("Missing Netbox configuration parameter")
         logger.debug(f"Initialized NetboxDataSource with API URL: {self.api_url}")
 
     async def fetch_data(self) -> List[Asset]:
