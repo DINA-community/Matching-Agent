@@ -1,19 +1,14 @@
 import asyncio
-import logging
-import sys
 from pathlib import Path
 
 from cachedb.database import CacheDB
+from common.logging import configure_logging, get_logger
 from manager.base import BaseManager
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)],
-)
+configure_logging()
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class AssetManager(BaseManager):

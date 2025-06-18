@@ -1,15 +1,12 @@
 import asyncio
-import logging
 import sys
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)],
-)
+from common.logging import configure_logging, get_logger
 
-logger = logging.getLogger(__name__)
+# Configure logging
+configure_logging()
+
+logger = get_logger(__name__)
 
 
 class Matcher:

@@ -1,19 +1,19 @@
-from typing import List, Union
+from typing import List, Union, Optional
 
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncEngine
 from sqlalchemy.sql.ddl import CreateSchema
 
 from cachedb.model import Base, Asset, CsafDocument
 
 
 class CacheDB:
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
-        self.engine = None
+        self.engine: Optional[AsyncEngine] = None
 
-    async def connect(self):
+    async def connect(self) -> None:
         self.engine = create_async_engine(
-            "postgresql+asyncpg://postgres:postgres@localhost:5432/cachedb", echo=True
+            "postgresql+asyncpg://postgres:postgres@localhost:5432/cachedb"
         )
         async with self.engine.begin() as conn:
             await conn.execute(CreateSchema("cacheDB", if_not_exists=True))
@@ -34,3 +34,7 @@ class CacheDB:
         async with AsyncSession(self.engine) as session:
             async with session.begin():
                 session.add_all(data)
+
+    async def disconnect(self) -> None:
+        if self.engine is not None:
+            await self.engine.dispose()

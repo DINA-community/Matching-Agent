@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import List
 
@@ -18,4 +19,8 @@ class NetboxDataSource(DataSourcePlugin):
     async def fetch_data(self) -> List[Asset]:
         logger.debug(f"Fetching data from Netbox at {self.api_url}")
         # In a real implementation, this would use the API URL and token to fetch data
-        return []
+        await asyncio.sleep(1)
+        return [Asset()]
+
+    def endpoint_info(self) -> str:
+        return f"{self.api_url}"

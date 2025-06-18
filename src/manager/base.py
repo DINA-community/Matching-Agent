@@ -7,6 +7,7 @@ that fetch data, transform it, and preprocess it using plugins.
 
 from __future__ import annotations
 
+import asyncio
 import importlib
 import logging
 import tomllib
@@ -24,7 +25,7 @@ logger = logging.getLogger(__name__)
 class BaseManager(ABC):
     def __init__(self, cache_db: CacheDB, data_source_plugin_configs: Path):
         """Initialize the BaseManager."""
-        self.cache_db = cache_db
+        self.cache_db: CacheDB = cache_db
 
         self.data_sources: List[DataSourcePlugin] = self.load_plugins(
             data_source_plugin_configs
@@ -118,17 +119,18 @@ class BaseManager(ABC):
 
     async def run(self):
         """Run the manager."""
+        async with asyncio.TaskGroup() as tg:
+            logger.info(f"Starting {len(self.data_sources)} data collection tasks:")
+            for source in self.data_sources:
+                logger.info(f"Creating task for {source.debug_info()}")
+                tg.create_task(self.collection_loop(source))
+
+    async def collection_loop(self, source: DataSourcePlugin):
+        """Perform a collection of data from a single data source."""
         while True:
-            data = await self.fetch_data()
+            data = await source.fetch_data()
             data = await self.preprocess_data(data)
             await self.store_data(data)
-
-    async def fetch_data(self) -> List[Union[Asset, CsafDocument]]:
-        """Fetch data from all registered data sources."""
-        data: List[Union[Asset, CsafDocument]] = []
-        for data_source in self.data_sources:
-            data.extend(await data_source.fetch_data())
-        return data
 
     async def preprocess_data(
         self, data: List[Union[Asset, CsafDocument]]
@@ -138,15 +140,26 @@ class BaseManager(ABC):
 
     async def store_data(self, data: List[Union[Asset, CsafDocument]]):
         """Store the preprocessed data."""
-        await self.cache_db.store(data)
+        logger.info(f"Storing {len(data)} items in cacheDB")
+        # TODO: Re-enable once the rest is stable enough
+        # await self.cache_db.store(data)
 
     async def cleanup(self):
-        pass
+        await self.cache_db.disconnect()
 
 
 class DataSourcePlugin(ABC):
-    def __init__(self, config: Dict[str, Any] = None):
-        self.config = config or {}
+    def __init__(self, config: Dict[str, Any]):
+        self.config = config
 
     @abstractmethod
     async def fetch_data(self): ...
+
+    def debug_info(self) -> str:
+        """Return debug information about the plugin."""
+        return f"{self.config.get('plugin_type')} plugin {self.config.get('plugin_name')} for endpoint {self.endpoint_info()}"
+
+    @abstractmethod
+    def endpoint_info(self) -> str:
+        """Return endpoint information about the plugin."""
+        ...
