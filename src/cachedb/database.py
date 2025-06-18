@@ -16,8 +16,8 @@ class CacheDB:
             "postgresql+asyncpg://postgres:postgres@localhost:5432/cachedb", echo=True
         )
         async with self.engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
             await conn.execute(CreateSchema("cacheDB", if_not_exists=True))
+            await conn.run_sync(Base.metadata.create_all)
 
     async def store(self, data: List[Union[Asset, CsafDocument]]) -> None:
         """
