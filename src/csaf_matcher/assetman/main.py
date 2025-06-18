@@ -1,9 +1,9 @@
 import asyncio
 from pathlib import Path
 
-from cachedb.database import CacheDB
-from common.logging import configure_logging, get_logger
-from manager.base import BaseManager
+from csaf_matcher.cachedb.database import CacheDB
+from csaf_matcher.common.logging import configure_logging, get_logger
+from csaf_matcher.manager.base import BaseManager
 
 # Configure logging
 configure_logging()

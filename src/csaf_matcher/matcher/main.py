@@ -1,7 +1,7 @@
 import asyncio
 import sys
 
-from common.logging import configure_logging, get_logger
+from csaf_matcher.common import configure_logging, get_logger
 
 # Configure logging
 configure_logging()

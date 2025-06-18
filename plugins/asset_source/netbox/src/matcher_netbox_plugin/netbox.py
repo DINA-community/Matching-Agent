@@ -2,8 +2,8 @@ import asyncio
 import logging
 from typing import List
 
-from cachedb.model import Asset
-from manager.base import DataSourcePlugin
+from csaf_matcher.cachedb.model import Asset
+from csaf_matcher.manager.base import DataSourcePlugin
 
 logger = logging.getLogger(__name__)
 

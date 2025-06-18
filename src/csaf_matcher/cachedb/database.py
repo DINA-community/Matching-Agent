@@ -3,7 +3,7 @@ from typing import List, Union, Optional
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncEngine
 from sqlalchemy.sql.ddl import CreateSchema
 
-from cachedb.model import Base, Asset, CsafDocument
+from csaf_matcher.cachedb.model import Base, Asset, CsafDocument
 
 
 class CacheDB:

@@ -5,6 +5,7 @@
       <sourceFolder url="file://$MODULE_DIR$/plugins/asset_source/netbox/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/plugins/base/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/src/csaf_matcher" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/dist" />
       <excludeFolder url="file://$MODULE_DIR$/matcher.egg-info" />

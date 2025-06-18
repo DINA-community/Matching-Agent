@@ -12,7 +12,7 @@ This repository contains a shared infrastructure for manager daemons that fetch,
 - `src/csafman/`: CSAF Manager implementation.
 - `src/matcher/`: Main package.
 
-For more details about the manager infrastructure, see the [Manager Infrastructure README](src/manager/README.md).
+For more details about the manager infrastructure, see the [Manager Infrastructure README](src/csaf_matcher/manager/README.md).
 
 ## Getting Started
 Install [uv](https://docs.astral.sh/uv/) in any way that suits you.

@@ -1,8 +1,8 @@
 import asyncio
 import sys
 
-from common.logging import configure_logging, get_logger
-from manager.base import BaseManager
+from csaf_matcher.common.logging import configure_logging, get_logger
+from csaf_matcher.manager.base import BaseManager
 
 # Configure logging
 configure_logging()

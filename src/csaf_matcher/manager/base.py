@@ -15,8 +15,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Dict, List, Union
 
-from cachedb.database import CacheDB
-from cachedb.model import Asset, CsafDocument
+from csaf_matcher.cachedb.database import CacheDB
+from csaf_matcher.cachedb.model import Asset, CsafDocument
 
 # Set up logging
 logger = logging.getLogger(__name__)
