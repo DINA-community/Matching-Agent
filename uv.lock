@@ -7,6 +7,7 @@ members = [
     "dina-matcher",
     "dina-plugins-datasource-netbox-fetcher",
     "dina-plugins-datasource-sample",
+    "dina-plugins-preprocessing-identity",
 ]
 
 [[package]]
@@ -180,6 +181,17 @@ requires-dist = [{ name = "dina-matcher", editable = "." }]
 name = "dina-plugins-datasource-sample"
 version = "0.1.0"
 source = { editable = "plugins/asset_source/sample" }
+dependencies = [
+    { name = "dina-matcher" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "dina-matcher", editable = "." }]
+
+[[package]]
+name = "dina-plugins-preprocessing-identity"
+version = "0.1.0"
+source = { editable = "plugins/preprocessing/identity" }
 dependencies = [
     { name = "dina-matcher" },
 ]

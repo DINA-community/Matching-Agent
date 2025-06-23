@@ -10,13 +10,14 @@ from __future__ import annotations
 import asyncio
 import logging
 import tomllib
-from abc import ABC, abstractmethod
+from abc import ABC
 from importlib.metadata import entry_points
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import List, Union
 
 from dina.cachedb.database import CacheDB
 from dina.cachedb.model import Asset, CsafDocument
+from dina.manager.plugin_base.data_source import DataSourcePlugin
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -151,20 +152,3 @@ class BaseManager(ABC):
 
     async def cleanup(self):
         await self.cache_db.disconnect()
-
-
-class DataSourcePlugin(ABC):
-    def __init__(self, config: Dict[str, Any]):
-        self.config = config
-
-    @abstractmethod
-    async def fetch_data(self) -> List[Union[Asset, CsafDocument]]: ...
-
-    def debug_info(self) -> str:
-        """Return debug information about the plugin."""
-        return f"{self.config.get('plugin_type')} plugin {self.config.get('plugin_name')} for endpoint {self.endpoint_info()}"
-
-    @abstractmethod
-    def endpoint_info(self) -> str:
-        """Return endpoint information about the plugin."""
-        ...

@@ -43,7 +43,7 @@ import asyncio
 from typing import List, Union
 
 from dina.cachedb.model import CsafDocument, Asset
-from dina.manager.base import DataSourcePlugin
+from dina.manager.plugin_base.data_source import DataSourcePlugin
 
 
 class YourPluginDataSource(DataSourcePlugin):

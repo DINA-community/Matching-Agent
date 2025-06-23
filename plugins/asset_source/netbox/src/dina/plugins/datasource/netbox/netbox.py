@@ -3,7 +3,7 @@ import logging
 from typing import List
 
 from dina.cachedb.model import Asset
-from dina.manager.base import DataSourcePlugin
+from dina.manager.plugin_base.data_source import DataSourcePlugin
 
 logger = logging.getLogger(__name__)
 

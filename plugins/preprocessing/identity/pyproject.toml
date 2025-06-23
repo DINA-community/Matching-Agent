@@ -1,7 +1,7 @@
 [project]
-name = "dina.plugins.datasource.netbox_fetcher"
+name = "dina.plugins.preprocessing.identity"
 version = "0.1.0"
-description = "Add your description here"
+description = "The identity preprocessor. It does nothing with the data."
 readme = "README.md"
 authors = [
     { name = "Mark Giraud", email = "mark.giraud@iosb.fraunhofer.de" }
@@ -15,8 +15,8 @@ dependencies = [
 packages = ["src/dina"]
 
 # A datasource plugin must specify the correct DataSource class as an entry-point.
-[project.entry-points."dina.plugins.datasource"]
-netbox_fetcher = "dina.plugins.datasource.netbox.netbox:NetboxDataSource"
+[project.entry-points."dina.plugins.preprocessing"]
+identity = "dina.plugins.preprocessing.identity.identity:IdentityPreprocessor"
 
 [build-system]
 requires = ["hatchling"]

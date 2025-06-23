@@ -40,6 +40,7 @@ packages = ["src/dina"]
 members = [
     "plugins/asset_source/netbox",
     "plugins/asset_source/sample",
+    "plugins/preprocessing/identity",
 ]
 
 [tool.uv.sources]
