@@ -23,7 +23,9 @@ class CSAFManager(BaseManager):
         Initialize the CSAF Manager.
         """
         cache_db = CacheDB()
-        super().__init__(cache_db, Path("./assets/plugin_configs/"))
+        super().__init__(
+            cache_db, Path("./assets/plugin_configs/"), Path("./assets/csafman.toml")
+        )
         # TODO: Initialize connections to asset databases and the cache database.
         # TODO: Find the appropriate transformer plugins.
 

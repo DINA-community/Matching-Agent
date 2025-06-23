@@ -18,21 +18,34 @@ from typing import List, Union
 from dina.cachedb.database import CacheDB
 from dina.cachedb.model import Asset, CsafDocument
 from dina.manager.plugin_base.data_source import DataSourcePlugin
+from dina.manager.plugin_base.preprocessor import PreprocessorPlugin
 
 # Set up logging
 logger = logging.getLogger(__name__)
 
 
 class BaseManager(ABC):
-    def __init__(self, cache_db: CacheDB, data_source_plugin_configs: Path):
-        """Initialize the BaseManager."""
+    def __init__(
+        self, cache_db: CacheDB, data_source_plugin_configs: Path, config_file: Path
+    ):
+        """Initialize the BaseManager.
+
+        Args:
+            cache_db: The cache database to use.
+            data_source_plugin_configs: Path to a directory containing data source plugin configuration files.
+            config_file: Path to the manager configuration file (e.g., assetman.toml).
+        """
         self.cache_db: CacheDB = cache_db
         self.pending_data: List[Union[Asset, CsafDocument]] = []
         self.preprocessed_data: List[Union[Asset, CsafDocument]] = []
+        self.config_file: Path = config_file
 
         self.data_sources: List[DataSourcePlugin] = self.load_plugins(
             data_source_plugin_configs
         )
+
+        self.preprocessor_plugins: List[PreprocessorPlugin] = []
+        self.load_preprocessor_plugins(config_file)
 
     @staticmethod
     def load_plugins(plugin_configs: Path) -> List[DataSourcePlugin]:
@@ -109,6 +122,90 @@ class BaseManager(ABC):
 
         return plugins
 
+    def load_preprocessor_plugins(self, config_file: Path):
+        """
+        Load preprocessor plugins specified in the configuration file.
+
+        Args:
+            config_file: Path to the configuration file (e.g., assetman.toml).
+
+        Raises:
+            FileNotFoundError: If the config_file does not exist.
+            KeyError: If the configuration file is missing required fields.
+        """
+        if not config_file.exists():
+            raise FileNotFoundError(f"Configuration file not found: {config_file}")
+
+        # TODO: Refactor this into configuration loading and plugin loading
+        #       Also consolidate the plugin loading parts to de-duplicate code
+
+        try:
+            # Parse the configuration file
+            with open(config_file, "rb") as f:
+                config_data = tomllib.load(f)
+
+            # Get the manager section (e.g., Assetman or Csafman)
+            manager_section = None
+            if "Assetman" in config_data:
+                manager_section = config_data["Assetman"]
+            elif "Csafman" in config_data:
+                manager_section = config_data["Csafman"]
+
+            if not manager_section:
+                logger.warning(
+                    f"No manager section found in configuration file: {config_file}"
+                )
+                return
+
+            # Get the list of preprocessor plugins
+            preprocessor_plugin_names = manager_section.get("preprocessor_plugins", [])
+            if not preprocessor_plugin_names:
+                logger.info("No preprocessor plugins specified in configuration")
+                return
+
+            # Load the preprocessor plugins
+            installed_plugins = entry_points(group="dina.plugins.preprocessing")
+            logger.info(
+                f"Found {len(installed_plugins)} installed preprocessor plugins:"
+            )
+            for installed_plugin in installed_plugins:
+                logger.info(f" - {installed_plugin.group}.{installed_plugin.name}")
+
+            if not installed_plugins:
+                raise ValueError(
+                    "No preprocessor plugins found. At least one plugin is required."
+                )
+
+            for plugin_name in preprocessor_plugin_names:
+                try:
+                    epoints = installed_plugins.select(name=plugin_name)
+                    if not epoints:
+                        logger.warning(
+                            f"No preprocessor plugin called {plugin_name} found"
+                        )
+                        continue
+                    if len(epoints) > 1:
+                        logger.warning(
+                            f"Too many entrypoints for preprocessor plugin {plugin_name} found: {epoints}"
+                        )
+                        continue
+
+                    loaded_plugin = [plugin.load() for plugin in epoints][0]
+                    plugin_instance = loaded_plugin()
+                    self.preprocessor_plugins.append(plugin_instance)
+
+                    logger.info(
+                        f"Successfully loaded preprocessor plugin: {plugin_name}"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Error loading preprocessor plugin {plugin_name}: {e}"
+                    )
+
+        except Exception as e:
+            logger.error(f"Error loading preprocessor plugins from {config_file}: {e}")
+            raise
+
     async def setup(self):
         await self.cache_db.connect()
 
@@ -130,11 +227,22 @@ class BaseManager(ABC):
             self.pending_data.extend(await source.fetch_data())
 
     async def preprocess_data_task(self):
+        """Process data using the loaded preprocessor plugins."""
+        assert self.preprocessor_plugins, "No preprocessor plugins loaded"
         while True:
             if self.pending_data:
                 logger.info(f"Preprocessing {len(self.pending_data)} items")
-                # TODO: Pass data to preprocessing plugin instead of doing no-op
-                self.preprocessed_data.extend(self.pending_data)
+
+                # Process data through each preprocessor plugin in sequence
+                processed_data = self.pending_data
+                for plugin in self.preprocessor_plugins:
+                    logger.info(
+                        f"Applying preprocessor plugin: {plugin.__class__.__name__}"
+                    )
+                    processed_data = await plugin.preprocess(processed_data)
+
+                self.preprocessed_data.extend(processed_data)
+
                 self.pending_data.clear()
             else:
                 await asyncio.sleep(0.1)

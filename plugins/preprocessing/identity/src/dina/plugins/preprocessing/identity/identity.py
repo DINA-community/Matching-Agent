@@ -4,7 +4,7 @@ from dina.cachedb.model import Asset, CsafDocument
 from dina.manager.plugin_base.preprocessor import PreprocessorPlugin
 
 
-class Identity(PreprocessorPlugin):
+class IdentityPreprocessor(PreprocessorPlugin):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 

@@ -13,7 +13,7 @@ class DataSourcePlugin(ABC):
 
     def debug_info(self) -> str:
         """Return debug information about the plugin."""
-        return f"{self.config.get('plugin_type')} plugin {self.config.get('plugin_name')} for endpoint {self.endpoint_info()}"
+        return f"plugin {self.config['DataSource']['plugin_name']} for endpoint {self.endpoint_info()}"
 
     @abstractmethod
     def endpoint_info(self) -> str:

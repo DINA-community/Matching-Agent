@@ -129,7 +129,7 @@ Important points:
 When working in the main repository, add the plugin as an extra to the main package:
 
 ```shell
-uv add --optional your_plugin_name --project=dina.plugins.datasource.your_plugin_name --editable plugins/asset_source/your_plugin_name
+uv add --optional datasource.your_plugin_name --project=dina.plugins.datasource.your_plugin_name --editable plugins/asset_source/your_plugin_name
 ```
 
 And then make sure all extras are installed for development purposes:

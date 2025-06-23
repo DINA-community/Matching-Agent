@@ -23,7 +23,9 @@ class AssetManager(BaseManager):
         Initialize the Asset Manager.
         """
         cache_db = CacheDB()
-        super().__init__(cache_db, Path("./assets/plugin_configs/"))
+        super().__init__(
+            cache_db, Path("./assets/plugin_configs/"), Path("./assets/assetman.toml")
+        )
         # TODO: Initialize connections to asset databases and the cache database.
         # TODO: Find the appropriate transformer plugins.
 
