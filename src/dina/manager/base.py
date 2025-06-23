@@ -26,6 +26,8 @@ class BaseManager(ABC):
     def __init__(self, cache_db: CacheDB, data_source_plugin_configs: Path):
         """Initialize the BaseManager."""
         self.cache_db: CacheDB = cache_db
+        self.pending_data: List[Union[Asset, CsafDocument]] = []
+        self.preprocessed_data: List[Union[Asset, CsafDocument]] = []
 
         self.data_sources: List[DataSourcePlugin] = self.load_plugins(
             data_source_plugin_configs
@@ -47,6 +49,7 @@ class BaseManager(ABC):
             ImportError: If a plugin module cannot be imported.
             KeyError: If a plugin configuration is missing required fields.
         """
+        plugin_configs = plugin_configs.resolve()
         if not plugin_configs.exists() or not plugin_configs.is_dir():
             raise FileNotFoundError(
                 f"Plugin configuration directory not found: {plugin_configs}"
@@ -102,29 +105,40 @@ class BaseManager(ABC):
     async def run(self):
         """Run the manager."""
         async with asyncio.TaskGroup() as tg:
-            logger.info(f"Starting {len(self.data_sources)} data collection tasks:")
+            logger.info(f"Starting {len(self.data_sources)} data fetching tasks:")
             for source in self.data_sources:
                 logger.info(f"Creating task for {source.debug_info()}")
-                tg.create_task(self.collection_loop(source))
+                tg.create_task(self.fetch_data_task(source))
+            logger.info("Starting preprocessing task")
+            tg.create_task(self.preprocess_data_task())
+            logger.info("Starting storing task")
+            tg.create_task(self.store_data_task())
 
-    async def collection_loop(self, source: DataSourcePlugin):
+    async def fetch_data_task(self, source: DataSourcePlugin):
         """Perform a collection of data from a single data source."""
         while True:
-            data = await source.fetch_data()
-            data = await self.preprocess_data(data)
-            await self.store_data(data)
+            self.pending_data.extend(await source.fetch_data())
 
-    async def preprocess_data(
-        self, data: List[Union[Asset, CsafDocument]]
-    ) -> List[Union[Asset, CsafDocument]]:
-        """Preprocess the transformed data."""
-        return data
+    async def preprocess_data_task(self):
+        while True:
+            if self.pending_data:
+                logger.info(f"Preprocessing {len(self.pending_data)} items")
+                # TODO: Pass data to preprocessing plugin instead of doing no-op
+                self.preprocessed_data.extend(self.pending_data)
+                self.pending_data.clear()
+            else:
+                await asyncio.sleep(0.1)
 
-    async def store_data(self, data: List[Union[Asset, CsafDocument]]):
+    async def store_data_task(self):
         """Store the preprocessed data."""
-        logger.info(f"Storing {len(data)} items in cacheDB")
-        # TODO: Re-enable once the rest is stable enough
-        # await self.cache_db.store(data)
+        while True:
+            if self.preprocessed_data:
+                logger.info(f"Storing {len(self.preprocessed_data)} items in cacheDB")
+                self.preprocessed_data.clear()
+                # TODO: Re-enable once the rest is stable enough
+                # await self.cache_db.store(data)
+            else:
+                await asyncio.sleep(0.1)
 
     async def cleanup(self):
         await self.cache_db.disconnect()
