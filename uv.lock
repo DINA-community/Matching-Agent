@@ -5,7 +5,8 @@ requires-python = ">=3.13"
 [manifest]
 members = [
     "dina-matcher",
-    "dina-matcher-netbox",
+    "dina-plugins-datasource-netbox-fetcher",
+    "dina-plugins-datasource-sample",
 ]
 
 [[package]]
@@ -126,14 +127,16 @@ dependencies = [
     { name = "aiohttp" },
     { name = "asyncpg" },
     { name = "colorlog" },
-    { name = "dina-matcher-netbox" },
     { name = "hatchling" },
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
 
 [package.optional-dependencies]
-netbox = [
-    { name = "dina-matcher-netbox" },
+netbox-fetcher = [
+    { name = "dina-plugins-datasource-netbox-fetcher" },
+]
+sample-fetcher = [
+    { name = "dina-plugins-datasource-sample" },
 ]
 
 [package.dev-dependencies]
@@ -148,12 +151,12 @@ requires-dist = [
     { name = "aiohttp", specifier = ">=3.12.13" },
     { name = "asyncpg", specifier = ">=0.30.0" },
     { name = "colorlog", specifier = ">=6.9.0" },
-    { name = "dina-matcher-netbox", editable = "plugins/asset_source/netbox" },
-    { name = "dina-matcher-netbox", marker = "extra == 'netbox'", editable = "plugins/asset_source/netbox" },
+    { name = "dina-plugins-datasource-netbox-fetcher", marker = "extra == 'netbox-fetcher'", editable = "plugins/asset_source/netbox" },
+    { name = "dina-plugins-datasource-sample", marker = "extra == 'sample-fetcher'", editable = "plugins/asset_source/sample" },
     { name = "hatchling", specifier = ">=1.27.0" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.0" },
 ]
-provides-extras = ["netbox"]
+provides-extras = ["netbox-fetcher", "sample-fetcher"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -163,9 +166,20 @@ dev = [
 ]
 
 [[package]]
-name = "dina-matcher-netbox"
+name = "dina-plugins-datasource-netbox-fetcher"
 version = "0.1.0"
 source = { editable = "plugins/asset_source/netbox" }
+dependencies = [
+    { name = "dina-matcher" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "dina-matcher", editable = "." }]
+
+[[package]]
+name = "dina-plugins-datasource-sample"
+version = "0.1.0"
+source = { editable = "plugins/asset_source/sample" }
 dependencies = [
     { name = "dina-matcher" },
 ]

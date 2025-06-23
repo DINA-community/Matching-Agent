@@ -1,0 +1,6 @@
+# An invalid plugin configuration
+
+[DataSource]
+plugin_name = "does_not_exist"
+timeout_seconds = 30
+update_interval = 60

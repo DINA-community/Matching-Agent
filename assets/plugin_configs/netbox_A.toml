@@ -1,8 +1,9 @@
 # Netbox plugin configuration
 
 [DataSource]
-# Plugin name must match the module name
-plugin_name = "matcher_netbox_plugin"
+# The plugin name is the name used to install the extra.
+# The package name must be dina.plugins.datasource.<plugin_name>
+plugin_name = "netbox_fetcher"
 timeout_seconds = 30
 update_interval = 60
 

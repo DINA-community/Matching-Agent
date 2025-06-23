@@ -57,6 +57,11 @@ class BaseManager(ABC):
 
         plugins: List[DataSourcePlugin] = []
 
+        installed_plugins = entry_points(group="dina.plugins.datasource")
+        logger.info(f"Found {len(installed_plugins)} installed plugins:")
+        for installed_plugin in installed_plugins:
+            logger.info(f" - {installed_plugin.group}.{installed_plugin.name}")
+
         # Scan the directory for TOML files
         for config_file in plugin_configs.glob("*.toml"):
             try:
@@ -76,14 +81,16 @@ class BaseManager(ABC):
 
                 # Import the plugin module
                 try:
-                    loaded_plugins = [
-                        plugin.load()
-                        for plugin in entry_points(
-                            group="dina.plugins", name="datasource"
+                    epoints = installed_plugins.select(name=plugin_name)
+                    if not epoints:
+                        raise ModuleNotFoundError(
+                            f"No module called {plugin_name} found"
                         )
-                    ]
-                    assert len(loaded_plugins) == 1
-                    loaded_plugin = loaded_plugins[0]
+                    if len(epoints) > 1:
+                        raise ValueError(
+                            f"Too many entrypoints for plugin {plugin_name} found: {epoints}"
+                        )
+                    loaded_plugin = [plugin.load() for plugin in epoints][0]
                 except KeyError as e:
                     logger.error(f"Failed to import plugin module '{plugin_name}': {e}")
                     continue
@@ -92,7 +99,9 @@ class BaseManager(ABC):
                 plugin_instance = loaded_plugin(config=config_data)
                 plugins.append(plugin_instance)
 
-                logger.info(f"Successfully loaded plugin: {plugin_name}")
+                logger.info(
+                    f"Successfully loaded plugin: {plugin_name} with config: {config_file}"
+                )
 
             except Exception as e:
                 logger.error(f"Error loading plugin from {config_file}: {e}")
@@ -149,7 +158,7 @@ class DataSourcePlugin(ABC):
         self.config = config
 
     @abstractmethod
-    async def fetch_data(self): ...
+    async def fetch_data(self) -> List[Union[Asset, CsafDocument]]: ...
 
     def debug_info(self) -> str:
         """Return debug information about the plugin."""

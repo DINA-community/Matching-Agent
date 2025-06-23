@@ -14,21 +14,23 @@ PostgreSQL database. It includes two concrete implementations:
 - `src/matcher/`: Main package.
 - `plugins/`: Plugin implementations for extending functionality.
 
-For more details about the manager infrastructure, see the [Manager Infrastructure README](src/csaf_matcher/manager/README.md).
+For more details about the manager infrastructure, see
+the [Manager Infrastructure README](src/csaf_matcher/manager/README.md).
 
 ## Getting Started
 
 Install [uv](https://docs.astral.sh/uv/) in any way that suits you.
-If you are using PyCharm, then you should not need to do anything further.
 
-If you are not using PyCharm, run 
+Run in your terminal or inside pycharm (double tap `<Ctrl>` and enter the command)
+
 ```shell
-uv sync
+uv sync --all-extras
 ```
 
 to set up the local dev environment.
 
-Afterwards any target can be run by typing `uv run <TARGET_NAME>`.
+Afterwards any target can be run by typing `uv run <TARGET_NAME>` or by selecting it in the run configurations menu
+in Pycharm.
 For example, try running the following to start the matching agent.
 
 ```shell

@@ -14,12 +14,14 @@ dependencies = [
     "asyncpg>=0.30.0",
     "colorlog>=6.9.0",
     "hatchling>=1.27.0",
-    "dina.matcher.netbox",
     "sqlalchemy[asyncio]>=2.0.0",
 ]
 
 [project.optional-dependencies]
-netbox = ["dina.matcher.netbox"]
+netbox_fetcher = ["dina.plugins.datasource.netbox_fetcher"]
+sample-fetcher = [
+    "dina-plugins-datasource-sample",
+]
 
 [project.scripts]
 assetman = "dina.assetman.main:main"
@@ -37,10 +39,12 @@ packages = ["src/dina"]
 [tool.uv.workspace]
 members = [
     "plugins/asset_source/netbox",
+    "plugins/asset_source/sample",
 ]
 
 [tool.uv.sources]
-"dina.matcher.netbox" = { workspace = true }
+"dina.plugins.datasource.netbox_fetcher" = { workspace = true }
+dina-plugins-datasource-sample = { workspace = true }
 
 
 [dependency-groups]
