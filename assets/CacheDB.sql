@@ -5,7 +5,7 @@
 -- Dumped from database version 15.11
 -- Dumped by pg_dump version 17.2
 
--- Started on 2025-05-21 14:54:10
+-- Started on 2025-06-27 12:47:59
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -54,7 +54,7 @@ CREATE TABLE "cacheDB".csaf_document (
 ALTER TABLE "cacheDB".csaf_document OWNER TO netbox;
 
 --
--- TOC entry 224 (class 1259 OID 31518)
+-- TOC entry 223 (class 1259 OID 31518)
 -- Name: csaf_product; Type: TABLE; Schema: cacheDB; Owner: netbox
 --
 
@@ -68,13 +68,13 @@ CREATE TABLE "cacheDB".csaf_product (
 ALTER TABLE "cacheDB".csaf_product OWNER TO netbox;
 
 --
--- TOC entry 225 (class 1259 OID 31523)
+-- TOC entry 224 (class 1259 OID 31523)
 -- Name: csaf_product_tree; Type: TABLE; Schema: cacheDB; Owner: netbox
 --
 
 CREATE TABLE "cacheDB".csaf_product_tree (
     id character varying NOT NULL,
-    csaf_id integer NOT NULL,
+    csaf_document_id integer NOT NULL,
     csaf_product_id integer NOT NULL
 );
 
@@ -90,7 +90,6 @@ CREATE TABLE "cacheDB".device (
     id integer NOT NULL,
     name text,
     serial text,
-    device_role_id integer,
     device_type_id integer
 );
 
@@ -98,20 +97,7 @@ CREATE TABLE "cacheDB".device (
 ALTER TABLE "cacheDB".device OWNER TO netbox;
 
 --
--- TOC entry 217 (class 1259 OID 31329)
--- Name: device_role; Type: TABLE; Schema: cacheDB; Owner: netbox
---
-
-CREATE TABLE "cacheDB".device_role (
-    id integer NOT NULL,
-    name text NOT NULL
-);
-
-
-ALTER TABLE "cacheDB".device_role OWNER TO netbox;
-
---
--- TOC entry 218 (class 1259 OID 31334)
+-- TOC entry 217 (class 1259 OID 31334)
 -- Name: device_type; Type: TABLE; Schema: cacheDB; Owner: netbox
 --
 
@@ -130,7 +116,7 @@ CREATE TABLE "cacheDB".device_type (
 ALTER TABLE "cacheDB".device_type OWNER TO netbox;
 
 --
--- TOC entry 220 (class 1259 OID 31344)
+-- TOC entry 219 (class 1259 OID 31344)
 -- Name: file; Type: TABLE; Schema: cacheDB; Owner: netbox
 --
 
@@ -144,7 +130,7 @@ CREATE TABLE "cacheDB".file (
 ALTER TABLE "cacheDB".file OWNER TO netbox;
 
 --
--- TOC entry 219 (class 1259 OID 31339)
+-- TOC entry 218 (class 1259 OID 31339)
 -- Name: hash; Type: TABLE; Schema: cacheDB; Owner: netbox
 --
 
@@ -159,7 +145,7 @@ CREATE TABLE "cacheDB".hash (
 ALTER TABLE "cacheDB".hash OWNER TO netbox;
 
 --
--- TOC entry 221 (class 1259 OID 31349)
+-- TOC entry 220 (class 1259 OID 31349)
 -- Name: manufacturer; Type: TABLE; Schema: cacheDB; Owner: netbox
 --
 
@@ -172,11 +158,11 @@ CREATE TABLE "cacheDB".manufacturer (
 ALTER TABLE "cacheDB".manufacturer OWNER TO netbox;
 
 --
--- TOC entry 222 (class 1259 OID 31354)
--- Name: matches; Type: TABLE; Schema: cacheDB; Owner: netbox
+-- TOC entry 221 (class 1259 OID 31354)
+-- Name: match; Type: TABLE; Schema: cacheDB; Owner: netbox
 --
 
-CREATE TABLE "cacheDB".matches (
+CREATE TABLE "cacheDB".match (
     id integer NOT NULL,
     score double precision NOT NULL,
     status text NOT NULL,
@@ -186,10 +172,10 @@ CREATE TABLE "cacheDB".matches (
 );
 
 
-ALTER TABLE "cacheDB".matches OWNER TO netbox;
+ALTER TABLE "cacheDB".match OWNER TO netbox;
 
 --
--- TOC entry 223 (class 1259 OID 31364)
+-- TOC entry 222 (class 1259 OID 31364)
 -- Name: software; Type: TABLE; Schema: cacheDB; Owner: netbox
 --
 
@@ -207,7 +193,7 @@ CREATE TABLE "cacheDB".software (
 ALTER TABLE "cacheDB".software OWNER TO netbox;
 
 --
--- TOC entry 3274 (class 2606 OID 31370)
+-- TOC entry 3271 (class 2606 OID 31370)
 -- Name: asset asset_pk; Type: CONSTRAINT; Schema: cacheDB; Owner: netbox
 --
 
@@ -216,7 +202,7 @@ ALTER TABLE ONLY "cacheDB".asset
 
 
 --
--- TOC entry 3297 (class 2606 OID 31529)
+-- TOC entry 3292 (class 2606 OID 31529)
 -- Name: csaf_product_tree csaf_document_pk; Type: CONSTRAINT; Schema: cacheDB; Owner: netbox
 --
 
@@ -225,7 +211,7 @@ ALTER TABLE ONLY "cacheDB".csaf_product_tree
 
 
 --
--- TOC entry 3276 (class 2606 OID 31384)
+-- TOC entry 3273 (class 2606 OID 31384)
 -- Name: csaf_document csaf_pk; Type: CONSTRAINT; Schema: cacheDB; Owner: netbox
 --
 
@@ -234,7 +220,7 @@ ALTER TABLE ONLY "cacheDB".csaf_document
 
 
 --
--- TOC entry 3295 (class 2606 OID 31522)
+-- TOC entry 3290 (class 2606 OID 31522)
 -- Name: csaf_product csaf_product_tree_pk; Type: CONSTRAINT; Schema: cacheDB; Owner: netbox
 --
 
@@ -243,7 +229,7 @@ ALTER TABLE ONLY "cacheDB".csaf_product
 
 
 --
--- TOC entry 3278 (class 2606 OID 31390)
+-- TOC entry 3275 (class 2606 OID 31390)
 -- Name: device device_pk; Type: CONSTRAINT; Schema: cacheDB; Owner: netbox
 --
 
@@ -252,16 +238,7 @@ ALTER TABLE ONLY "cacheDB".device
 
 
 --
--- TOC entry 3280 (class 2606 OID 31392)
--- Name: device_role devicerole_pk; Type: CONSTRAINT; Schema: cacheDB; Owner: netbox
---
-
-ALTER TABLE ONLY "cacheDB".device_role
-    ADD CONSTRAINT devicerole_pk PRIMARY KEY (id);
-
-
---
--- TOC entry 3283 (class 2606 OID 31394)
+-- TOC entry 3278 (class 2606 OID 31394)
 -- Name: device_type devicetype_pk; Type: CONSTRAINT; Schema: cacheDB; Owner: netbox
 --
 
@@ -270,7 +247,7 @@ ALTER TABLE ONLY "cacheDB".device_type
 
 
 --
--- TOC entry 3285 (class 2606 OID 31396)
+-- TOC entry 3280 (class 2606 OID 31396)
 -- Name: hash filehash_pk; Type: CONSTRAINT; Schema: cacheDB; Owner: netbox
 --
 
@@ -279,7 +256,7 @@ ALTER TABLE ONLY "cacheDB".hash
 
 
 --
--- TOC entry 3287 (class 2606 OID 31398)
+-- TOC entry 3282 (class 2606 OID 31398)
 -- Name: file hash_pk; Type: CONSTRAINT; Schema: cacheDB; Owner: netbox
 --
 
@@ -288,7 +265,7 @@ ALTER TABLE ONLY "cacheDB".file
 
 
 --
--- TOC entry 3289 (class 2606 OID 31400)
+-- TOC entry 3284 (class 2606 OID 31400)
 -- Name: manufacturer manufacturer_pk; Type: CONSTRAINT; Schema: cacheDB; Owner: netbox
 --
 
@@ -297,16 +274,16 @@ ALTER TABLE ONLY "cacheDB".manufacturer
 
 
 --
--- TOC entry 3291 (class 2606 OID 31402)
--- Name: matches matching_agent_pk; Type: CONSTRAINT; Schema: cacheDB; Owner: netbox
+-- TOC entry 3286 (class 2606 OID 31402)
+-- Name: match matching_agent_pk; Type: CONSTRAINT; Schema: cacheDB; Owner: netbox
 --
 
-ALTER TABLE ONLY "cacheDB".matches
+ALTER TABLE ONLY "cacheDB".match
     ADD CONSTRAINT matching_agent_pk PRIMARY KEY (id);
 
 
 --
--- TOC entry 3293 (class 2606 OID 31406)
+-- TOC entry 3288 (class 2606 OID 31406)
 -- Name: software software_pk; Type: CONSTRAINT; Schema: cacheDB; Owner: netbox
 --
 
@@ -315,7 +292,7 @@ ALTER TABLE ONLY "cacheDB".software
 
 
 --
--- TOC entry 3281 (class 1259 OID 31552)
+-- TOC entry 3276 (class 1259 OID 31552)
 -- Name: device_type_id_idx; Type: INDEX; Schema: cacheDB; Owner: netbox
 --
 
@@ -323,7 +300,7 @@ CREATE INDEX device_type_id_idx ON "cacheDB".device_type USING btree (id, manufa
 
 
 --
--- TOC entry 3298 (class 2606 OID 31407)
+-- TOC entry 3293 (class 2606 OID 31407)
 -- Name: asset asset_device_fk; Type: FK CONSTRAINT; Schema: cacheDB; Owner: netbox
 --
 
@@ -332,7 +309,7 @@ ALTER TABLE ONLY "cacheDB".asset
 
 
 --
--- TOC entry 3299 (class 2606 OID 31412)
+-- TOC entry 3294 (class 2606 OID 31412)
 -- Name: asset asset_software_fk; Type: FK CONSTRAINT; Schema: cacheDB; Owner: netbox
 --
 
@@ -341,16 +318,7 @@ ALTER TABLE ONLY "cacheDB".asset
 
 
 --
--- TOC entry 3310 (class 2606 OID 31530)
--- Name: csaf_product_tree csaf_document_csaf_fk; Type: FK CONSTRAINT; Schema: cacheDB; Owner: netbox
---
-
-ALTER TABLE ONLY "cacheDB".csaf_product_tree
-    ADD CONSTRAINT csaf_document_csaf_fk FOREIGN KEY (csaf_id) REFERENCES "cacheDB".csaf_document(id);
-
-
---
--- TOC entry 3311 (class 2606 OID 31535)
+-- TOC entry 3304 (class 2606 OID 31535)
 -- Name: csaf_product_tree csaf_document_csaf_product_fk; Type: FK CONSTRAINT; Schema: cacheDB; Owner: netbox
 --
 
@@ -359,7 +327,7 @@ ALTER TABLE ONLY "cacheDB".csaf_product_tree
 
 
 --
--- TOC entry 3308 (class 2606 OID 31540)
+-- TOC entry 3302 (class 2606 OID 31540)
 -- Name: csaf_product csaf_product_device_fk; Type: FK CONSTRAINT; Schema: cacheDB; Owner: netbox
 --
 
@@ -368,7 +336,7 @@ ALTER TABLE ONLY "cacheDB".csaf_product
 
 
 --
--- TOC entry 3309 (class 2606 OID 31545)
+-- TOC entry 3303 (class 2606 OID 31545)
 -- Name: csaf_product csaf_product_software_fk; Type: FK CONSTRAINT; Schema: cacheDB; Owner: netbox
 --
 
@@ -377,16 +345,16 @@ ALTER TABLE ONLY "cacheDB".csaf_product
 
 
 --
--- TOC entry 3300 (class 2606 OID 31467)
--- Name: device device_device_role_fk; Type: FK CONSTRAINT; Schema: cacheDB; Owner: netbox
+-- TOC entry 3305 (class 2606 OID 31553)
+-- Name: csaf_product_tree csaf_product_tree_csaf_document_fk; Type: FK CONSTRAINT; Schema: cacheDB; Owner: netbox
 --
 
-ALTER TABLE ONLY "cacheDB".device
-    ADD CONSTRAINT device_device_role_fk FOREIGN KEY (device_role_id) REFERENCES "cacheDB".device_role(id);
+ALTER TABLE ONLY "cacheDB".csaf_product_tree
+    ADD CONSTRAINT csaf_product_tree_csaf_document_fk FOREIGN KEY (csaf_document_id) REFERENCES "cacheDB".csaf_document(id);
 
 
 --
--- TOC entry 3301 (class 2606 OID 31472)
+-- TOC entry 3295 (class 2606 OID 31472)
 -- Name: device device_device_type_fk; Type: FK CONSTRAINT; Schema: cacheDB; Owner: netbox
 --
 
@@ -395,7 +363,7 @@ ALTER TABLE ONLY "cacheDB".device
 
 
 --
--- TOC entry 3302 (class 2606 OID 31477)
+-- TOC entry 3296 (class 2606 OID 31477)
 -- Name: device_type device_type_manufacturer_fk; Type: FK CONSTRAINT; Schema: cacheDB; Owner: netbox
 --
 
@@ -404,7 +372,7 @@ ALTER TABLE ONLY "cacheDB".device_type
 
 
 --
--- TOC entry 3303 (class 2606 OID 31482)
+-- TOC entry 3297 (class 2606 OID 31482)
 -- Name: hash filehash_hash_fk; Type: FK CONSTRAINT; Schema: cacheDB; Owner: netbox
 --
 
@@ -413,7 +381,7 @@ ALTER TABLE ONLY "cacheDB".hash
 
 
 --
--- TOC entry 3304 (class 2606 OID 31487)
+-- TOC entry 3298 (class 2606 OID 31487)
 -- Name: file hash_software_fk; Type: FK CONSTRAINT; Schema: cacheDB; Owner: netbox
 --
 
@@ -422,25 +390,25 @@ ALTER TABLE ONLY "cacheDB".file
 
 
 --
--- TOC entry 3305 (class 2606 OID 31492)
--- Name: matches matching_agent_asset_fk; Type: FK CONSTRAINT; Schema: cacheDB; Owner: netbox
+-- TOC entry 3299 (class 2606 OID 31492)
+-- Name: match matching_agent_asset_fk; Type: FK CONSTRAINT; Schema: cacheDB; Owner: netbox
 --
 
-ALTER TABLE ONLY "cacheDB".matches
+ALTER TABLE ONLY "cacheDB".match
     ADD CONSTRAINT matching_agent_asset_fk FOREIGN KEY (asset_id) REFERENCES "cacheDB".asset(id);
 
 
 --
--- TOC entry 3306 (class 2606 OID 31497)
--- Name: matches matching_agent_csaf_fk; Type: FK CONSTRAINT; Schema: cacheDB; Owner: netbox
+-- TOC entry 3300 (class 2606 OID 31497)
+-- Name: match matching_agent_csaf_fk; Type: FK CONSTRAINT; Schema: cacheDB; Owner: netbox
 --
 
-ALTER TABLE ONLY "cacheDB".matches
+ALTER TABLE ONLY "cacheDB".match
     ADD CONSTRAINT matching_agent_csaf_fk FOREIGN KEY (csaf_id) REFERENCES "cacheDB".csaf_document(id);
 
 
 --
--- TOC entry 3307 (class 2606 OID 31512)
+-- TOC entry 3301 (class 2606 OID 31512)
 -- Name: software software_manufacturer_fk; Type: FK CONSTRAINT; Schema: cacheDB; Owner: netbox
 --
 
@@ -448,7 +416,7 @@ ALTER TABLE ONLY "cacheDB".software
     ADD CONSTRAINT software_manufacturer_fk FOREIGN KEY (manufacturer_id) REFERENCES "cacheDB".manufacturer(id);
 
 
--- Completed on 2025-05-21 14:54:10
+-- Completed on 2025-06-27 12:47:59
 
 --
 -- PostgreSQL database dump complete

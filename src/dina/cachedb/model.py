@@ -23,15 +23,6 @@ class Manufacturer(Base):
     software: Mapped[List["Software"]] = relationship(back_populates="manufacturer")
 
 
-class DeviceRole(Base):
-    __tablename__ = "device_role"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(Text)
-
-    devices: Mapped[List["Device"]] = relationship(back_populates="device_role")
-
-
 class DeviceType(Base):
     __tablename__ = "device_type"
 
@@ -75,14 +66,10 @@ class Device(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str | None] = mapped_column(Text)
     serial: Mapped[str | None] = mapped_column(Text)
-    device_role_id: Mapped[int | None] = mapped_column(
-        ForeignKey("cacheDB.device_role.id")
-    )
     device_type_id: Mapped[int | None] = mapped_column(
         ForeignKey("cacheDB.device_type.id")
     )
 
-    device_role: Mapped["DeviceRole"] = relationship(back_populates="devices")
     device_type: Mapped["DeviceType"] = relationship(back_populates="devices")
     assets: Mapped[List["Asset"]] = relationship(back_populates="device")
     csaf_products: Mapped[List["CsafProduct"]] = relationship(back_populates="device")
@@ -97,7 +84,7 @@ class Asset(Base):
 
     device: Mapped["Device"] = relationship(back_populates="assets")
     software: Mapped["Software"] = relationship(back_populates="assets")
-    matches: Mapped[List["Matches"]] = relationship(back_populates="asset")
+    matches: Mapped[List["Match"]] = relationship(back_populates="asset")
 
 
 class File(Base):
@@ -132,7 +119,7 @@ class CsafDocument(Base):
     lang: Mapped[str]
     publisher: Mapped[str | None] = mapped_column(Text)
 
-    matches: Mapped[List["Matches"]] = relationship(back_populates="csaf_document")
+    matches: Mapped[List["Match"]] = relationship(back_populates="csaf_document")
     csaf_product_trees: Mapped[List["CsafProductTree"]] = relationship(
         back_populates="csaf_document"
     )
@@ -156,7 +143,7 @@ class CsafProductTree(Base):
     __tablename__ = "csaf_product_tree"
 
     id: Mapped[str] = mapped_column(primary_key=True)
-    csaf_id: Mapped[int] = mapped_column(ForeignKey("cacheDB.csaf_document.id"))
+    csaf_document_id: Mapped[int] = mapped_column(ForeignKey("cacheDB.csaf_document.id"))
     csaf_product_id: Mapped[int] = mapped_column(ForeignKey("cacheDB.csaf_product.id"))
 
     csaf_document: Mapped["CsafDocument"] = relationship(
@@ -167,8 +154,8 @@ class CsafProductTree(Base):
     )
 
 
-class Matches(Base):
-    __tablename__ = "matches"
+class Match(Base):
+    __tablename__ = "match"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     score: Mapped[float]
