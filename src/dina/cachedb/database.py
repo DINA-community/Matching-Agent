@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import List, Union, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncEngine
@@ -7,13 +8,21 @@ from dina.cachedb.model import Base, Asset, CsafDocument
 
 
 class CacheDB:
+    @dataclass
+    class Config:
+        user: str
+        password: str
+        host: str
+        port: int
+        database: str
+
     def __init__(self) -> None:
         super().__init__()
         self.engine: Optional[AsyncEngine] = None
 
-    async def connect(self) -> None:
+    async def connect(self, config: Config) -> None:
         self.engine = create_async_engine(
-            "postgresql+asyncpg://postgres:postgres@localhost:5432/cachedb"
+            f"postgresql+asyncpg://{config.user}:{config.password}@{config.host}:{config.port}/{config.database}"
         )
         async with self.engine.begin() as conn:
             await conn.execute(CreateSchema("cacheDB", if_not_exists=True))

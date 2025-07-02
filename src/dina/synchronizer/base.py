@@ -39,13 +39,15 @@ class BaseSynchronizer(ABC):
         self.pending_data: List[Union[Asset, CsafDocument]] = []
         self.preprocessed_data: List[Union[Asset, CsafDocument]] = []
         self.config_file: Path = config_file
+        self.config_data: dict = {}
+        self.load_config(config_file)
 
         self.data_sources: List[DataSourcePlugin] = self.load_plugins(
             data_source_plugin_configs
         )
 
         self.preprocessor_plugins: List[PreprocessorPlugin] = []
-        self.load_preprocessor_plugins(config_file)
+        self.load_preprocessor_plugins()
 
     @staticmethod
     def load_plugins(plugin_configs: Path) -> List[DataSourcePlugin]:
@@ -122,38 +124,36 @@ class BaseSynchronizer(ABC):
 
         return plugins
 
-    def load_preprocessor_plugins(self, config_file: Path):
-        """
-        Load preprocessor plugins specified in the configuration file.
-
-        Args:
-            config_file: Path to the configuration file (e.g., assetman.toml).
-
-        Raises:
-            FileNotFoundError: If the config_file does not exist.
-            KeyError: If the configuration file is missing required fields.
-        """
+    def load_config(self, config_file: Path):
         if not config_file.exists():
             raise FileNotFoundError(f"Configuration file not found: {config_file}")
 
+        with open(config_file, "rb") as f:
+            self.config_data = tomllib.load(f)
+
+    def load_preprocessor_plugins(self):
+        """
+        Load preprocessor plugins specified in the configuration file.
+
+        Raises:
+            KeyError: If the configuration file is missing required fields.
+        """
+
         # TODO: Refactor this into configuration loading and plugin loading
         #       Also consolidate the plugin loading parts to de-duplicate code
-
         try:
             # Parse the configuration file
-            with open(config_file, "rb") as f:
-                config_data = tomllib.load(f)
 
             # Get the manager section (e.g., Assetman or Csafman)
             manager_section = None
-            if "Assetsync" in config_data:
-                manager_section = config_data["Assetsync"]
-            elif "Csafsync" in config_data:
-                manager_section = config_data["Csafsync"]
+            if "Assetsync" in self.config_data:
+                manager_section = self.config_data["Assetsync"]
+            elif "Csafsync" in self.config_data:
+                manager_section = self.config_data["Csafsync"]
 
             if not manager_section:
                 logger.warning(
-                    f"No manager section found in configuration file: {config_file}"
+                    f"No manager section found in configuration file: {self.config_file}"
                 )
                 return
 
@@ -203,11 +203,21 @@ class BaseSynchronizer(ABC):
                     )
 
         except Exception as e:
-            logger.error(f"Error loading preprocessor plugins from {config_file}: {e}")
+            logger.error(
+                f"Error loading preprocessor plugins from {self.config_file}: {e}"
+            )
             raise
 
     async def setup(self):
-        await self.cache_db.connect()
+        cachedb = self.config_data["Cachedb"]
+        config = CacheDB.Config(
+            host=cachedb["host"],
+            port=cachedb["port"],
+            database=cachedb["database"],
+            user=cachedb["username"],
+            password=cachedb["password"],
+        )
+        await self.cache_db.connect(config)
 
     async def run(self):
         """Run the manager."""
