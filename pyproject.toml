@@ -27,8 +27,8 @@ preprocessor-identity = [
 ]
 
 [project.scripts]
-assetman = "dina.assetman.main:main"
-csafman = "dina.csafman.main:main"
+assetsync = "dina.assetsync.main:main"
+csafsync = "dina.csafsync.main:main"
 csaf_matcher = "dina.matcher.main:main"
 csaf_matcher_cli = "dina.cli.main:main"
 

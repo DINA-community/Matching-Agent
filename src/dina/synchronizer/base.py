@@ -17,14 +17,14 @@ from typing import List, Union
 
 from dina.cachedb.database import CacheDB
 from dina.cachedb.model import Asset, CsafDocument
-from dina.manager.plugin_base.data_source import DataSourcePlugin
-from dina.manager.plugin_base.preprocessor import PreprocessorPlugin
+from dina.synchronizer.plugin_base.data_source import DataSourcePlugin
+from dina.synchronizer.plugin_base.preprocessor import PreprocessorPlugin
 
 # Set up logging
 logger = logging.getLogger(__name__)
 
 
-class BaseManager(ABC):
+class BaseSynchronizer(ABC):
     def __init__(
         self, cache_db: CacheDB, data_source_plugin_configs: Path, config_file: Path
     ):
@@ -146,10 +146,10 @@ class BaseManager(ABC):
 
             # Get the manager section (e.g., Assetman or Csafman)
             manager_section = None
-            if "Assetman" in config_data:
-                manager_section = config_data["Assetman"]
-            elif "Csafman" in config_data:
-                manager_section = config_data["Csafman"]
+            if "Assetsync" in config_data:
+                manager_section = config_data["Assetsync"]
+            elif "Csafsync" in config_data:
+                manager_section = config_data["Csafsync"]
 
             if not manager_section:
                 logger.warning(

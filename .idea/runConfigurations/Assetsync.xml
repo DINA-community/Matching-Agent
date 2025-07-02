@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Assetman" type="UvRunConfigurationType" factoryName="UvRunConfigurationType">
+  <configuration default="false" name="Assetsync" type="UvRunConfigurationType" factoryName="UvRunConfigurationType">
     <option name="args">
       <list />
     </option>
@@ -10,7 +10,7 @@
       </map>
     </option>
     <option name="runType" value="MODULE" />
-    <option name="scriptOrModule" value="dina.assetman.main" />
+    <option name="scriptOrModule" value="dina.assetsync.main" />
     <option name="uvArgs">
       <list />
     </option>

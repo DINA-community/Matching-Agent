@@ -3,7 +3,7 @@
 # The preprocessor plugins to use must be explicitly specified.
 # If no preprocessing is needed, use the default identity preprocessor.
 
-[Assetman]
+[Csafsync]
 # A list of preprocessor plugins. The order in which they are provided
 # here is the order in which they are executed on the data.
 preprocessor_plugins = ["identity"]

@@ -2,7 +2,7 @@ import asyncio
 from typing import List, Union
 
 from dina.cachedb.model import CsafDocument, Asset
-from dina.manager.base import DataSourcePlugin
+from dina.synchronizer.base import DataSourcePlugin
 
 
 class SampleDataSource(DataSourcePlugin):

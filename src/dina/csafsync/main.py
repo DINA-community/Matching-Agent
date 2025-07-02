@@ -3,7 +3,7 @@ from pathlib import Path
 
 from dina.cachedb.database import CacheDB
 from dina.common.logging import configure_logging, get_logger
-from dina.manager.base import BaseManager
+from dina.synchronizer.base import BaseSynchronizer
 
 # Configure logging
 configure_logging()
@@ -11,7 +11,7 @@ configure_logging()
 logger = get_logger(__name__)
 
 
-class CSAFManager(BaseManager):
+class CSAFSynchronizer(BaseSynchronizer):
     """
     CSAF Manager implementation.
 
@@ -24,7 +24,7 @@ class CSAFManager(BaseManager):
         """
         cache_db = CacheDB()
         super().__init__(
-            cache_db, Path("./assets/plugin_configs/"), Path("./assets/csafman.toml")
+            cache_db, Path("./assets/plugin_configs/"), Path("./assets/csafsync.toml")
         )
         # TODO: Initialize connections to asset databases and the cache database.
         # TODO: Find the appropriate transformer plugins.
@@ -33,7 +33,7 @@ class CSAFManager(BaseManager):
 async def run_csaf_manager():
     """Run the CSAF Manager."""
     # Create and initialize the CSAF Manager
-    csaf_manager = CSAFManager()
+    csaf_manager = CSAFSynchronizer()
 
     try:
         await csaf_manager.setup()

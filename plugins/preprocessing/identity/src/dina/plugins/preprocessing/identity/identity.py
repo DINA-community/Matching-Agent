@@ -1,7 +1,7 @@
 from typing import List, Union
 
 from dina.cachedb.model import Asset, CsafDocument
-from dina.manager.plugin_base.preprocessor import PreprocessorPlugin
+from dina.synchronizer.plugin_base.preprocessor import PreprocessorPlugin
 
 
 class IdentityPreprocessor(PreprocessorPlugin):

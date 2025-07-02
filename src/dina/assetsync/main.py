@@ -3,7 +3,7 @@ from pathlib import Path
 
 from dina.cachedb.database import CacheDB
 from dina.common.logging import configure_logging, get_logger
-from dina.manager.base import BaseManager
+from dina.synchronizer.base import BaseSynchronizer
 
 # Configure logging
 configure_logging()
@@ -11,7 +11,7 @@ configure_logging()
 logger = get_logger(__name__)
 
 
-class AssetManager(BaseManager):
+class AssetSynchronizer(BaseSynchronizer):
     """
     Asset Manager implementation.
 
@@ -24,7 +24,7 @@ class AssetManager(BaseManager):
         """
         cache_db = CacheDB()
         super().__init__(
-            cache_db, Path("./assets/plugin_configs/"), Path("./assets/assetman.toml")
+            cache_db, Path("./assets/plugin_configs/"), Path("./assets/assetsync.toml")
         )
         # TODO: Initialize connections to asset databases and the cache database.
         # TODO: Find the appropriate transformer plugins.
@@ -33,7 +33,7 @@ class AssetManager(BaseManager):
 async def run_asset_manager():
     """Run the Asset Manager."""
     # Create and initialize the Asset Manager
-    asset_manager = AssetManager()
+    asset_manager = AssetSynchronizer()
 
     try:
         await asset_manager.setup()
