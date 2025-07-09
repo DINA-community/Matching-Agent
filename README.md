@@ -1,21 +1,21 @@
 # Matching-Agent
 
-This repository contains a shared infrastructure for manager daemons that fetch, transform, and store data in a
-PostgreSQL database. It includes two concrete implementations:
+This repository contains a shared infrastructure for synchronizer daemons that fetch, transform, and store data in a
+PostgreSQL database as well as a csaf-asset matching daemon.
+It includes two concrete implementations:
 
-1. **Asset Manager (`assetman`)**: Fetches and processes asset data.
-2. **CSAF Manager (`csafman`)**: Fetches and processes CSAF (Common Security Advisory Framework) data.
+1. **Asset Synchronizer (`assetsync`)**: Fetches and processes asset data.
+2. **CSAF Synchronizer (`csafsync`)**: Fetches and processes CSAF (Common Security Advisory Framework) data.
 
 ## Project Structure
 
-- `src/manager/`: Shared infrastructure for manager daemons.
-- `src/assetman/`: Asset Manager implementation.
-- `src/csafman/`: CSAF Manager implementation.
-- `src/matcher/`: Main package.
+- `src/dina/synchronizer/`: Shared infrastructure for synchronizer daemons.
+- `src/dina/assetsync/`: Asset Synchronizer implementation.
+- `src/dina/csafsync/`: CSAF Synchronizer implementation.
+- `src/dina/matcher/`: Main package.
 - `plugins/`: Plugin implementations for extending functionality.
 
-For more details about the manager infrastructure, see
-the [Manager Infrastructure README](src/csaf_matcher/manager/README.md).
+For more details about the synchronizer infrastructure, see the Synchronizer Infrastructure README. (TODO)
 
 ## Getting Started
 
@@ -34,19 +34,19 @@ in Pycharm.
 For example, try running the following to start the matching agent.
 
 ```shell
-uv run matcher
+uv run csaf_matcher
 ```
 
-To run the Asset Manager:
+To run the Asset Synchronizer:
 
 ```shell
-uv run assetman
+uv run assetsync
 ```
 
-To run the CSAF Manager:
+To run the CSAF Synchronizer:
 
 ```shell
-uv run csafman
+uv run csafsync
 ```
 
 ### Setting up git pre-commit hooks
