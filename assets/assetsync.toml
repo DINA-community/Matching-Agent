@@ -13,5 +13,5 @@ preprocessor_plugins = ["identity"]
 host = "localhost"
 port = 5432
 database = "cachedb"
-username = "postgres"
-password = "postgres"
+username = "admin"
+password = "secret"
