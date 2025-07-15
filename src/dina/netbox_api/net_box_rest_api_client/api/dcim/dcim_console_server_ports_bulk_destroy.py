@@ -1,0 +1,126 @@
+from http import HTTPStatus
+from typing import Any, Optional, Union
+
+import httpx
+
+from ... import errors
+from ...client import AuthenticatedClient, Client
+from ...models.console_server_port_request import ConsoleServerPortRequest
+from ...types import Response
+
+
+def _get_kwargs(
+    *,
+    body: Union[
+        list["ConsoleServerPortRequest"],
+        list["ConsoleServerPortRequest"],
+    ],
+) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
+
+    _kwargs: dict[str, Any] = {
+        "method": "delete",
+        "url": "/api/dcim/console-server-ports/",
+    }
+
+    if isinstance(body, list["ConsoleServerPortRequest"]):
+        _json_body = []
+        for body_item_data in body:
+            body_item = body_item_data.to_dict()
+            _json_body.append(body_item)
+
+        _kwargs["json"] = _json_body
+        headers["Content-Type"] = "application/json"
+    if isinstance(body, list["ConsoleServerPortRequest"]):
+        _files_body = []
+        for body_item_data in body:
+            body_item = body_item_data.to_dict()
+            _files_body.append(body_item)
+
+        _kwargs["files"] = _files_body
+        headers["Content-Type"] = "multipart/form-data"
+
+    _kwargs["headers"] = headers
+    return _kwargs
+
+
+def _parse_response(*, client: Union[AuthenticatedClient, Client], response: httpx.Response) -> Optional[Any]:
+    if response.status_code == 204:
+        return None
+    if client.raise_on_unexpected_status:
+        raise errors.UnexpectedStatus(response.status_code, response.content)
+    else:
+        return None
+
+
+def _build_response(*, client: Union[AuthenticatedClient, Client], response: httpx.Response) -> Response[Any]:
+    return Response(
+        status_code=HTTPStatus(response.status_code),
+        content=response.content,
+        headers=response.headers,
+        parsed=_parse_response(client=client, response=response),
+    )
+
+
+def sync_detailed(
+    *,
+    client: AuthenticatedClient,
+    body: Union[
+        list["ConsoleServerPortRequest"],
+        list["ConsoleServerPortRequest"],
+    ],
+) -> Response[Any]:
+    """Delete a list of console server port objects.
+
+    Args:
+        body (list['ConsoleServerPortRequest']):
+        body (list['ConsoleServerPortRequest']):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Response[Any]
+    """
+
+    kwargs = _get_kwargs(
+        body=body,
+    )
+
+    response = client.get_httpx_client().request(
+        **kwargs,
+    )
+
+    return _build_response(client=client, response=response)
+
+
+async def asyncio_detailed(
+    *,
+    client: AuthenticatedClient,
+    body: Union[
+        list["ConsoleServerPortRequest"],
+        list["ConsoleServerPortRequest"],
+    ],
+) -> Response[Any]:
+    """Delete a list of console server port objects.
+
+    Args:
+        body (list['ConsoleServerPortRequest']):
+        body (list['ConsoleServerPortRequest']):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Response[Any]
+    """
+
+    kwargs = _get_kwargs(
+        body=body,
+    )
+
+    response = await client.get_async_httpx_client().request(**kwargs)
+
+    return _build_response(client=client, response=response)
