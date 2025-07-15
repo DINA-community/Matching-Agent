@@ -9,5 +9,5 @@ update_interval = 60
 
 [DataSource.Netbox]
 # Netbox-specific configuration
-api_url = "https://netbox.example.com/api"
-api_token = "abcdef123456"
+api_url = "http://172.16.15.61:8000"
+api_token = "11ff5d2484c3f34b3618e4de3156ce699298bc3f"
