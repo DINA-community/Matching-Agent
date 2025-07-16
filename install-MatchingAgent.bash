@@ -22,6 +22,6 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 cd /home
 
 echo "Installation MatchingAgent finished!"
-echo "rebotting now"
+echo "rebooting now"
 reboot
 
