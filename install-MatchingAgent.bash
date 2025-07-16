@@ -9,7 +9,7 @@
 #####################################################
 
 
-echo "Installation MacthingAgent starting..."
+echo "Installation MatchingAgent starting..."
 
 apt install -y postgresql
 systemctl start postgresql
