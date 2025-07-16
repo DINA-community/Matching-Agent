@@ -19,7 +19,17 @@ For more details about the synchronizer infrastructure, see the Synchronizer Inf
 
 ## Getting Started
 
+### Installation on Ubuntu
+
+```cd /home
+git clone -b feat/initial_structure https://github.com/DINA-community/Matching-Agent.git
+cd Matching-Agent
+./install-MatchingAgent.bash
+```
+### or any other way that suits you
 Install [uv](https://docs.astral.sh/uv/) in any way that suits you.
+
+### after installation
 
 Run in your terminal or inside pycharm (double tap `<Ctrl>` and enter the command)
 

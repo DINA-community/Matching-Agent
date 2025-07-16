@@ -15,6 +15,9 @@ dependencies = [
     "colorlog>=6.9.0",
     "hatchling>=1.27.0",
     "sqlalchemy[asyncio]>=2.0.0",
+    "openapi-python-client",
+    "httpx",
+    "python-dateutil",
 ]
 
 [project.optional-dependencies]
