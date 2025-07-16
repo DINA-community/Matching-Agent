@@ -15,7 +15,7 @@ apt install -y postgresql
 systemctl start postgresql
 systemctl enable postgresql
 
-sudo -i -u postgres psql -f ./initdb.sql
+sudo -i -u postgres psql -f /home/Matching-Agent/initdb.sql
 
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
