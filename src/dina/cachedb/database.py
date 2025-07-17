@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 from typing import List, Union, Optional
-
+import logging
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncEngine
 from sqlalchemy.sql.ddl import CreateSchema
 
 from dina.cachedb.model import Base, Asset, CsafDocument
-
+logger = logging.getLogger(__name__)
 
 class CacheDB:
     @dataclass
@@ -40,9 +40,10 @@ class CacheDB:
 
         :return: None
         """
-        async with AsyncSession(self.engine) as session:
-            async with session.begin():
-                session.add_all(data)
+        logger.info(f"DATA: {data}")
+#        async with AsyncSession(self.engine) as session:
+#            async with session.begin():
+#                session.add_all(data)
 
     async def disconnect(self) -> None:
         if self.engine is not None:

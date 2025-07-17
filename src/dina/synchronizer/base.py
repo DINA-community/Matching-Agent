@@ -262,9 +262,9 @@ class BaseSynchronizer(ABC):
         while True:
             if self.preprocessed_data:
                 logger.info(f"Storing {len(self.preprocessed_data)} items in cacheDB")
-                self.preprocessed_data.clear()
                 # TODO: Re-enable once the rest is stable enough
-                # await self.cache_db.store(data)
+                await self.cache_db.store(self.preprocessed_data)
+                self.preprocessed_data.clear()
             else:
                 await asyncio.sleep(0.1)
 
