@@ -28,6 +28,9 @@ datasource-sample = [
 preprocessor-identity = [
     "dina-plugins-preprocessing-identity",
 ]
+preprocessor-netbox = [
+    "dina-plugins-preprocessing-netbox",
+]
 
 [project.scripts]
 assetsync = "dina.assetsync.main:main"
@@ -47,12 +50,14 @@ members = [
     "plugins/asset_source/netbox",
     "plugins/asset_source/sample",
     "plugins/preprocessing/identity",
+    "plugins/preprocessing/netbox",
 ]
 
 [tool.uv.sources]
 "dina.plugins.datasource.netbox_fetcher" = { workspace = true }
 dina-plugins-datasource-sample = { workspace = true }
 dina-plugins-preprocessing-identity = { workspace = true }
+dina-plugins-preprocessing-netbox = { workspace = true }
 
 
 [dependency-groups]
