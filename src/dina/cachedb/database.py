@@ -41,9 +41,11 @@ class CacheDB:
         :return: None
         """
         logger.info(f"DATA: {data}")
-#        async with AsyncSession(self.engine) as session:
-#            async with session.begin():
-#                session.add_all(data)
+        async with AsyncSession(self.engine) as session:
+            async with session.begin():
+                session.add_all(data)
+                session.commit()
+                session.close()
 
     async def disconnect(self) -> None:
         if self.engine is not None:
