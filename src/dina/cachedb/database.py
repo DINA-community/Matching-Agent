@@ -44,8 +44,8 @@ class CacheDB:
         async with AsyncSession(self.engine) as session:
             async with session.begin():
                 session.add_all(data)
-                session.commit()
-                session.close()
+                await session.commit()
+                await session.close()
 
     async def disconnect(self) -> None:
         if self.engine is not None:

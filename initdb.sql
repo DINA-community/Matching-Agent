@@ -1,4 +1,4 @@
 
 CREATE DATABASE cachedb;
-CREATE USER admin WITH PASSWORD 'secret';
-ALTER DATABASE cachedb OWNER TO admin;
+CREATE USER analyst WITH PASSWORD 'secret';
+ALTER DATABASE cachedb OWNER TO analyst;
