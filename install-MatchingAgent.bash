@@ -11,6 +11,8 @@
 
 echo "Installation MatchingAgent starting..."
 
+git config user.email "root@assetmanager.bsi.corp"
+
 apt install -y postgresql
 systemctl start postgresql
 systemctl enable postgresql
