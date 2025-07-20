@@ -2,7 +2,10 @@ import asyncio
 from typing import List, Union
 
 from dina.cachedb.model import CsafDocument, Asset
+from dina.common import logging
 from dina.synchronizer.base import DataSourcePlugin
+
+logger = logging.get_logger(__name__)
 
 
 class SampleDataSource(DataSourcePlugin):
@@ -26,6 +29,7 @@ class SampleDataSource(DataSourcePlugin):
         # This is where you would connect to your data source and retrieve data
 
         # Example: Simulate fetching data with a delay
+        logger.trace("SampleDataSource: Fetching data from data source")
         await asyncio.sleep(1)
 
         # Return a list of Asset or CsafDocument objects

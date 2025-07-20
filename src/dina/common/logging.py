@@ -12,6 +12,17 @@ def configure_logging():
     from the LOG_LEVEL environment variable (defaults to INFO if not set).
     """
     # Get log level from environment variable, default to INFO
+    TRACE_LEVEL = 5
+    logging.addLevelName(TRACE_LEVEL, "TRACE")
+    logging.TRACE = TRACE_LEVEL
+
+    # Add trace method to all loggers
+    def trace(self, message, *args, **kwargs):
+        if self.isEnabledFor(TRACE_LEVEL):
+            self._log(TRACE_LEVEL, message, args, **kwargs)
+
+    logging.Logger.trace = trace
+
     log_level = os.getenv("LOG_LEVEL", "INFO").upper()
 
     # Configure logging with colors
