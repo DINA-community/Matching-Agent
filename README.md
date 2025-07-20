@@ -19,19 +19,33 @@ For more details about the synchronizer infrastructure, see the Synchronizer Inf
 
 ## Getting Started
 
+### Setting up git pre-commit hooks
+
+Before commiting anything, make sure you have set up your git pre-commit hooks correctly.
+To do so, simply run the following:
+
+```shell
+uv run pre-commit install
+```
+
 ### Installation on Ubuntu
 
+Clone the repository.
 ```cd /home
 git clone -b feat/initial_structure https://github.com/DINA-community/Matching-Agent.git
 cd Matching-Agent
-./install-MatchingAgent.bash
 ```
-### or any other way that suits you
-Install [uv](https://docs.astral.sh/uv/) in any way that suits you.
+
+Install [uv](https://docs.astral.sh/uv/), docker and docker compose in any way that suits you.
 
 ### after installation
+Create the development database:
 
-Run in your terminal or inside pycharm (double tap `<Ctrl>` and enter the command)
+```shell
+docker compose -f dev/docker-compose.yml up -d
+```
+
+Install the dependencies with uv by running in your terminal or inside pycharm (double tap `<Ctrl>` and enter the command)
 
 ```shell
 uv sync --all-extras
@@ -57,13 +71,4 @@ To run the CSAF Synchronizer:
 
 ```shell
 uv run csafsync
-```
-
-### Setting up git pre-commit hooks
-
-Before commiting anything, make sure you have set up your git pre-commit hooks correctly.
-To do so, simply run the following:
-
-```shell
-uv run pre-commit install
 ```

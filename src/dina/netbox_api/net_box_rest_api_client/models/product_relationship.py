@@ -39,7 +39,7 @@ class ProductRelationship:
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def method1(self):
-        print ("HALLO productrelationship")
+        print("HALLO productrelationship")
 
     def to_dict(self) -> dict[str, Any]:
         id = self.id

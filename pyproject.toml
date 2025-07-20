@@ -59,6 +59,9 @@ dina-plugins-datasource-sample = { workspace = true }
 dina-plugins-preprocessing-identity = { workspace = true }
 dina-plugins-preprocessing-netbox = { workspace = true }
 
+[tool.ruff]
+exclude = ["src/dina/netbox_api"]
+
 
 [dependency-groups]
 dev = [

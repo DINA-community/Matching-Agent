@@ -11,7 +11,7 @@ preprocessor_plugins = ["netbox"]
 
 [Cachedb]
 host = "localhost"
-port = 5432
+port = 2345
 database = "cachedb"
 username = "admin"
 password = "secret"

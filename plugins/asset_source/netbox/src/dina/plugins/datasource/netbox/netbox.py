@@ -7,31 +7,12 @@ from dina.synchronizer.plugin_base.data_source import DataSourcePlugin
 
 from dina.netbox_api.net_box_rest_api_client.client import Client
 from dina.netbox_api.net_box_rest_api_client.types import Response
-import json
 
-from dina.netbox_api.net_box_rest_api_client.models import device
-from dina.netbox_api.net_box_rest_api_client.models import device_type
-from dina.netbox_api.net_box_rest_api_client.models import interface
-from dina.netbox_api.net_box_rest_api_client.models import ip_address
-from dina.netbox_api.net_box_rest_api_client.models import manufacturer
-from dina.netbox_api.net_box_rest_api_client.models import software
-from dina.netbox_api.net_box_rest_api_client.models import x_generic_uri
-from dina.netbox_api.net_box_rest_api_client.models import hash_
-from dina.netbox_api.net_box_rest_api_client.models import file_hash
-from dina.netbox_api.net_box_rest_api_client.models import product_relationship
 
-from dina.netbox_api.net_box_rest_api_client.api.dcim import dcim_devices_list
-from dina.netbox_api.net_box_rest_api_client.api.dcim import dcim_device_types_list
-from dina.netbox_api.net_box_rest_api_client.api.dcim import dcim_interfaces_list
 from dina.netbox_api.net_box_rest_api_client.api.dcim import dcim_manufacturers_list
-from dina.netbox_api.net_box_rest_api_client.api.ipam import ipam_ip_addresses_list
-from dina.netbox_api.net_box_rest_api_client.api.plugins import plugins_d3c_software_list_list
-from dina.netbox_api.net_box_rest_api_client.api.plugins import plugins_d3c_xgenericuri_list_list
-from dina.netbox_api.net_box_rest_api_client.api.plugins import plugins_d3c_hash_list_list
-from dina.netbox_api.net_box_rest_api_client.api.plugins import plugins_d3c_filehash_list_list
-from dina.netbox_api.net_box_rest_api_client.api.plugins import plugins_d3c_productrelationship_list_list
 
 logger = logging.getLogger(__name__)
+
 
 class NetboxDataSource(DataSourcePlugin):
     def __init__(self, config=None):
@@ -43,7 +24,8 @@ class NetboxDataSource(DataSourcePlugin):
             self.api_token = netbox["api_token"]
             self.client = Client(
                 base_url=self.api_url,
-                headers={"Authorization": f"Token {self.api_token}"})
+                headers={"Authorization": f"Token {self.api_token}"},
+            )
         except KeyError:
             raise KeyError("Missing Netbox configuration parameter")
         logger.debug(f"Initialized NetboxDataSource with API URL: {self.api_url}")
@@ -52,7 +34,7 @@ class NetboxDataSource(DataSourcePlugin):
         # In a real implementation, this would use the API URL and token to fetch data
         self.response: Response = dcim_manufacturers_list.sync(client=self.client)
         self.results = self.response.results
-        #logger.info(f"DATA: {self.results}")
+        # logger.info(f"DATA: {self.results}")
         await asyncio.sleep(1)
         return [self.results]
 

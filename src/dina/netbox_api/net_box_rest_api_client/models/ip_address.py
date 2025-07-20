@@ -395,7 +395,7 @@ class IPAddress:
             vrf=vrf,
             tenant=tenant,
             status=status,
-#            role=role,
+            #            role=role,
             assigned_object_type=assigned_object_type,
             assigned_object_id=assigned_object_id,
             nat_inside=nat_inside,

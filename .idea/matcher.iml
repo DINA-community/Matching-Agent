@@ -6,6 +6,7 @@
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/plugins/asset_source/sample/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/plugins/preprocessing/identity/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/plugins/preprocessing/netbox/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/dist" />
       <excludeFolder url="file://$MODULE_DIR$/matcher.egg-info" />

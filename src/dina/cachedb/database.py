@@ -3,9 +3,8 @@ from typing import List, Union, Optional
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncEngine
 from sqlalchemy.sql.ddl import CreateSchema
-from sqlalchemy import select
 
-from dina.cachedb.model import Base, Asset, CsafDocument, Manufacturer
+from dina.cachedb.model import Base, Asset, CsafDocument
 
 logger = logging.getLogger(__name__)
 
@@ -45,20 +44,15 @@ class CacheDB:
         """
         logger.info(f"DATA: {data}")
         async with AsyncSession(self.engine) as session:
-            """
-            for asset in data:
-                asset.create_or_update(session)
-            """
             async with session.begin():
-                #                session.add_all(data)
-                await session.commit()
+                session.add_all(data)
 
-        async with AsyncSession(self.engine) as session:
-            async with session.begin():
-                test = await session.execute(select(Manufacturer))
-                vendors = test.scalars().all()
-                logger.info(f"VENDOR:  {vendors}")
-                await session.close()
+        # async with AsyncSession(self.engine) as session:
+        #     async with session.begin():
+        #         test = await session.execute(select(Manufacturer))
+        #         vendors = test.scalars().all()
+        #         logger.info(f"VENDOR:  {vendors}")
+        #         await session.close()
 
     async def disconnect(self) -> None:
         if self.engine is not None:

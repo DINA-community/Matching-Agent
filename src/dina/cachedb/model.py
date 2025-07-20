@@ -143,7 +143,9 @@ class CsafProductTree(Base):
     __tablename__ = "csaf_product_tree"
 
     id: Mapped[str] = mapped_column(primary_key=True)
-    csaf_document_id: Mapped[int] = mapped_column(ForeignKey("cacheDB.csaf_document.id"))
+    csaf_document_id: Mapped[int] = mapped_column(
+        ForeignKey("cacheDB.csaf_document.id")
+    )
     csaf_product_id: Mapped[int] = mapped_column(ForeignKey("cacheDB.csaf_product.id"))
 
     csaf_document: Mapped["CsafDocument"] = relationship(
