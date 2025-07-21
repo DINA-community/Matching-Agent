@@ -18,6 +18,8 @@ dependencies = [
     "openapi-python-client",
     "httpx",
     "python-dateutil",
+    "ruff>=0.12.0",
+    "mypy>=1.16.1",
 ]
 
 [project.optional-dependencies]
