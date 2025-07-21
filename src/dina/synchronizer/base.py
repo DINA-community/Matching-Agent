@@ -11,7 +11,7 @@ import asyncio
 import logging
 import tomllib
 from abc import ABC
-from importlib.metadata import entry_points
+from importlib.metadata import entry_points, EntryPoints
 from pathlib import Path
 from typing import List, Union
 
@@ -22,6 +22,54 @@ from dina.synchronizer.plugin_base.preprocessor import PreprocessorPlugin
 
 # Set up logging
 logger = logging.getLogger(__name__)
+
+
+class SynchronizerConfig:
+    @property
+    def cachedb_config(self) -> CacheDB.Config:
+        return self.__cachedb_config
+
+    @property
+    def preprocessor_plugin_names(self) -> List[str]:
+        return self.__preprocessor_plugin_names
+
+    def __init__(self, config: dict):
+        self.__raw_config: dict = config
+        # Parse the configuration file
+
+        # Get the manager section (e.g., Assetman or Csafman)
+        manager_section = None
+        if "Assetsync" in self.__raw_config:
+            manager_section = self.__raw_config["Assetsync"]
+        elif "Csafsync" in self.__raw_config:
+            manager_section = self.__raw_config["Csafsync"]
+
+        if not manager_section:
+            logger.warning(
+                f"No manager section found in configuration file: {self.config_file}"
+            )
+            raise KeyError("Missing manager section in configuration file")
+
+        # Get the list of preprocessor plugins
+        self.__preprocessor_plugin_names = manager_section.get(
+            "preprocessor_plugins", None
+        )
+        if self.__preprocessor_plugin_names is None:
+            logger.info("No preprocessor plugins specified in configuration")
+            raise KeyError("Missing preprocessor_plugins in configuration")
+
+        cachedb_config = self.__raw_config.get("Cachedb", None)
+        if cachedb_config is None:
+            logger.info("No CacheDB section specified in configuration")
+            raise KeyError("Missing Cachedb section in configuration")
+
+        self.__cachedb_config = CacheDB.Config(
+            host=cachedb_config["host"],
+            port=cachedb_config["port"],
+            database=cachedb_config["database"],
+            user=cachedb_config["username"],
+            password=cachedb_config["password"],
+        )
 
 
 class BaseSynchronizer(ABC):
@@ -39,15 +87,22 @@ class BaseSynchronizer(ABC):
         self.pending_data: List[Union[Asset, CsafDocument]] = []
         self.preprocessed_data: List[Union[Asset, CsafDocument]] = []
         self.config_file: Path = config_file
-        self.config_data: dict = {}
-        self.load_config(config_file)
+        self.config: SynchronizerConfig = self.load_config(config_file)
 
         self.data_sources: List[DataSourcePlugin] = self.load_plugins(
             data_source_plugin_configs
         )
 
         self.preprocessor_plugins: List[PreprocessorPlugin] = []
-        self.load_preprocessor_plugins()
+        self.load_preprocessor_plugins(self.config.preprocessor_plugin_names)
+
+    @staticmethod
+    def get_installed_plugins() -> EntryPoints:
+        installed_plugins = entry_points(group="dina.plugins.datasource")
+        logger.info(f"Found {len(installed_plugins)} installed plugins:")
+        for installed_plugin in installed_plugins:
+            logger.info(f" - {installed_plugin.group}.{installed_plugin.name}")
+        return installed_plugins
 
     @staticmethod
     def load_plugins(plugin_configs: Path) -> List[DataSourcePlugin]:
@@ -73,10 +128,7 @@ class BaseSynchronizer(ABC):
 
         plugins: List[DataSourcePlugin] = []
 
-        installed_plugins = entry_points(group="dina.plugins.datasource")
-        logger.info(f"Found {len(installed_plugins)} installed plugins:")
-        for installed_plugin in installed_plugins:
-            logger.info(f" - {installed_plugin.group}.{installed_plugin.name}")
+        installed_plugins = BaseSynchronizer.get_installed_plugins()
 
         # Scan the directory for TOML files
         for config_file in plugin_configs.glob("*.toml"):
@@ -124,14 +176,15 @@ class BaseSynchronizer(ABC):
 
         return plugins
 
-    def load_config(self, config_file: Path):
+    @staticmethod
+    def load_config(config_file: Path) -> SynchronizerConfig:
         if not config_file.exists():
             raise FileNotFoundError(f"Configuration file not found: {config_file}")
 
         with open(config_file, "rb") as f:
-            self.config_data = tomllib.load(f)
+            return SynchronizerConfig(tomllib.load(f))
 
-    def load_preprocessor_plugins(self):
+    def load_preprocessor_plugins(self, preprocessor_plugin_names: List[str]):
         """
         Load preprocessor plugins specified in the configuration file.
 
@@ -142,27 +195,6 @@ class BaseSynchronizer(ABC):
         # TODO: Refactor this into configuration loading and plugin loading
         #       Also consolidate the plugin loading parts to de-duplicate code
         try:
-            # Parse the configuration file
-
-            # Get the manager section (e.g., Assetman or Csafman)
-            manager_section = None
-            if "Assetsync" in self.config_data:
-                manager_section = self.config_data["Assetsync"]
-            elif "Csafsync" in self.config_data:
-                manager_section = self.config_data["Csafsync"]
-
-            if not manager_section:
-                logger.warning(
-                    f"No manager section found in configuration file: {self.config_file}"
-                )
-                return
-
-            # Get the list of preprocessor plugins
-            preprocessor_plugin_names = manager_section.get("preprocessor_plugins", [])
-            if not preprocessor_plugin_names:
-                logger.info("No preprocessor plugins specified in configuration")
-                return
-
             # Load the preprocessor plugins
             installed_plugins = entry_points(group="dina.plugins.preprocessing")
             logger.info(
@@ -209,15 +241,7 @@ class BaseSynchronizer(ABC):
             raise
 
     async def setup(self):
-        cachedb = self.config_data["Cachedb"]
-        config = CacheDB.Config(
-            host=cachedb["host"],
-            port=cachedb["port"],
-            database=cachedb["database"],
-            user=cachedb["username"],
-            password=cachedb["password"],
-        )
-        await self.cache_db.connect(config)
+        await self.cache_db.connect(self.config.cachedb_config)
 
     async def run(self):
         """Run the manager."""
