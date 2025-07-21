@@ -60,7 +60,7 @@ dina-plugins-preprocessing-identity = { workspace = true }
 dina-plugins-preprocessing-netbox = { workspace = true }
 
 [tool.ruff]
-exclude = ["src/dina/netbox_api"]
+exclude = ["plugins/asset_source/netbox/src/dina/plugins/datasource/netbox/api_client"]
 
 
 [dependency-groups]

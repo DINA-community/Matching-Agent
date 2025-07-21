@@ -4,12 +4,8 @@ from typing import List
 from dina.cachedb.model import Asset
 from dina.common import logging
 from dina.synchronizer.plugin_base.data_source import DataSourcePlugin
-
-from dina.netbox_api.net_box_rest_api_client.client import Client
-from dina.netbox_api.net_box_rest_api_client.types import Response
-
-
-from dina.netbox_api.net_box_rest_api_client.api.dcim import dcim_manufacturers_list
+from .api_client import Client  # type: ignore
+from .api_client.api.dcim import dcim_manufacturers_list  # type: ignore
 
 logger = logging.get_logger(__name__)
 
@@ -32,13 +28,11 @@ class NetboxDataSource(DataSourcePlugin):
 
     async def fetch_data(self) -> List[Asset]:
         # In a real implementation, this would use the API URL and token to fetch data
-        self.response: Response = await dcim_manufacturers_list.asyncio(
-            client=self.client
-        )
-        self.results = self.response.results
+        response = await dcim_manufacturers_list.asyncio(client=self.client)
+        results = response.results
         # logger.info(f"DATA: {self.results}")
         await asyncio.sleep(1)
-        return [self.results]
+        return [results]
 
     def endpoint_info(self) -> str:
         return f"{self.api_url}"

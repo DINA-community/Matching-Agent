@@ -5,7 +5,7 @@ repos:
   hooks:
     # Run the linter.
     - id: ruff-check
-      exclude: src/dina/netbox_api
+      exclude: plugins/asset_source/netbox/src/dina/plugins/datasource/netbox/api_client
     # Run the formatter.
     - id: ruff-format
-      exclude: src/dina/netbox_api
+      exclude: plugins/asset_source/netbox/src/dina/plugins/datasource/netbox/api_client
