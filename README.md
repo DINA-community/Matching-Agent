@@ -53,6 +53,12 @@ To do so, simply run the following:
 uv run pre-commit install
 ```
 
+To manually run the pre-commit hooks (in case you want to check without commiting), run the following:
+
+```shell
+uv run pre-commit run --all-files
+```
+
 
 ### Running the application
 Targets can be run by typing `uv run <TARGET_NAME>` or by selecting it in the run configurations menu
