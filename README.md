@@ -19,15 +19,6 @@ For more details about the synchronizer infrastructure, see the Synchronizer Inf
 
 ## Getting Started
 
-### Setting up git pre-commit hooks
-
-Before commiting anything, make sure you have set up your git pre-commit hooks correctly.
-To do so, simply run the following:
-
-```shell
-uv run pre-commit install
-```
-
 ### Installation on Ubuntu
 
 Clone the repository.
@@ -53,7 +44,18 @@ uv sync --all-extras
 
 to set up the local dev environment.
 
-Afterwards any target can be run by typing `uv run <TARGET_NAME>` or by selecting it in the run configurations menu
+### Setting up git pre-commit hooks
+
+Before commiting anything, make sure you have set up your git pre-commit hooks correctly.
+To do so, simply run the following:
+
+```shell
+uv run pre-commit install
+```
+
+
+### Running the application
+Targets can be run by typing `uv run <TARGET_NAME>` or by selecting it in the run configurations menu
 in Pycharm.
 For example, try running the following to start the matching agent.
 
