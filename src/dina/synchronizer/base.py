@@ -72,6 +72,10 @@ class SynchronizerConfig:
         )
 
 
+class PluginLoadError(Exception):
+    pass
+
+
 class BaseSynchronizer(ABC):
     def __init__(
         self, cache_db: CacheDB, data_source_plugin_configs: Path, config_file: Path
@@ -89,23 +93,72 @@ class BaseSynchronizer(ABC):
         self.config_file: Path = config_file
         self.config: SynchronizerConfig = self.load_config(config_file)
 
-        self.data_sources: List[DataSourcePlugin] = self.load_plugins(
+        self.data_sources: List[DataSourcePlugin] = self.__load_datasource_plugins(
             data_source_plugin_configs
         )
-
-        self.preprocessor_plugins: List[PreprocessorPlugin] = []
-        self.load_preprocessor_plugins(self.config.preprocessor_plugin_names)
+        self.preprocessor_plugins = self.__load_preprocessor_plugins(
+            self.config.preprocessor_plugin_names
+        )
 
     @staticmethod
-    def get_installed_plugins() -> EntryPoints:
-        installed_plugins = entry_points(group="dina.plugins.datasource")
-        logger.info(f"Found {len(installed_plugins)} installed plugins:")
+    def get_installed_plugins(group: str) -> EntryPoints:
+        installed_plugins = entry_points(group=group)
+        logger.debug(f"Found {len(installed_plugins)} installed plugins:")
         for installed_plugin in installed_plugins:
-            logger.info(f" - {installed_plugin.group}.{installed_plugin.name}")
+            logger.debug(f" - {installed_plugin.group}.{installed_plugin.name}")
         return installed_plugins
 
     @staticmethod
-    def load_plugins(plugin_configs: Path) -> List[DataSourcePlugin]:
+    def _load_plugin_from_entrypoint(
+        plugin_name: str, entry_points_group: str, config_data: dict
+    ) -> Union[DataSourcePlugin, PreprocessorPlugin]:
+        """
+        Load a single plugin from entry points.
+
+        Args:
+            plugin_name: Name of the plugin to load
+            entry_points_group: Entry points group to search in
+            config_data: Configuration data for the plugin
+
+        Returns:
+            Loaded plugin instance or None if loading failed
+        """
+        installed_plugins = BaseSynchronizer.get_installed_plugins(entry_points_group)
+
+        try:
+            epoints = installed_plugins.select(name=plugin_name)
+            if not epoints:
+                raise PluginLoadError(f"No module called {plugin_name} found")
+
+            if len(epoints) > 1:
+                raise PluginLoadError(
+                    f"Too many entrypoints for plugin {plugin_name} found: {epoints}"
+                )
+
+            loaded_plugin = [plugin.load() for plugin in epoints][0]
+
+            # Initialize plugin with or without config
+            if config_data:
+                plugin_instance = loaded_plugin(config=config_data)
+            else:
+                plugin_instance = loaded_plugin()
+
+            logger.info(f"Successfully loaded plugin: {plugin_name}")
+            return plugin_instance
+
+        except Exception as e:
+            raise PluginLoadError(f"Error loading plugin {plugin_name}: {e}")
+
+    @staticmethod
+    def load_config(config_file: Path) -> SynchronizerConfig:
+        if not config_file.exists():
+            raise FileNotFoundError(f"Configuration file not found: {config_file}")
+
+        with open(config_file, "rb") as f:
+            return SynchronizerConfig(tomllib.load(f))
+
+    @staticmethod
+    def __load_datasource_plugins(plugin_configs: Path) -> List[DataSourcePlugin]:
         """
         Load plugins from configuration files in the specified directory.
 
@@ -128,44 +181,30 @@ class BaseSynchronizer(ABC):
 
         plugins: List[DataSourcePlugin] = []
 
-        installed_plugins = BaseSynchronizer.get_installed_plugins()
-
         # Scan the directory for TOML files
         for config_file in plugin_configs.glob("*.toml"):
             try:
                 # Parse the TOML file
                 with open(config_file, "rb") as f:
                     config_data = tomllib.load(f)
-
                 data_source = config_data["DataSource"]
                 # Extract plugin information
                 plugin_name = data_source.get("plugin_name")
-
                 if not plugin_name:
                     logger.error(
                         f"Missing required fields in plugin configuration: {config_file}"
                     )
                     continue
 
-                # Import the plugin module
-                try:
-                    epoints = installed_plugins.select(name=plugin_name)
-                    if not epoints:
-                        raise ModuleNotFoundError(
-                            f"No module called {plugin_name} found"
-                        )
-                    if len(epoints) > 1:
-                        raise ValueError(
-                            f"Too many entrypoints for plugin {plugin_name} found: {epoints}"
-                        )
-                    loaded_plugin = [plugin.load() for plugin in epoints][0]
-                except KeyError as e:
-                    logger.error(f"Failed to import plugin module '{plugin_name}': {e}")
-                    continue
-
-                # Initialize the plugin with the configuration
-                plugin_instance = loaded_plugin(config=config_data)
-                plugins.append(plugin_instance)
+                plugin_instance = BaseSynchronizer._load_plugin_from_entrypoint(
+                    plugin_name, "dina.plugins.datasource", config_data
+                )
+                if isinstance(plugin_instance, PreprocessorPlugin):
+                    raise ValueError(
+                        f"Plugin {plugin_name} is a preprocessor plugin, not a data source plugin"
+                    )
+                else:
+                    plugins.append(plugin_instance)
 
                 logger.info(
                     f"Successfully loaded plugin: {plugin_name} with config: {config_file}"
@@ -177,68 +216,36 @@ class BaseSynchronizer(ABC):
         return plugins
 
     @staticmethod
-    def load_config(config_file: Path) -> SynchronizerConfig:
-        if not config_file.exists():
-            raise FileNotFoundError(f"Configuration file not found: {config_file}")
-
-        with open(config_file, "rb") as f:
-            return SynchronizerConfig(tomllib.load(f))
-
-    def load_preprocessor_plugins(self, preprocessor_plugin_names: List[str]):
+    def __load_preprocessor_plugins(
+        preprocessor_plugin_names: List[str],
+    ) -> List[PreprocessorPlugin]:
         """
         Load preprocessor plugins specified in the configuration file.
-
         Raises:
             KeyError: If the configuration file is missing required fields.
         """
-
-        # TODO: Refactor this into configuration loading and plugin loading
-        #       Also consolidate the plugin loading parts to de-duplicate code
+        preprocessor_plugins: List[PreprocessorPlugin] = []
         try:
-            # Load the preprocessor plugins
-            installed_plugins = entry_points(group="dina.plugins.preprocessing")
-            logger.info(
-                f"Found {len(installed_plugins)} installed preprocessor plugins:"
-            )
-            for installed_plugin in installed_plugins:
-                logger.info(f" - {installed_plugin.group}.{installed_plugin.name}")
-
-            if not installed_plugins:
-                raise ValueError(
-                    "No preprocessor plugins found. At least one plugin is required."
-                )
+            if not preprocessor_plugin_names:
+                logger.warning("No preprocessor plugins specified in configuration")
+                raise KeyError("Missing preprocessor_plugins in configuration")
 
             for plugin_name in preprocessor_plugin_names:
-                try:
-                    epoints = installed_plugins.select(name=plugin_name)
-                    if not epoints:
-                        logger.warning(
-                            f"No preprocessor plugin called {plugin_name} found"
-                        )
-                        continue
-                    if len(epoints) > 1:
-                        logger.warning(
-                            f"Too many entrypoints for preprocessor plugin {plugin_name} found: {epoints}"
-                        )
-                        continue
+                plugin_instance = BaseSynchronizer._load_plugin_from_entrypoint(
+                    plugin_name, "dina.plugins.preprocessing", {}
+                )
 
-                    loaded_plugin = [plugin.load() for plugin in epoints][0]
-                    plugin_instance = loaded_plugin()
-                    self.preprocessor_plugins.append(plugin_instance)
-
-                    logger.info(
-                        f"Successfully loaded preprocessor plugin: {plugin_name}"
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"Error loading preprocessor plugin {plugin_name}: {e}"
+                if plugin_instance and isinstance(plugin_instance, PreprocessorPlugin):
+                    preprocessor_plugins.append(plugin_instance)
+                else:
+                    raise ValueError(
+                        f"Plugin {plugin_name} is not a preprocessor plugin"
                     )
 
         except Exception as e:
-            logger.error(
-                f"Error loading preprocessor plugins from {self.config_file}: {e}"
-            )
+            logger.error(f"Error loading preprocessor plugins: {e}")
             raise
+        return preprocessor_plugins
 
     async def setup(self):
         await self.cache_db.connect(self.config.cachedb_config)
