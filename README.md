@@ -59,6 +59,12 @@ To manually run the pre-commit hooks (in case you want to check without commitin
 uv run pre-commit run --all-files
 ```
 
+If you want to run the linter manually, run the following:
+
+```shell
+uv run ruff check
+```
+
 
 ### Running the application
 Targets can be run by typing `uv run <TARGET_NAME>` or by selecting it in the run configurations menu
