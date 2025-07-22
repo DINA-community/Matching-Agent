@@ -43,20 +43,12 @@ class CacheDB:
 
         :return: None
         """
-        logger.info(f"DATA: {data}")
         async with AsyncSession(self.engine) as session:
             async with session.begin():
                 for asset in data:
                     logger.info(f"DATA: {asset}")
                     await asset.create_or_update(session)
                 await session.commit()
-                await session.close()
-
-        async with AsyncSession(self.engine) as session:
-            async with session.begin():
-                test = await session.execute(select(Manufacturer))
-                vendors = test.scalars().all()
-                logger.info(f"VENDORS: {vendors}")
                 await session.close()
 
     async def disconnect(self) -> None:

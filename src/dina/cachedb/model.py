@@ -27,7 +27,6 @@ class Manufacturer(Base):
 
     async def create_or_update(self, session) -> None:
         logger.info(f"CREATE-OR-UPDATE: {self.name}")
-
         stmt = select(Manufacturer).where(Manufacturer.nb_id == self.nb_id)
         result = await session.execute(stmt)
         obj = result.scalar_one_or_none()
@@ -36,9 +35,8 @@ class Manufacturer(Base):
             if (obj.name != self.name):
                 setattr(obj, "name", self.name)
         else:
-            logger.info(f"TO BE CREATED: {obj}")
+            logger.info(f"CREATE")
             session.add(self)
-
         return obj
 
 
