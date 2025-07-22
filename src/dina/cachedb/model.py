@@ -45,6 +45,9 @@ class DeviceType(Base):
     __tablename__ = "device_type"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    nb_id: Mapped[int] = mapped_column(Integer)
+    nb_manu_id: Mapped[int] = mapped_column(Integer)
+    model: Mapped[str] = mapped_column(Text)
     model_number: Mapped[str] = mapped_column(Text)
     part_number: Mapped[str | None] = mapped_column(Text)
     device_family: Mapped[str | None] = mapped_column(Text)
@@ -58,11 +61,49 @@ class DeviceType(Base):
     manufacturer: Mapped["Manufacturer"] = relationship(back_populates="device_types")
     devices: Mapped[List["Device"]] = relationship(back_populates="device_type")
 
+    async def create_or_update(self, session) -> None:
+
+        async def find_manufacturer_key(nb_key):
+            stmt = select(Manufacturer).where(Manufacturer.nb_id == nb_key)
+            result = await session.execute(stmt)
+            obj = result.scalar_one_or_none()
+            if obj:
+                return(obj.id)
+            else:
+                return(None)
+
+        logger.info(f"CREATE-OR-UPDATE: {self.model_number}")
+        stmt = select(DeviceType).where(DeviceType.nb_id == self.nb_id)
+        result = await session.execute(stmt)
+        obj = result.scalar_one_or_none()
+        manu_id = await find_manufacturer_key(self.nb_manu_id)
+        if obj:
+            logger.info(f"FOUND: {obj.nb_id} {obj.model_number}")
+            if obj.model_number != self.model_number:
+                setattr(obj, "model_number", self.model_number)
+            if obj.part_number != self.part_number:
+                setattr(obj, "part_number", self.part_number)
+            if obj.device_family != self.device_family:
+                setattr(obj, "device_family", self.device_family)
+            if obj.cpe != self.cpe:
+                setattr(obj, "cpe", self.cpe)
+            if obj.hardware_version != self.hardware_version:
+                setattr(obj, "hardware_version", self.hardware_version)
+            if obj.hardware_name != self.hardware_name:
+                setattr(obj, "hardware_name", self.hardware_name)
+            if obj.manufacturer_id != manu_id:
+                setattr(obj, "manufacturer_id", manu_id)
+        else:
+            logger.info("CREATE")
+            self.manufacturer_id = manu_id
+            session.add(self)
+        return obj
 
 class Software(Base):
     __tablename__ = "software"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    nb_id: Mapped[int] = mapped_column(Integer)
     name: Mapped[str] = mapped_column(Text)
     version: Mapped[str | None] = mapped_column(Text)
     cpe: Mapped[str | None] = mapped_column(Text)
@@ -82,6 +123,7 @@ class Device(Base):
     __tablename__ = "device"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    nb_id: Mapped[int] = mapped_column(Integer)
     name: Mapped[str | None] = mapped_column(Text)
     serial: Mapped[str | None] = mapped_column(Text)
     device_type_id: Mapped[int | None] = mapped_column(
@@ -109,6 +151,7 @@ class File(Base):
     __tablename__ = "file"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    nb_id: Mapped[int] = mapped_column(Integer)
     filename: Mapped[str]
     software_id: Mapped[int] = mapped_column(ForeignKey("cacheDB.software.id"))
 
@@ -120,6 +163,7 @@ class Hash(Base):
     __tablename__ = "hash"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    nb_id: Mapped[int] = mapped_column(Integer)
     algorithm: Mapped[str] = mapped_column(Text)
     value: Mapped[str] = mapped_column(Text)
     file_id: Mapped[int] = mapped_column(ForeignKey("cacheDB.file.id"))
