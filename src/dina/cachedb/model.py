@@ -124,6 +124,7 @@ class Device(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     nb_id: Mapped[int] = mapped_column(Integer)
+    nb_devicetype_id: Mapped[int] = mapped_column(Integer)
     name: Mapped[str | None] = mapped_column(Text)
     serial: Mapped[str | None] = mapped_column(Text)
     device_type_id: Mapped[int | None] = mapped_column(
@@ -134,6 +135,35 @@ class Device(Base):
     assets: Mapped[List["Asset"]] = relationship(back_populates="device")
     csaf_products: Mapped[List["CsafProduct"]] = relationship(back_populates="device")
 
+    async def create_or_update(self, session) -> None:
+
+        async def find_devicetype_key(nb_key):
+            stmt = select(DeviceType).where(DeviceType.nb_id == nb_key)
+            result = await session.execute(stmt)
+            obj = result.scalar_one_or_none()
+            if obj:
+                return(obj.id)
+            else:
+                return(None)
+
+        logger.info(f"CREATE-OR-UPDATE: {self.name}")
+        stmt = select(Device).where(Device.nb_id == self.nb_id)
+        result = await session.execute(stmt)
+        obj = result.scalar_one_or_none()
+        devicetype_id = await find_devicetype_key(self.nb_devicetype_id)
+        if obj:
+            logger.info(f"FOUND: {obj.nb_id} {obj.name}")
+            if obj.name != self.name:
+                setattr(obj, "name", self.name)
+            if obj.serial != self.serial:
+                setattr(obj, "serial", self.serial)
+            if obj.device_type_id != devicetype_id:
+                setattr(obj, "device_type_id", devicetype_id)
+        else:
+            logger.info("CREATE")
+            self.device_type_id = devicetype_id
+            session.add(self)
+        return obj
 
 class Asset(Base):
     __tablename__ = "asset"
