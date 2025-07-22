@@ -18,6 +18,6 @@ class NetboxPreprocessor(PreprocessorPlugin):
         for x in data[0]:
             logger.info(f"DATA: {x}")
             if x.__class__.__name__ == "Manufacturer":
-                result.append(Manufacturer(id=x.id, name=x.name))
+                result.append(Manufacturer(nb_id=x.id, name=x.name))
         logger.info(f"RESULT: {result}")
         return result

@@ -1,10 +1,12 @@
 import datetime
-
-from sqlalchemy import Text, ForeignKey, MetaData
+import logging
+from sqlalchemy import Text, ForeignKey, MetaData, Integer
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from typing import List
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy import select
 
+logger = logging.getLogger(__name__)
 
 class Base(AsyncAttrs, DeclarativeBase):
     metadata = MetaData(schema="cacheDB")
@@ -15,12 +17,29 @@ class Manufacturer(Base):
     __tablename__ = "manufacturer"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    nb_id: Mapped[int] = mapped_column(Integer)
     name: Mapped[str] = mapped_column(Text)
 
     device_types: Mapped[List["DeviceType"]] = relationship(
         back_populates="manufacturer"
     )
     software: Mapped[List["Software"]] = relationship(back_populates="manufacturer")
+
+    async def create_or_update(self, session) -> None:
+        logger.info(f"CREATE-OR-UPDATE: {self.name}")
+
+        stmt = select(Manufacturer).where(Manufacturer.nb_id == self.nb_id)
+        result = await session.execute(stmt)
+        obj = result.scalar_one_or_none()
+        if obj:
+            logger.info(f"FOUND: {obj.nb_id} {obj.name}")
+            if (obj.name != self.name):
+                setattr(obj, "name", self.name)
+        else:
+            logger.info(f"TO BE CREATED: {obj}")
+            session.add(self)
+
+        return obj
 
 
 class DeviceType(Base):

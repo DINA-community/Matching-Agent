@@ -252,15 +252,19 @@ class BaseSynchronizer(ABC):
 
     async def run(self):
         """Run the manager."""
-        async with asyncio.TaskGroup() as tg:
-            logger.info(f"Starting {len(self.data_sources)} data fetching tasks:")
-            for source in self.data_sources:
-                logger.info(f"Creating task for {source.debug_info()}")
-                tg.create_task(self.fetch_data_task(source))
-            logger.info("Starting preprocessing task")
-            tg.create_task(self.preprocess_data_task())
-            logger.info("Starting storing task")
-            tg.create_task(self.store_data_task())
+        try:
+            async with asyncio.TaskGroup() as tg:
+                logger.info(f"Starting {len(self.data_sources)} data fetching tasks:")
+                for source in self.data_sources:
+                    logger.info(f"Creating task for {source.debug_info()}")
+                    tg.create_task(self.fetch_data_task(source))
+                logger.info("Starting preprocessing task")
+                tg.create_task(self.preprocess_data_task())
+                logger.info("Starting storing task")
+                tg.create_task(self.store_data_task())
+        except* Exception as eg:
+            for e in eg.exceptions:
+                logger.error("TaskGroup exception:", exc_info=e)
 
     async def fetch_data_task(self, source: DataSourcePlugin):
         """Perform a collection of data from a single data source."""

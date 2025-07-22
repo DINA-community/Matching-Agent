@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 from typing import List, Union, Optional
 import logging
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncEngine
 from sqlalchemy.sql.ddl import CreateSchema
 
-from dina.cachedb.model import Base, Asset, CsafDocument
+from dina.cachedb.model import Base, Asset, CsafDocument, Manufacturer
 
 logger = logging.getLogger(__name__)
 
@@ -45,14 +46,23 @@ class CacheDB:
         logger.info(f"DATA: {data}")
         async with AsyncSession(self.engine) as session:
             async with session.begin():
-                session.add_all(data)
 
-        # async with AsyncSession(self.engine) as session:
-        #     async with session.begin():
-        #         test = await session.execute(select(Manufacturer))
-        #         vendors = test.scalars().all()
-        #         logger.info(f"VENDOR:  {vendors}")
-        #         await session.close()
+                for asset in data:
+                    logger.info(f"DATA: {asset}")
+                    await asset.create_or_update(session)
+            await session.commit()
+            await session.close()
+            """
+                session.add_all(data)
+                await session.commit()
+            """
+
+        async with AsyncSession(self.engine) as session:
+            async with session.begin():
+                test = await session.execute(select(Manufacturer))
+                vendors = test.scalars().all()
+                logger.info(f"VENDOR:  {vendors}")
+                await session.close()
 
     async def disconnect(self) -> None:
         if self.engine is not None:
