@@ -8,6 +8,7 @@ from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
 
+
 class Base(AsyncAttrs, DeclarativeBase):
     metadata = MetaData(schema="cacheDB")
     pass
@@ -32,10 +33,10 @@ class Manufacturer(Base):
         obj = result.scalar_one_or_none()
         if obj:
             logger.info(f"FOUND: {obj.nb_id} {obj.name}")
-            if (obj.name != self.name):
+            if obj.name != self.name:
                 setattr(obj, "name", self.name)
         else:
-            logger.info(f"CREATE")
+            logger.info("CREATE")
             session.add(self)
         return obj
 

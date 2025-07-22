@@ -3,7 +3,6 @@ from typing import List, Union, Optional
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncEngine
 from sqlalchemy.sql.ddl import CreateSchema
-from sqlalchemy import select
 
 from dina.cachedb.model import Base, Manufacturer, CsafDocument
 
