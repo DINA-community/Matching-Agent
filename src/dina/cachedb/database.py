@@ -3,8 +3,9 @@ from typing import List, Union, Optional
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncEngine
 from sqlalchemy.sql.ddl import CreateSchema
+from sqlalchemy import select
 
-from dina.cachedb.model import Base, Asset, CsafDocument
+from dina.cachedb.model import Base, Manufacturer, CsafDocument
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ class CacheDB:
             await conn.execute(CreateSchema("cacheDB", if_not_exists=True))
             await conn.run_sync(Base.metadata.create_all)
 
-    async def store(self, data: List[Union[Asset, CsafDocument]]) -> None:
+    async def store(self, data: List[Union[Manufacturer, CsafDocument]]) -> None:
         """
         Stores a list of assets or CSAF documents into the database. This function ensures
         the provided data is added to the database in a single transaction using the
@@ -45,14 +46,18 @@ class CacheDB:
         logger.info(f"DATA: {data}")
         async with AsyncSession(self.engine) as session:
             async with session.begin():
-                session.add_all(data)
+                for asset in data:
+                    logger.info(f"DATA: {asset}")
+                    await asset.create_or_update(session)
+                await session.commit()
+                await session.close()
 
-        # async with AsyncSession(self.engine) as session:
-        #     async with session.begin():
-        #         test = await session.execute(select(Manufacturer))
-        #         vendors = test.scalars().all()
-        #         logger.info(f"VENDOR:  {vendors}")
-        #         await session.close()
+        async with AsyncSession(self.engine) as session:
+            async with session.begin():
+                test = await session.execute(select(Manufacturer))
+                vendors = test.scalars().all()
+                logger.info(f"VENDORS: {vendors}")
+                await session.close()
 
     async def disconnect(self) -> None:
         if self.engine is not None:
