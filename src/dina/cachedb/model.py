@@ -1,6 +1,6 @@
 import datetime
 import logging
-from sqlalchemy import Text, ForeignKey, MetaData, Integer
+from sqlalchemy import Text, ForeignKey, MetaData, Integer, JSON
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from typing import List
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -32,11 +32,11 @@ class Manufacturer(Base):
         result = await session.execute(stmt)
         obj = result.scalar_one_or_none()
         if obj:
-            logger.info(f"FOUND: {obj.nb_id} {obj.name}")
+            #logger.info(f"FOUND: {obj.nb_id} {obj.name}")
             if obj.name != self.name:
                 setattr(obj, "name", self.name)
         else:
-            logger.info("CREATE")
+            #logger.info("CREATE")
             session.add(self)
         return obj
 
@@ -78,7 +78,7 @@ class DeviceType(Base):
         obj = result.scalar_one_or_none()
         manu_id = await find_manufacturer_key(self.nb_manu_id)
         if obj:
-            logger.info(f"FOUND: {obj.nb_id} {obj.model_number}")
+            #logger.info(f"FOUND: {obj.nb_id} {obj.model_number}")
             if obj.model_number != self.model_number:
                 setattr(obj, "model_number", self.model_number)
             if obj.part_number != self.part_number:
@@ -94,7 +94,7 @@ class DeviceType(Base):
             if obj.manufacturer_id != manu_id:
                 setattr(obj, "manufacturer_id", manu_id)
         else:
-            logger.info("CREATE")
+            #logger.info("CREATE")
             self.manufacturer_id = manu_id
             session.add(self)
         return obj
@@ -104,11 +104,12 @@ class Software(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     nb_id: Mapped[int] = mapped_column(Integer)
+    nb_manu_id: Mapped[int] = mapped_column(Integer)
     name: Mapped[str] = mapped_column(Text)
     version: Mapped[str | None] = mapped_column(Text)
     cpe: Mapped[str | None] = mapped_column(Text)
     purl: Mapped[str | None] = mapped_column(Text)
-    sbom_urls: Mapped[str | None] = mapped_column(Text)
+    sbom_urls: Mapped[List[ str ]| None] = mapped_column(JSON)
     manufacturer_id: Mapped[int | None] = mapped_column(
         ForeignKey("cacheDB.manufacturer.id")
     )
@@ -118,6 +119,41 @@ class Software(Base):
     files: Mapped[List["File"]] = relationship(back_populates="software")
     csaf_products: Mapped[List["CsafProduct"]] = relationship(back_populates="software")
 
+    async def create_or_update(self, session) -> None:
+
+        async def find_manufacturer_key(nb_key):
+            stmt = select(Manufacturer).where(Manufacturer.nb_id == nb_key)
+            result = await session.execute(stmt)
+            obj = result.scalar_one_or_none()
+            if obj:
+                return(obj.id)
+            else:
+                return(None)
+
+        logger.info(f"CREATE-OR-UPDATE: {self.name}")
+        stmt = select(Software).where(Software.nb_id == self.nb_id)
+        result = await session.execute(stmt)
+        obj = result.scalar_one_or_none()
+        manu_id = await find_manufacturer_key(self.nb_manu_id)
+        if obj:
+            #logger.info(f"FOUND: {obj.nb_id} {obj.name}")
+            if obj.name != self.name:
+                setattr(obj, "name", self.name)
+            if obj.version != self.version:
+                setattr(obj, "version", self.version)
+            if obj.cpe != self.cpe:
+                setattr(obj, "cpe", self.cpe)
+            if obj.purl != self.purl:
+                setattr(obj, "purl", self.purl)
+            if obj.sbom_urls != self.sbom_urls:
+                setattr(obj, "sbom_urls", self.sbom_urls)
+            if obj.manufacturer_id != manu_id:
+                setattr(obj, "manufacturer_id", manu_id)
+        else:
+            #logger.info("CREATE")
+            self.manufacturer_id = manu_id
+            session.add(self)
+        return obj
 
 class Device(Base):
     __tablename__ = "device"
@@ -152,7 +188,7 @@ class Device(Base):
         obj = result.scalar_one_or_none()
         devicetype_id = await find_devicetype_key(self.nb_devicetype_id)
         if obj:
-            logger.info(f"FOUND: {obj.nb_id} {obj.name}")
+            #logger.info(f"FOUND: {obj.nb_id} {obj.name}")
             if obj.name != self.name:
                 setattr(obj, "name", self.name)
             if obj.serial != self.serial:
@@ -160,7 +196,7 @@ class Device(Base):
             if obj.device_type_id != devicetype_id:
                 setattr(obj, "device_type_id", devicetype_id)
         else:
-            logger.info("CREATE")
+            #logger.info("CREATE")
             self.device_type_id = devicetype_id
             session.add(self)
         return obj
@@ -182,6 +218,7 @@ class File(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     nb_id: Mapped[int] = mapped_column(Integer)
+    nb_software_id: Mapped[int] = mapped_column(Integer)
     filename: Mapped[str]
     software_id: Mapped[int] = mapped_column(ForeignKey("cacheDB.software.id"))
 
@@ -194,6 +231,7 @@ class Hash(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     nb_id: Mapped[int] = mapped_column(Integer)
+    nb_file_id: Mapped[int] = mapped_column(Integer)
     algorithm: Mapped[str] = mapped_column(Text)
     value: Mapped[str] = mapped_column(Text)
     file_id: Mapped[int] = mapped_column(ForeignKey("cacheDB.file.id"))
