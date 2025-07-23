@@ -6,7 +6,7 @@
 [Assetsync]
 # A list of preprocessor plugins. The order in which they are provided
 # here is the order in which they are executed on the data.
-preprocessor_plugins = ["netbox"]
+preprocessor_plugins = ["identity"]
 
 
 [Cachedb]
