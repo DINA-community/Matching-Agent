@@ -31,7 +31,7 @@ class CacheDB:
             await conn.execute(CreateSchema("cacheDB", if_not_exists=True))
             await conn.run_sync(Base.metadata.create_all)
 
-    async def store(self, data: List[Union[Asset, CsafDocument]]) -> None:
+    async def store(self, data: List[Union[Asset, CsafDocument, Manufacturer]]) -> None:
         """
         Stores a list of assets or CSAF documents into the database. This function ensures
         the provided data is added to the database in a single transaction using the
@@ -43,25 +43,12 @@ class CacheDB:
 
         :return: None
         """
-        logger.info(f"DATA: {data}")
         async with AsyncSession(self.engine) as session:
             async with session.begin():
-
                 for asset in data:
                     logger.info(f"DATA: {asset}")
                     await asset.create_or_update(session)
-            await session.commit()
-            await session.close()
-            """
-                session.add_all(data)
                 await session.commit()
-            """
-
-        async with AsyncSession(self.engine) as session:
-            async with session.begin():
-                test = await session.execute(select(Manufacturer))
-                vendors = test.scalars().all()
-                logger.info(f"VENDOR:  {vendors}")
                 await session.close()
 
     async def disconnect(self) -> None:
