@@ -2,7 +2,7 @@
 
 - Download the swagger file of the ISDuBA API and store it as isduba-api.json:
   ```
-  wget --no-check-certificate -O isduba-api.json https://<host:port>/swagger/doc.json
+  curl -o isduba-api.json --insecure https://<host:port>/swagger/doc.json
   ```
   
 - Correct
