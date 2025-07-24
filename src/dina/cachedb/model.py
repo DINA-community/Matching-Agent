@@ -3,7 +3,7 @@ import logging
 from sqlalchemy import Text, ForeignKey, MetaData, Integer, JSON
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from typing import List
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, selectinload
 from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
@@ -29,10 +29,12 @@ class Manufacturer(Base):
     async def create_or_update(self, session) -> None:
         logger.info(f"CREATE-OR-UPDATE: {self.name}")
         stmt = select(Manufacturer).where(Manufacturer.nb_id == self.nb_id)
+        #stmt = select(Manufacturer).options(selectinload(Manufacturer.device_types)).options(selectinload(Manufacturer.software)).where(
+            Manufacturer.nb_id == self.nb_id)
         result = await session.execute(stmt)
         obj = result.scalar_one_or_none()
         if obj:
-            #logger.info(f"FOUND: {obj.nb_id} {obj.name}")
+            #logger.info(f"RELATIONSHIP ATTR: {obj.name}  {obj.device_types} {obj.software}")
             if obj.name != self.name:
                 setattr(obj, "name", self.name)
         else:
