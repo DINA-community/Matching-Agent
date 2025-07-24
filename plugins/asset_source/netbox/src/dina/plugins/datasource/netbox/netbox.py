@@ -51,15 +51,15 @@ class NetboxDataSource(DataSourcePlugin):
         for x in response.results:
             results.append(Software(nb_id=x.id,name=x.name,nb_manu_id=x.manufacturer.id,version=x.version,cpe=x.cpe,purl=x.purl,sbom_urls=x.sbom_urls))
 
-        response = await plugins_d3c_filehash_list_list.asyncio(client=self.client)
-        for x in response.results:
-            logger.info(f"DATA: {x}")
-            #results.append(File(nb_id=x.id, nb_software_id=x.hash_.software.id, filename=x.hash_.filename))
-
         response = await plugins_d3c_hash_list_list.asyncio(client=self.client)
         for x in response.results:
-            logger.info(f"DATA: {x}")
-            #results.append(Hash(nb_id=x.id, filename=x.name, nb_file_id=x.filename.id, algorithm=x.algorithm, value=x.value))
+            results.append(File(nb_id=x.id, filename=x.filename, nb_software_id=x.software.id, ))
+
+        response = await plugins_d3c_filehash_list_list.asyncio(client=self.client)
+        for x in response.results:
+            results.append(Hash(nb_id=x.id, nb_file_id=x.hash_.id,algorithm=x.algorithm,value=x.value))
+
+
 
         logger.info(f"DATA: {results}")
         await asyncio.sleep(1)

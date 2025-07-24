@@ -225,6 +225,33 @@ class File(Base):
     software: Mapped["Software"] = relationship(back_populates="files")
     hashes: Mapped[List["Hash"]] = relationship(back_populates="file")
 
+    async def create_or_update(self, session) -> None:
+
+        async def find_software_key(nb_key):
+            stmt = select(Software).where(Software.nb_id == nb_key)
+            result = await session.execute(stmt)
+            obj = result.scalar_one_or_none()
+            if obj:
+                return(obj.id)
+            else:
+                return(None)
+
+        logger.info(f"CREATE-OR-UPDATE: {self.filename}")
+        stmt = select(File).where(File.nb_id == self.nb_id)
+        result = await session.execute(stmt)
+        obj = result.scalar_one_or_none()
+        software_id = await find_software_key(self.nb_software_id)
+        if obj:
+            #logger.info(f"FOUND: {obj.nb_id} {obj.name}")
+            if obj.filename != self.filename:
+                setattr(obj, "filename", self.filename)
+            if obj.software_id != software_id:
+                setattr(obj, "software_id", software_id)
+        else:
+            #logger.info("CREATE")
+            self.software_id = software_id
+            session.add(self)
+        return obj
 
 class Hash(Base):
     __tablename__ = "hash"
@@ -237,6 +264,36 @@ class Hash(Base):
     file_id: Mapped[int] = mapped_column(ForeignKey("cacheDB.file.id"))
 
     file: Mapped["File"] = relationship(back_populates="hashes")
+
+    async def create_or_update(self, session) -> None:
+
+        async def find_file_key(nb_key):
+            stmt = select(File).where(File.nb_id == nb_key)
+            result = await session.execute(stmt)
+            obj = result.scalar_one_or_none()
+            if obj:
+                return(obj.id)
+            else:
+                return(None)
+
+        logger.info(f"CREATE-OR-UPDATE: {self.id}")
+        stmt = select(Hash).where(Hash.nb_id == self.nb_id)
+        result = await session.execute(stmt)
+        obj = result.scalar_one_or_none()
+        file_id = await find_file_key(self.nb_file_id)
+        if obj:
+            #logger.info(f"FOUND: {obj.nb_id} {obj.name}")
+            if obj.algorithm != self.algorithm:
+                setattr(obj, "algorithm", self.name)
+            if obj.value != self.value:
+                setattr(obj, "value", self.serial)
+            if obj.file_id != file_id:
+                setattr(obj, "file_id", file_id)
+        else:
+            #logger.info("CREATE")
+            self.file_id = file_id
+            session.add(self)
+        return obj
 
 
 class CsafDocument(Base):
