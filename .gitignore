@@ -206,4 +206,3 @@ src/.DS_Store
 # ISDuBA API
 isduba-api.json
 plugins/asset_source/isduba/src/dina/plugins/datasource/isduba/api_client
-matching-agent-venv

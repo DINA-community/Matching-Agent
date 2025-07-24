@@ -29,8 +29,6 @@ cd Matching-Agent
 
 Install [uv](https://docs.astral.sh/uv/), docker and docker compose in any way that suits you.
 
-Generate the [ISDuBA API](ISDuBA-API.md).
-
 ### after installation
 Create the development database:
 
@@ -45,6 +43,8 @@ uv sync --all-extras
 ```
 
 to set up the local dev environment.
+
+Generate the [ISDuBA API](ISDuBA-API.md).
 
 ### Setting up git pre-commit hooks
 
