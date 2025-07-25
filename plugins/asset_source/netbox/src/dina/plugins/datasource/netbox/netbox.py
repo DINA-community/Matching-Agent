@@ -6,7 +6,7 @@ from dina.common import logging
 from dina.synchronizer.plugin_base.data_source import DataSourcePlugin
 from .api_client import Client  # type: ignore
 from .api_client.api.dcim import dcim_manufacturers_list,dcim_device_types_list,dcim_devices_list
-from .api_client.api.plugins import plugins_d3c_software_list_list, plugins_d3c_filehash_list_list, plugins_d3c_hash_list_list
+from .api_client.api.plugins import plugins_d3c_software_list_list, plugins_d3c_filehash_list_list, plugins_d3c_hash_list_list, plugins_d3c_productrelationship_list_list
 
 logger = logging.get_logger(__name__)
 
@@ -59,8 +59,12 @@ class NetboxDataSource(DataSourcePlugin):
         for x in response.results:
             results.append(Hash(nb_id=x.id, nb_file_id=x.hash_.id,algorithm=x.algorithm,value=x.value))
 
-
-
+        """
+        response = await plugins_d3c_productrelationship_list_list.asyncio(client=self.client)
+        logger.info(f"PRODUCTREL: {response}")
+        for x in response.results:
+            logger.info(f"PRODUCTREL: {x.source_type} {x.source_id} {x.destination_type} {x.destination_id} {x.category}")
+        """
         logger.info(f"DATA: {results}")
         await asyncio.sleep(1)
         return results

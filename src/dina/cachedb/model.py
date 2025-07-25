@@ -303,7 +303,6 @@ class Hash(Base):
             session.add(self)
         return obj
 
-
 class CsafDocument(Base):
     __tablename__ = "csaf_document"
 
