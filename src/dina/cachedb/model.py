@@ -30,7 +30,7 @@ class Manufacturer(Base):
         logger.info(f"CREATE-OR-UPDATE: {self.name}")
         stmt = select(Manufacturer).where(Manufacturer.nb_id == self.nb_id)
         #stmt = select(Manufacturer).options(selectinload(Manufacturer.device_types)).options(selectinload(Manufacturer.software)).where(
-            Manufacturer.nb_id == self.nb_id)
+        #    Manufacturer.nb_id == self.nb_id)
         result = await session.execute(stmt)
         obj = result.scalar_one_or_none()
         if obj:
@@ -155,6 +155,9 @@ class Software(Base):
             #logger.info("CREATE")
             self.manufacturer_id = manu_id
             session.add(self)
+            await session.flush()
+            the_asset = Asset(software_id=self.id)
+            session.add(the_asset)
         return obj
 
 class Device(Base):
@@ -201,6 +204,9 @@ class Device(Base):
             #logger.info("CREATE")
             self.device_type_id = devicetype_id
             session.add(self)
+            await session.flush()
+            the_asset = Asset(device_id=self.id)
+            session.add(the_asset)
         return obj
 
 class Asset(Base):
