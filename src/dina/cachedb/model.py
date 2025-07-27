@@ -70,9 +70,9 @@ class DeviceType(Base):
             result = await session.execute(stmt)
             obj = result.scalar_one_or_none()
             if obj:
-                return(obj.id)
+                return obj.id
             else:
-                return(None)
+                return None
 
         logger.info(f"CREATE-OR-UPDATE: {self.model_number}")
         stmt = select(DeviceType).where(DeviceType.nb_id == self.nb_id)
@@ -128,9 +128,9 @@ class Software(Base):
             result = await session.execute(stmt)
             obj = result.scalar_one_or_none()
             if obj:
-                return(obj.id)
+                return obj.id
             else:
-                return(None)
+                return None
 
         logger.info(f"CREATE-OR-UPDATE: {self.name}")
         stmt = select(Software).where(Software.nb_id == self.nb_id)
@@ -183,9 +183,9 @@ class Device(Base):
             result = await session.execute(stmt)
             obj = result.scalar_one_or_none()
             if obj:
-                return(obj.id)
+                return obj.id
             else:
-                return(None)
+                return None
 
         logger.info(f"CREATE-OR-UPDATE: {self.name}")
         stmt = select(Device).where(Device.nb_id == self.nb_id)
@@ -253,8 +253,6 @@ class ProductRelationship(Base):
     async def create_or_update(self, session) -> None:
 
         async def find_related_key(nb_key, the_type):
-            logger.info(f"FIND-RELATED-KEY: {nb_key} {the_type}")
-
             if the_type == 'Device':
                 stmt = select(Device).where(Device.nb_id == nb_key)
             elif the_type == 'Software':
@@ -264,7 +262,7 @@ class ProductRelationship(Base):
             result = await session.execute(stmt)
             obj = result.scalar_one_or_none()
             if obj:
-                return (obj.id)
+                return obj.id
             else:
                 return None
 
@@ -314,7 +312,7 @@ class File(Base):
             if obj:
                 return(obj.id)
             else:
-                return(None)
+                return None
 
         logger.info(f"CREATE-OR-UPDATE: {self.filename}")
         stmt = select(File).where(File.nb_id == self.nb_id)
@@ -352,9 +350,9 @@ class Hash(Base):
             result = await session.execute(stmt)
             obj = result.scalar_one_or_none()
             if obj:
-                return(obj.id)
+                return obj.id
             else:
-                return(None)
+                return None
 
         logger.info(f"CREATE-OR-UPDATE: {self.id}")
         stmt = select(Hash).where(Hash.nb_id == self.nb_id)
