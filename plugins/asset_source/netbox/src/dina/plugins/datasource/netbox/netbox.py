@@ -1,7 +1,7 @@
 import asyncio
 from typing import List
 
-from dina.cachedb.model import Asset, Manufacturer, DeviceType, Device, Software, File, Hash
+from dina.cachedb.model import Asset, Manufacturer, DeviceType, Device, Software, File, Hash, ProductRelationship
 from dina.common import logging
 from dina.synchronizer.plugin_base.data_source import DataSourcePlugin
 from .api_client import Client  # type: ignore
@@ -29,6 +29,15 @@ class NetboxDataSource(DataSourcePlugin):
 
     async def fetch_data(self) -> List[Asset]:
         # In a real implementation, this would use the API URL and token to fetch data
+
+        def find_cachedb_type(nb_type):
+            if nb_type == "dcim.device":
+                return "Device"
+            elif nb_type == "d3c.software":
+                return "Software"
+            else:
+                return None
+
         results = []
 
         response = await dcim_manufacturers_list.asyncio(client=self.client)
@@ -59,12 +68,10 @@ class NetboxDataSource(DataSourcePlugin):
         for x in response.results:
             results.append(Hash(nb_id=x.id, nb_file_id=x.hash_.id,algorithm=x.algorithm,value=x.value))
 
-        """
         response = await plugins_d3c_productrelationship_list_list.asyncio(client=self.client)
-        logger.info(f"PRODUCTREL: {response}")
         for x in response.results:
-            logger.info(f"PRODUCTREL: {x.source_type} {x.source_id} {x.destination_type} {x.destination_id} {x.category}")
-        """
+            results.append(ProductRelationship(nb_id=x.id,nb_source_id=x.source_id,source_type=find_cachedb_type(x.source_type),nb_target_id=x.destination_id,target_type=find_cachedb_type(x.destination_type),category=int(x.category)))
+
         logger.info(f"DATA: {results}")
         await asyncio.sleep(1)
         return results

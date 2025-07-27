@@ -221,6 +221,78 @@ class Asset(Base):
     matches: Mapped[List["Match"]] = relationship(back_populates="asset")
 
 
+class ProductRelationship(Base):
+    __tablename__ = "productrelationship"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nb_id: Mapped[int] = mapped_column(Integer)
+    nb_source_id: Mapped[int] = mapped_column(Integer)
+    nb_target_id: Mapped[int] = mapped_column(Integer)
+    category: Mapped[int] = mapped_column(Integer)
+    source_id: Mapped[int] = mapped_column(Integer)
+    source_type: Mapped[str] = mapped_column(Text)
+    target_id: Mapped[int] = mapped_column(Integer)
+    target_type: Mapped[str] = mapped_column(Text)
+
+    def get_source(self,session):
+        if self.source_type == 'Device':
+            return session.get(Device, self.source_id)
+        elif self.source_type == 'Software':
+            return session.get(Software, self.source_id)
+        else:
+            return None
+
+    def get_target(self,session):
+        if self.target_type == 'Device':
+            return session.get(Device, self.target_id)
+        elif self.target_type == 'Software':
+            return session.get(Software, self.target_id)
+        else:
+            return None
+
+    async def create_or_update(self, session) -> None:
+
+        async def find_related_key(nb_key, the_type):
+            logger.info(f"FIND-RELATED-KEY: {nb_key} {the_type}")
+
+            if the_type == 'Device':
+                stmt = select(Device).where(Device.nb_id == nb_key)
+            elif the_type == 'Software':
+                stmt = select(Software).where(Software.nb_id == nb_key)
+            else:
+                return None
+            result = await session.execute(stmt)
+            obj = result.scalar_one_or_none()
+            if obj:
+                return (obj.id)
+            else:
+                return None
+
+        logger.info(f"CREATE-OR-UPDATE: {self.source_type}")
+        stmt = select(ProductRelationship).where(ProductRelationship.nb_id == self.nb_id)
+        result = await session.execute(stmt)
+        obj = result.scalar_one_or_none()
+        source_id = await find_related_key(self.nb_source_id, self.source_type)
+        target_id = await find_related_key(self.nb_target_id, self.target_type)
+        if obj:
+            # logger.info(f"FOUND: {obj.nb_id} {obj.name}")
+            if obj.source_id != source_id:
+                setattr(obj, "source_id", source_id)
+            if obj.target_id != target_id:
+                setattr(obj, "target_id", target_id)
+            if obj.source_type != self.source_type:
+                setattr(obj, "source_type", self.source_type)
+            if obj.target_type != self.target_type:
+                setattr(obj, "target_type", self.target_type)
+            if obj.category != self.category:
+                setattr(obj, "category", self.category)
+        else:
+            # logger.info("CREATE")
+            self.source_id = source_id
+            self.target_id = target_id
+            session.add(self)
+        return obj
+
 class File(Base):
     __tablename__ = "file"
 
