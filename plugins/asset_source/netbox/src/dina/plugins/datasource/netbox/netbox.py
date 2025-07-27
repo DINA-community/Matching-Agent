@@ -1,7 +1,7 @@
 import asyncio
-from typing import List
+from typing import List, Union
 
-from dina.cachedb.model import Asset, Manufacturer, DeviceType, Device, Software, File, Hash, ProductRelationship
+from dina.cachedb.model import Manufacturer, DeviceType, Device, Software, File, Hash, ProductRelationship
 from dina.common import logging
 from dina.synchronizer.plugin_base.data_source import DataSourcePlugin
 from .api_client import Client  # type: ignore
@@ -27,7 +27,7 @@ class NetboxDataSource(DataSourcePlugin):
             raise KeyError("Missing Netbox configuration parameter")
         logger.debug(f"Initialized NetboxDataSource with API URL: {self.api_url}")
 
-    async def fetch_data(self) -> List[Asset]:
+    async def fetch_data(self) -> List[Union[Manufacturer, DeviceType, Device, Software, File, Hash, ProductRelationship]]:
         # In a real implementation, this would use the API URL and token to fetch data
 
         def find_cachedb_type(nb_type):
@@ -46,7 +46,7 @@ class NetboxDataSource(DataSourcePlugin):
 
         response = await dcim_device_types_list.asyncio(client=self.client)
         for x in response.results:
-            if x.custom_fields.additional_properties['model_number'] == None:
+            if x.custom_fields.additional_properties['model_number'] is None:
                 model_number = ""
             else:
                 model_number=x.custom_fields.additional_properties['model_number']
@@ -70,7 +70,10 @@ class NetboxDataSource(DataSourcePlugin):
 
         response = await plugins_d3c_productrelationship_list_list.asyncio(client=self.client)
         for x in response.results:
-            results.append(ProductRelationship(nb_id=x.id,nb_source_id=x.source_id,source_type=find_cachedb_type(x.source_type),nb_target_id=x.destination_id,target_type=find_cachedb_type(x.destination_type),category=int(x.category)))
+            source_type = find_cachedb_type(x.source_type)
+            target_type = find_cachedb_type(x.destination_type)
+            if source_type and target_type:
+                results.append(ProductRelationship(nb_id=x.id,nb_source_id=x.source_id,source_type=source_type,nb_target_id=x.destination_id,target_type=target_type,category=int(x.category)))
 
         logger.info(f"DATA: {results}")
         await asyncio.sleep(1)
