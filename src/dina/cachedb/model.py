@@ -21,6 +21,19 @@ class AssetSynchronizer(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     last_run: Mapped[float] = mapped_column(Float)
 
+    async def create_or_update(self, session) -> None:
+        logger.info(f"CREATE-OR-UPDATE: {self.id}")
+        stmt = select(AssetSynchronizer)
+        result = await session.execute(stmt)
+        obj = result.scalar_one_or_none()
+        if obj:
+            #logger.info(f"RELATIONSHIP ATTR: {obj.name}  {obj.device_types} {obj.software}")
+            setattr(obj, "last_run", self.last_run)
+        else:
+            #logger.info("CREATE")
+            session.add(self)
+        return obj
+
 class Manufacturer(Base):
     __tablename__ = "manufacturer"
 

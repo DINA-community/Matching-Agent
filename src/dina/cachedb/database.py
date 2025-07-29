@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncEngin
 from sqlalchemy.sql.ddl import CreateSchema
 from sqlalchemy import select
 
-from dina.cachedb.model import Base,Manufacturer,DeviceType,Device,Software,File,Hash,ProductRelationship,CsafDocument
+from dina.cachedb.model import Base,Manufacturer,DeviceType,Device,Software,File,Hash,ProductRelationship,AssetSynchronizer,CsafDocument
 
 logger = logging.getLogger(__name__)
 
@@ -51,13 +51,21 @@ class CacheDB:
                 await session.commit()
                 await session.close()
 
-    async def check_delete(self,starttime):
-        logger.info(f"DELETE {starttime}")
+    async def check_delete(self):
+
         async with AsyncSession(self.engine) as session:
+
+            stmt = select(AssetSynchronizer)
+            result = await session.execute(stmt)
+            obj = result.scalar_one_or_none()
+            if obj:
+                starttime=obj.last_run
+                logger.info(f"DELETE {starttime}")
 
             result = await session.execute(select(Manufacturer))
             all_objects = result.scalars().all()
             for x in all_objects:
+                logger.info(f"DELETE Manufacturer: {x.name} {x.last_seen}")
                 if x.last_seen < starttime:
                     logger.info(f"DELETE Manufacturer: {x.name} {x.last_seen}")
                     await session.delete(x)

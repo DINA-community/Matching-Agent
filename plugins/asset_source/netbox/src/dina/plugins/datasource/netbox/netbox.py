@@ -1,7 +1,7 @@
 import asyncio
 from typing import List, Union
 import time
-from dina.cachedb.model import Manufacturer, DeviceType, Device, Software, File, Hash, ProductRelationship
+from dina.cachedb.model import Manufacturer, DeviceType, Device, Software, File, Hash, ProductRelationship, AssetSynchronizer
 from dina.common import logging
 from dina.synchronizer.plugin_base.data_source import DataSourcePlugin
 from .api_client import Client  # type: ignore
@@ -27,7 +27,7 @@ class NetboxDataSource(DataSourcePlugin):
             raise KeyError("Missing Netbox configuration parameter")
         logger.debug(f"Initialized NetboxDataSource with API URL: {self.api_url}")
 
-    async def fetch_data(self, starttime1) -> List[Union[Manufacturer, DeviceType, Device, Software, File, Hash, ProductRelationship]]:
+    async def fetch_data(self) -> List[Union[Manufacturer, DeviceType, Device, Software, File, Hash, ProductRelationship]]:
         # In a real implementation, this would use the API URL and token to fetch data
 
         def find_cachedb_type(nb_type):
@@ -41,7 +41,8 @@ class NetboxDataSource(DataSourcePlugin):
         results = []
 
         starttime = time.time()
-        logger.error(f"START: {starttime}")
+        logger.info(f"START: {starttime}")
+        results.append(AssetSynchronizer(last_run=starttime))
 
         response = await dcim_manufacturers_list.asyncio(client=self.client)
         for x in response.results:

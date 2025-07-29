@@ -23,7 +23,7 @@ class SampleDataSource(DataSourcePlugin):
         """Return information about the data source endpoint."""
         return "http://endpoint.sample.com/"
 
-    async def fetch_data(self,starttime) -> List[Union[Asset, CsafDocument]]:
+    async def fetch_data(self) -> List[Union[Asset, CsafDocument]]:
         """Fetch data from the data source and return it as a list of Assets or CsafDocuments."""
         # Implement your data fetching logic here
         # This is where you would connect to your data source and retrieve data

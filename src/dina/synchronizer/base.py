@@ -268,10 +268,8 @@ class BaseSynchronizer(ABC):
             tg.create_task(self.store_data_task())
 
     async def fetch_data_task(self, source: DataSourcePlugin):
-        self.starttime = time.time()
-        logger.info(f"START: {self.starttime}")
         while True:
-            self.pending_data.extend(await source.fetch_data(self.starttime))
+            self.pending_data.extend(await source.fetch_data())
 
     async def preprocess_data_task(self):
         """Process data using the loaded preprocessor plugins."""
@@ -301,7 +299,7 @@ class BaseSynchronizer(ABC):
                 logger.info(f"Storing {len(self.preprocessed_data)} items in cacheDB")
                 # TODO: Re-enable once the rest is stable enough
                 await self.cache_db.store(self.preprocessed_data)
-                await self.cache_db.check_delete(self.starttime)
+                await self.cache_db.check_delete()
                 self.preprocessed_data.clear()
             else:
                 await asyncio.sleep(0.1)
