@@ -73,7 +73,7 @@ class CacheDB:
             all_objects = result.scalars().all()
             for x in all_objects:
                 if x.last_seen < starttime:
-                    logger.info(f"DELETEn Device: {x.name} {x.last_seen}")
+                    logger.info(f"DELETE Device: {x.name} {x.last_seen}")
                     await session.delete(x)
 
             result = await session.execute(select(Software))

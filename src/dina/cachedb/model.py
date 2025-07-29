@@ -100,6 +100,7 @@ class DeviceType(Base):
                 setattr(obj, "hardware_name", self.hardware_name)
             if obj.manufacturer_id != manu_id:
                 setattr(obj, "manufacturer_id", manu_id)
+            setattr(obj, "last_seen", self.last_seen)
         else:
             #logger.info("CREATE")
             self.manufacturer_id = manu_id
@@ -157,6 +158,7 @@ class Software(Base):
                 setattr(obj, "sbom_urls", self.sbom_urls)
             if obj.manufacturer_id != manu_id:
                 setattr(obj, "manufacturer_id", manu_id)
+            setattr(obj, "last_seen", self.last_seen)
         else:
             #logger.info("CREATE")
             self.manufacturer_id = manu_id
@@ -207,6 +209,7 @@ class Device(Base):
                 setattr(obj, "serial", self.serial)
             if obj.device_type_id != devicetype_id:
                 setattr(obj, "device_type_id", devicetype_id)
+            setattr(obj, "last_seen", self.last_seen)
         else:
             #logger.info("CREATE")
             self.device_type_id = devicetype_id
@@ -293,6 +296,7 @@ class ProductRelationship(Base):
                 setattr(obj, "target_type", self.target_type)
             if obj.category != self.category:
                 setattr(obj, "category", self.category)
+            setattr(obj, "last_seen", self.last_seen)
         else:
             # logger.info("CREATE")
             self.source_id = source_id
@@ -335,6 +339,7 @@ class File(Base):
                 setattr(obj, "filename", self.filename)
             if obj.software_id != software_id:
                 setattr(obj, "software_id", software_id)
+            setattr(obj, "last_seen", self.last_seen)
         else:
             #logger.info("CREATE")
             self.software_id = software_id
@@ -378,6 +383,7 @@ class Hash(Base):
                 setattr(obj, "value", self.serial)
             if obj.file_id != file_id:
                 setattr(obj, "file_id", file_id)
+            setattr(obj, "last_seen", self.last_seen)
         else:
             #logger.info("CREATE")
             self.file_id = file_id
