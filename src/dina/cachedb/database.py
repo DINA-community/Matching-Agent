@@ -3,6 +3,7 @@ from typing import List, Union, Optional
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncEngine
 from sqlalchemy.sql.ddl import CreateSchema
+from sqlalchemy import select
 
 from dina.cachedb.model import Base, Manufacturer, CsafDocument
 
@@ -49,6 +50,14 @@ class CacheDB:
                     await asset.create_or_update(session)
                 await session.commit()
                 await session.close()
+
+    async def check_delete(self,starttime):
+        logger.info(f"DELETE {starttime}")
+        async with AsyncSession(self.engine) as session:
+            result = await session.execute(select(Manufacturer))
+            all_objects = result.scalars().all()
+            for x in all_objects:
+                logger.info(f"DELETE: {x.name}")
 
     async def disconnect(self) -> None:
         if self.engine is not None:

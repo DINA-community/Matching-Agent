@@ -47,7 +47,6 @@ class Manufacturer(Base):
             session.add(self)
         return obj
 
-
 class DeviceType(Base):
     __tablename__ = "device_type"
 
@@ -163,7 +162,7 @@ class Software(Base):
             self.manufacturer_id = manu_id
             session.add(self)
             await session.flush()
-            the_asset = Asset(software_id=self.id)
+            the_asset = Asset(software_id=self.id,last_seen=self.last_seen)
             session.add(the_asset)
         return obj
 
@@ -213,7 +212,7 @@ class Device(Base):
             self.device_type_id = devicetype_id
             session.add(self)
             await session.flush()
-            the_asset = Asset(device_id=self.id)
+            the_asset = Asset(device_id=self.id,last_seen=self.last_seen)
             session.add(the_asset)
         return obj
 

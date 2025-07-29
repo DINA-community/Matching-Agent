@@ -30,6 +30,7 @@ class AssetSynchronizer(BaseSynchronizer):
         # TODO: Find the appropriate transformer plugins.
 
 
+
 async def run_asset_manager():
     """Run the Asset Manager."""
     # Create and initialize the Asset Manager

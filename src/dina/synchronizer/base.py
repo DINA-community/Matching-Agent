@@ -14,6 +14,8 @@ from abc import ABC
 from importlib.metadata import entry_points, EntryPoints
 from pathlib import Path
 from typing import List, Union
+from datetime import datetime
+import time
 
 from dina.cachedb.database import CacheDB
 from dina.cachedb.model import Asset, CsafDocument
@@ -77,6 +79,9 @@ class PluginLoadError(Exception):
 
 
 class BaseSynchronizer(ABC):
+
+    starttime = 0
+
     def __init__(
         self, cache_db: CacheDB, data_source_plugin_configs: Path, config_file: Path
     ):
@@ -265,7 +270,7 @@ class BaseSynchronizer(ABC):
     async def fetch_data_task(self, source: DataSourcePlugin):
         """Perform a collection of data from a single data source."""
         while True:
-            self.pending_data.extend(await source.fetch_data())
+            self.pending_data.extend(await source.fetch_data(self.starttime))
 
     async def preprocess_data_task(self):
         """Process data using the loaded preprocessor plugins."""
@@ -290,11 +295,16 @@ class BaseSynchronizer(ABC):
 
     async def store_data_task(self):
         """Store the preprocessed data."""
+        self.starttime = time.time()
+        #zeit = datetime.fromtimestamp(time.time())
+        logger.info(f"START: {self.starttime}")
+        #logger.info(f"START: {zeit}")
         while True:
             if self.preprocessed_data:
                 logger.info(f"Storing {len(self.preprocessed_data)} items in cacheDB")
                 # TODO: Re-enable once the rest is stable enough
                 await self.cache_db.store(self.preprocessed_data)
+                await self.cache_db.check_delete(self.starttime)
                 self.preprocessed_data.clear()
             else:
                 await asyncio.sleep(0.1)
