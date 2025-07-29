@@ -3,7 +3,10 @@ import logging
 from sqlalchemy import Text, ForeignKey, MetaData, Integer, JSON
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from typing import List
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, selectinload
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+#from sqlalchemy.orm import selectinload
+from sqlalchemy import Text, ForeignKey, MetaData, Integer, JSON
+
 from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
@@ -19,6 +22,7 @@ class Manufacturer(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     nb_id: Mapped[int] = mapped_column(Integer)
+    last_seen: Mapped[float] = mapped_column(Float)
     name: Mapped[str] = mapped_column(Text)
 
     device_types: Mapped[List["DeviceType"]] = relationship(

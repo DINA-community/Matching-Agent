@@ -1,6 +1,7 @@
 import asyncio
 from typing import List, Union
-
+from datetime import datetime
+import time
 from dina.cachedb.model import Manufacturer, DeviceType, Device, Software, File, Hash, ProductRelationship
 from dina.common import logging
 from dina.synchronizer.plugin_base.data_source import DataSourcePlugin
@@ -29,6 +30,11 @@ class NetboxDataSource(DataSourcePlugin):
 
     async def fetch_data(self) -> List[Union[Manufacturer, DeviceType, Device, Software, File, Hash, ProductRelationship]]:
         # In a real implementation, this would use the API URL and token to fetch data
+
+        starttime = time.time()
+        zeit = datetime.fromtimestamp(time.time())
+        logger.info(f"START: {starttime}")
+        logger.info(f"START: {zeit}")
 
         def find_cachedb_type(nb_type):
             if nb_type == "dcim.device":
