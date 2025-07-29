@@ -16,6 +16,10 @@ class Base(AsyncAttrs, DeclarativeBase):
     metadata = MetaData(schema="cacheDB")
     pass
 
+class AssetSynchronizer(Base):
+    __tablename__ = "assetsync"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    last_run: Mapped[float] = mapped_column(Float)
 
 class Manufacturer(Base):
     __tablename__ = "manufacturer"
