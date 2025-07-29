@@ -269,9 +269,7 @@ class BaseSynchronizer(ABC):
 
     async def fetch_data_task(self, source: DataSourcePlugin):
         self.starttime = time.time()
-        #zeit = datetime.fromtimestamp(time.time())
         logger.info(f"START: {self.starttime}")
-        #logger.info(f"START: {zeit}")
         while True:
             self.pending_data.extend(await source.fetch_data(self.starttime))
 
