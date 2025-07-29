@@ -268,7 +268,10 @@ class BaseSynchronizer(ABC):
             tg.create_task(self.store_data_task())
 
     async def fetch_data_task(self, source: DataSourcePlugin):
-        """Perform a collection of data from a single data source."""
+        self.starttime = time.time()
+        #zeit = datetime.fromtimestamp(time.time())
+        logger.info(f"START: {self.starttime}")
+        #logger.info(f"START: {zeit}")
         while True:
             self.pending_data.extend(await source.fetch_data(self.starttime))
 
@@ -295,10 +298,6 @@ class BaseSynchronizer(ABC):
 
     async def store_data_task(self):
         """Store the preprocessed data."""
-        self.starttime = time.time()
-        #zeit = datetime.fromtimestamp(time.time())
-        logger.info(f"START: {self.starttime}")
-        #logger.info(f"START: {zeit}")
         while True:
             if self.preprocessed_data:
                 logger.info(f"Storing {len(self.preprocessed_data)} items in cacheDB")

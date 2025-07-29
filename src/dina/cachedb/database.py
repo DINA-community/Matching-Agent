@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncEngin
 from sqlalchemy.sql.ddl import CreateSchema
 from sqlalchemy import select
 
-from dina.cachedb.model import Base, Manufacturer, CsafDocument
+from dina.cachedb.model import Base,Manufacturer,DeviceType,Device,Software,File,Hash,ProductRelationship,CsafDocument
 
 logger = logging.getLogger(__name__)
 
@@ -54,10 +54,57 @@ class CacheDB:
     async def check_delete(self,starttime):
         logger.info(f"DELETE {starttime}")
         async with AsyncSession(self.engine) as session:
+
             result = await session.execute(select(Manufacturer))
             all_objects = result.scalars().all()
             for x in all_objects:
-                logger.info(f"DELETE: {x.name}")
+                if x.last_seen < starttime:
+                    logger.info(f"DELETE Manufacturer: {x.name} {x.last_seen}")
+                    await session.delete(x)
+
+            result = await session.execute(select(DeviceType))
+            all_objects = result.scalars().all()
+            for x in all_objects:
+                if x.last_seen < starttime:
+                    logger.info(f"DELETE DeviceType: {x.model} {x.last_seen}")
+                    await session.delete(x)
+
+            result = await session.execute(select(Device))
+            all_objects = result.scalars().all()
+            for x in all_objects:
+                if x.last_seen < starttime:
+                    logger.info(f"DELETEn Device: {x.name} {x.last_seen}")
+                    await session.delete(x)
+
+            result = await session.execute(select(Software))
+            all_objects = result.scalars().all()
+            for x in all_objects:
+                if x.last_seen < starttime:
+                    logger.info(f"DELETE Software: {x.name} {x.last_seen}")
+                    await session.delete(x)
+
+            result = await session.execute(select(Hash))
+            all_objects = result.scalars().all()
+            for x in all_objects:
+                if x.last_seen < starttime:
+                    logger.info(f"DELETE Hash: {x.name} {x.last_seen}")
+                    await session.delete(x)
+
+            result = await session.execute(select(File))
+            all_objects = result.scalars().all()
+            for x in all_objects:
+                if x.last_seen < starttime:
+                    logger.info(f"DELETE File: {x.name} {x.last_seen}")
+                    await session.delete(x)
+
+            result = await session.execute(select(ProductRelationship))
+            all_objects = result.scalars().all()
+            for x in all_objects:
+                if x.last_seen < starttime:
+                    logger.info(f"DELETE ProductRelationship: {x.id} {x.last_seen}")
+                    await session.delete(x)
+
+            await session.commit()
 
     async def disconnect(self) -> None:
         if self.engine is not None:
