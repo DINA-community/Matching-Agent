@@ -48,7 +48,7 @@ class NetboxDataSource(DataSourcePlugin):
 
         response = await dcim_manufacturers_list.asyncio(client=self.client)
         for x in response.results:
-            results.append(Manufacturer(nb_id=x.id, name=x.name))
+            results.append(Manufacturer(nb_id=x.id, name=x.name, last_seen=starttime))
 
         response = await dcim_device_types_list.asyncio(client=self.client)
         for x in response.results:
@@ -56,30 +56,30 @@ class NetboxDataSource(DataSourcePlugin):
                 model_number = ""
             else:
                 model_number=x.custom_fields.additional_properties['model_number']
-            results.append(DeviceType(nb_id=x.id,model=x.model,model_number=model_number,part_number=x.part_number, hardware_name=x.custom_fields.additional_properties['hardware_name'],hardware_version=x.custom_fields.additional_properties['hardware_version'],device_family=x.custom_fields.additional_properties['device_family'],cpe=x.custom_fields.additional_properties['cpe'],nb_manu_id=x.manufacturer.id))
+            results.append(DeviceType(nb_id=x.id,model=x.model,model_number=model_number,part_number=x.part_number, hardware_name=x.custom_fields.additional_properties['hardware_name'],hardware_version=x.custom_fields.additional_properties['hardware_version'],device_family=x.custom_fields.additional_properties['device_family'],cpe=x.custom_fields.additional_properties['cpe'],nb_manu_id=x.manufacturer.id,last_seen=starttime))
 
         response = await dcim_devices_list.asyncio(client=self.client)
         for x in response.results:
-            results.append(Device(nb_id=x.id, name=x.name, serial=x.serial, nb_devicetype_id=x.device_type.id))
+            results.append(Device(nb_id=x.id, name=x.name, serial=x.serial, nb_devicetype_id=x.device_type.id,last_seen=starttime))
 
         response = await plugins_d3c_software_list_list.asyncio(client=self.client)
         for x in response.results:
-            results.append(Software(nb_id=x.id,name=x.name,nb_manu_id=x.manufacturer.id,version=x.version,cpe=x.cpe,purl=x.purl,sbom_urls=x.sbom_urls))
+            results.append(Software(nb_id=x.id,name=x.name,nb_manu_id=x.manufacturer.id,version=x.version,cpe=x.cpe,purl=x.purl,sbom_urls=x.sbom_urls,last_seen=starttime))
 
         response = await plugins_d3c_hash_list_list.asyncio(client=self.client)
         for x in response.results:
-            results.append(File(nb_id=x.id, filename=x.filename, nb_software_id=x.software.id, ))
+            results.append(File(nb_id=x.id, filename=x.filename, nb_software_id=x.software.id,last_seen=starttime))
 
         response = await plugins_d3c_filehash_list_list.asyncio(client=self.client)
         for x in response.results:
-            results.append(Hash(nb_id=x.id, nb_file_id=x.hash_.id,algorithm=x.algorithm,value=x.value))
+            results.append(Hash(nb_id=x.id, nb_file_id=x.hash_.id,algorithm=x.algorithm,value=x.value,last_seen=starttime))
 
         response = await plugins_d3c_productrelationship_list_list.asyncio(client=self.client)
         for x in response.results:
             source_type = find_cachedb_type(x.source_type)
             target_type = find_cachedb_type(x.destination_type)
             if source_type and target_type:
-                results.append(ProductRelationship(nb_id=x.id,nb_source_id=x.source_id,source_type=source_type,nb_target_id=x.destination_id,target_type=target_type,category=int(x.category)))
+                results.append(ProductRelationship(nb_id=x.id,nb_source_id=x.source_id,source_type=source_type,nb_target_id=x.destination_id,target_type=target_type,category=int(x.category),last_seen=starttime))
 
         logger.info(f"DATA: {results}")
         await asyncio.sleep(1)

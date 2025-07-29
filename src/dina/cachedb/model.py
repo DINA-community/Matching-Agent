@@ -1,6 +1,6 @@
 import datetime
 import logging
-from sqlalchemy import Text, ForeignKey, MetaData, Integer, JSON
+from sqlalchemy import Text, ForeignKey, MetaData, Integer, JSON, Float
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from typing import List
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -41,6 +41,7 @@ class Manufacturer(Base):
             #logger.info(f"RELATIONSHIP ATTR: {obj.name}  {obj.device_types} {obj.software}")
             if obj.name != self.name:
                 setattr(obj, "name", self.name)
+            setattr(obj, "last_seen", self.last_seen)
         else:
             #logger.info("CREATE")
             session.add(self)
@@ -52,6 +53,7 @@ class DeviceType(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     nb_id: Mapped[int] = mapped_column(Integer)
+    last_seen: Mapped[float] = mapped_column(Float)
     nb_manu_id: Mapped[int] = mapped_column(Integer)
     model: Mapped[str] = mapped_column(Text)
     model_number: Mapped[str] = mapped_column(Text)
@@ -110,6 +112,7 @@ class Software(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     nb_id: Mapped[int] = mapped_column(Integer)
+    last_seen: Mapped[float] = mapped_column(Float)
     nb_manu_id: Mapped[int] = mapped_column(Integer)
     name: Mapped[str] = mapped_column(Text)
     version: Mapped[str | None] = mapped_column(Text)
@@ -169,6 +172,7 @@ class Device(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     nb_id: Mapped[int] = mapped_column(Integer)
+    last_seen: Mapped[float] = mapped_column(Float)
     nb_devicetype_id: Mapped[int] = mapped_column(Integer)
     name: Mapped[str | None] = mapped_column(Text)
     serial: Mapped[str | None] = mapped_column(Text)
@@ -217,6 +221,7 @@ class Asset(Base):
     __tablename__ = "asset"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    last_seen: Mapped[float] = mapped_column(Float)
     device_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.device.id"))
     software_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.software.id"))
 
@@ -230,6 +235,7 @@ class ProductRelationship(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     nb_id: Mapped[int] = mapped_column(Integer)
+    last_seen: Mapped[float] = mapped_column(Float)
     nb_source_id: Mapped[int] = mapped_column(Integer)
     nb_target_id: Mapped[int] = mapped_column(Integer)
     category: Mapped[int] = mapped_column(Integer)
@@ -300,6 +306,7 @@ class File(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     nb_id: Mapped[int] = mapped_column(Integer)
+    last_seen: Mapped[float] = mapped_column(Float)
     nb_software_id: Mapped[int] = mapped_column(Integer)
     filename: Mapped[str]
     software_id: Mapped[int] = mapped_column(ForeignKey("cacheDB.software.id"))
@@ -340,6 +347,7 @@ class Hash(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     nb_id: Mapped[int] = mapped_column(Integer)
+    last_seen: Mapped[float] = mapped_column(Float)
     nb_file_id: Mapped[int] = mapped_column(Integer)
     algorithm: Mapped[str] = mapped_column(Text)
     value: Mapped[str] = mapped_column(Text)
