@@ -50,11 +50,7 @@ class NetboxDataSource(DataSourcePlugin):
 
         response = await dcim_device_types_list.asyncio(client=self.client)
         for x in response.results:
-            if x.custom_fields.additional_properties['model_number'] is None:
-                model_number = ""
-            else:
-                model_number=x.custom_fields.additional_properties['model_number']
-            results.append(DeviceType(nb_id=x.id,model=x.model,model_number=model_number,part_number=x.part_number, hardware_name=x.custom_fields.additional_properties['hardware_name'],hardware_version=x.custom_fields.additional_properties['hardware_version'],device_family=x.custom_fields.additional_properties['device_family'],cpe=x.custom_fields.additional_properties['cpe'],nb_manu_id=x.manufacturer.id,last_seen=starttime))
+            results.append(DeviceType(nb_id=x.id,model=x.model,model_number=x.custom_fields.additional_properties['model_number'],part_number=x.part_number, hardware_name=x.custom_fields.additional_properties['hardware_name'],hardware_version=x.custom_fields.additional_properties['hardware_version'],device_family=x.custom_fields.additional_properties['device_family'],cpe=x.custom_fields.additional_properties['cpe'],nb_manu_id=x.manufacturer.id,last_seen=starttime))
 
         response = await dcim_devices_list.asyncio(client=self.client)
         for x in response.results:

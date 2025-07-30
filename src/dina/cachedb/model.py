@@ -71,7 +71,7 @@ class DeviceType(Base):
     last_seen: Mapped[float] = mapped_column(Float)
     nb_manu_id: Mapped[int] = mapped_column(Integer)
     model: Mapped[str] = mapped_column(Text)
-    model_number: Mapped[str] = mapped_column(Text)
+    model_number: Mapped[str | None] = mapped_column(Text)
     part_number: Mapped[str | None] = mapped_column(Text)
     device_family: Mapped[str | None] = mapped_column(Text)
     cpe: Mapped[str | None] = mapped_column(Text)
