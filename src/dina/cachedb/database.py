@@ -4,7 +4,18 @@ import logging
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncEngine
 from sqlalchemy.sql.ddl import CreateSchema
 from sqlalchemy import select
-from dina.cachedb.model import Base,Manufacturer,DeviceType,Device,Software,File,Hash,ProductRelationship,AssetSynchronizer,CsafDocument
+from dina.cachedb.model import (
+    Base,
+    Manufacturer,
+    DeviceType,
+    Device,
+    Software,
+    File,
+    Hash,
+    ProductRelationship,
+    AssetSynchronizer,
+    CsafDocument,
+)
 from dina.cachedb.model import data_consistency_problem
 
 logger = logging.getLogger(__name__)
@@ -46,23 +57,23 @@ class CacheDB:
         async with AsyncSession(self.engine) as session:
             async with session.begin():
                 for asset in data:
-                    #logger.info(f"DATA: {asset}")
+                    # logger.info(f"DATA: {asset}")
                     try:
                         await asset.create_or_update(session)
                     except data_consistency_problem as e:
-                        logger.error(f"Data consistency problem when processing: {asset} {e} ")
+                        logger.error(
+                            f"Data consistency problem when processing: {asset} {e} "
+                        )
                 await session.commit()
                 await session.close()
 
     async def check_delete(self):
-
         async with AsyncSession(self.engine) as session:
-
             stmt = select(AssetSynchronizer)
             result = await session.execute(stmt)
             obj = result.scalar_one_or_none()
             if obj:
-                starttime=obj.last_run
+                starttime = obj.last_run
                 logger.info(f"DELETE {starttime}")
 
             result = await session.execute(select(Manufacturer))

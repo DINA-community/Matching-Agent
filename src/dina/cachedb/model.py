@@ -1,23 +1,30 @@
 import datetime
 import logging
-from sqlalchemy import Text, ForeignKey, MetaData, Integer, JSON, Float
+from sqlalchemy import Float
+
+# from sqlalchemy import ForeignKey
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from typing import List
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-#from sqlalchemy.orm import selectinload
+
+# from sqlalchemy.orm import selectinload
 from sqlalchemy import Text, ForeignKey, MetaData, Integer, JSON
 
 from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
 
+
 class data_consistency_problem(Exception):
     """consistency with netbox data detected"""
+
     pass
+
 
 class Base(AsyncAttrs, DeclarativeBase):
     metadata = MetaData(schema="cacheDB")
     pass
+
 
 class AssetSynchronizer(Base):
     __tablename__ = "assetsync"
@@ -33,6 +40,7 @@ class AssetSynchronizer(Base):
         else:
             session.add(self)
         return obj
+
 
 class Manufacturer(Base):
     __tablename__ = "manufacturer"
@@ -50,7 +58,7 @@ class Manufacturer(Base):
     async def create_or_update(self, session) -> None:
         updated = False
         stmt = select(Manufacturer).where(Manufacturer.nb_id == self.nb_id)
-        #stmt = select(Manufacturer).options(selectinload(Manufacturer.device_types)).options(selectinload(Manufacturer.software)).where(
+        # stmt = select(Manufacturer).options(selectinload(Manufacturer.device_types)).options(selectinload(Manufacturer.software)).where(
         #    Manufacturer.nb_id == self.nb_id)
         result = await session.execute(stmt)
         obj = result.scalar_one_or_none()
@@ -65,6 +73,7 @@ class Manufacturer(Base):
             session.add(self)
             logger.info(f"CREATED: {self} {self.name}")
         return obj
+
 
 class DeviceType(Base):
     __tablename__ = "device_type"
@@ -89,6 +98,7 @@ class DeviceType(Base):
 
     async def create_or_update(self, session) -> None:
         updated = False
+
         async def find_manufacturer_key(nb_key):
             stmt = select(Manufacturer).where(Manufacturer.nb_id == nb_key)
             result = await session.execute(stmt)
@@ -132,6 +142,7 @@ class DeviceType(Base):
             logger.info(f"CREATED: {self} {self.model_number}")
         return obj
 
+
 class Software(Base):
     __tablename__ = "software"
 
@@ -143,7 +154,7 @@ class Software(Base):
     version: Mapped[str | None] = mapped_column(Text)
     cpe: Mapped[str | None] = mapped_column(Text)
     purl: Mapped[str | None] = mapped_column(Text)
-    sbom_urls: Mapped[List[ str ]| None] = mapped_column(JSON)
+    sbom_urls: Mapped[List[str] | None] = mapped_column(JSON)
     manufacturer_id: Mapped[int | None] = mapped_column(
         ForeignKey("cacheDB.manufacturer.id")
     )
@@ -155,6 +166,7 @@ class Software(Base):
 
     async def create_or_update(self, session) -> None:
         updated = False
+
         async def find_manufacturer_key(nb_key):
             stmt = select(Manufacturer).where(Manufacturer.nb_id == nb_key)
             result = await session.execute(stmt)
@@ -194,11 +206,12 @@ class Software(Base):
             self.manufacturer_id = manu_id
             session.add(self)
             await session.flush()
-            the_asset = Asset(software_id=self.id,last_seen=self.last_seen)
+            the_asset = Asset(software_id=self.id, last_seen=self.last_seen)
             session.add(the_asset)
             logger.info(f"CREATED: {self} {self.name}")
             logger.info(f"CREATED: {the_asset} {the_asset.id}")
         return obj
+
 
 class Device(Base):
     __tablename__ = "device"
@@ -219,6 +232,7 @@ class Device(Base):
 
     async def create_or_update(self, session) -> None:
         updated = False
+
         async def find_devicetype_key(nb_key):
             stmt = select(DeviceType).where(DeviceType.nb_id == nb_key)
             result = await session.execute(stmt)
@@ -249,11 +263,12 @@ class Device(Base):
             self.device_type_id = devicetype_id
             session.add(self)
             await session.flush()
-            the_asset = Asset(device_id=self.id,last_seen=self.last_seen)
+            the_asset = Asset(device_id=self.id, last_seen=self.last_seen)
             session.add(the_asset)
             logger.info(f"CREATED: {self} {self.name}")
             logger.info(f"CREATED: {the_asset} {the_asset.id}")
         return obj
+
 
 class Asset(Base):
     __tablename__ = "asset"
@@ -282,28 +297,29 @@ class ProductRelationship(Base):
     target_id: Mapped[int] = mapped_column(Integer)
     target_type: Mapped[str] = mapped_column(Text)
 
-    def get_source(self,session):
-        if self.source_type == 'Device':
+    def get_source(self, session):
+        if self.source_type == "Device":
             return session.get(Device, self.source_id)
-        elif self.source_type == 'Software':
+        elif self.source_type == "Software":
             return session.get(Software, self.source_id)
         else:
             return None
 
-    def get_target(self,session):
-        if self.target_type == 'Device':
+    def get_target(self, session):
+        if self.target_type == "Device":
             return session.get(Device, self.target_id)
-        elif self.target_type == 'Software':
+        elif self.target_type == "Software":
             return session.get(Software, self.target_id)
         else:
             return None
 
     async def create_or_update(self, session) -> None:
         updated = False
+
         async def find_related_key(nb_key, the_type):
-            if the_type == 'Device':
+            if the_type == "Device":
                 stmt = select(Device).where(Device.nb_id == nb_key)
-            elif the_type == 'Software':
+            elif the_type == "Software":
                 stmt = select(Software).where(Software.nb_id == nb_key)
             else:
                 return None
@@ -314,7 +330,9 @@ class ProductRelationship(Base):
             else:
                 raise data_consistency_problem("Device of Software not found")
 
-        stmt = select(ProductRelationship).where(ProductRelationship.nb_id == self.nb_id)
+        stmt = select(ProductRelationship).where(
+            ProductRelationship.nb_id == self.nb_id
+        )
         result = await session.execute(stmt)
         obj = result.scalar_one_or_none()
         source_id = await find_related_key(self.nb_source_id, self.source_type)
@@ -345,6 +363,7 @@ class ProductRelationship(Base):
             logger.info(f"CREATED: {self} {self.id}")
         return obj
 
+
 class File(Base):
     __tablename__ = "file"
 
@@ -360,12 +379,13 @@ class File(Base):
 
     async def create_or_update(self, session) -> None:
         updated = False
+
         async def find_software_key(nb_key):
             stmt = select(Software).where(Software.nb_id == nb_key)
             result = await session.execute(stmt)
             obj = result.scalar_one_or_none()
             if obj:
-                return(obj.id)
+                return obj.id
             else:
                 raise data_consistency_problem("Software not found")
 
@@ -389,6 +409,7 @@ class File(Base):
             logger.info(f"CREATED: {self} {self.filename}")
         return obj
 
+
 class Hash(Base):
     __tablename__ = "hash"
 
@@ -404,6 +425,7 @@ class Hash(Base):
 
     async def create_or_update(self, session) -> None:
         updated = False
+
         async def find_file_key(nb_key):
             stmt = select(File).where(File.nb_id == nb_key)
             result = await session.execute(stmt)
@@ -418,7 +440,7 @@ class Hash(Base):
         obj = result.scalar_one_or_none()
         file_id = await find_file_key(self.nb_file_id)
         if obj:
-            #logger.info(f"FOUND: {obj.nb_id} {obj.name}")
+            # logger.info(f"FOUND: {obj.nb_id} {obj.name}")
             if obj.algorithm != self.algorithm:
                 setattr(obj, "algorithm", self.name)
                 updated = True
@@ -436,6 +458,7 @@ class Hash(Base):
             session.add(self)
             logger.info(f"CREATED: {self} {self.id}")
         return obj
+
 
 class CsafDocument(Base):
     __tablename__ = "csaf_document"

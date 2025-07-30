@@ -14,8 +14,6 @@ from abc import ABC
 from importlib.metadata import entry_points, EntryPoints
 from pathlib import Path
 from typing import List, Union
-from datetime import datetime
-import time
 
 from dina.cachedb.database import CacheDB
 from dina.cachedb.model import Asset, CsafDocument
@@ -79,7 +77,6 @@ class PluginLoadError(Exception):
 
 
 class BaseSynchronizer(ABC):
-
     starttime = 0
 
     def __init__(
