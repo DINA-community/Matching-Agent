@@ -4,8 +4,8 @@ import logging
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncEngine
 from sqlalchemy.sql.ddl import CreateSchema
 from sqlalchemy import select
-
 from dina.cachedb.model import Base,Manufacturer,DeviceType,Device,Software,File,Hash,ProductRelationship,AssetSynchronizer,CsafDocument
+from dina.cachedb.model import data_consistency_problem
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,10 @@ class CacheDB:
             async with session.begin():
                 for asset in data:
                     #logger.info(f"DATA: {asset}")
-                    await asset.create_or_update(session)
+                    try:
+                        await asset.create_or_update(session)
+                    except data_consistency_problem as e:
+                        logger.error(f"Data consistency problem when processing: {asset} {e} ")
                 await session.commit()
                 await session.close()
 

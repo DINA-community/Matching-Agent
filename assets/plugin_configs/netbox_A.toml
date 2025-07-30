@@ -9,7 +9,9 @@ update_interval = 60
 
 [DataSource.Netbox]
 # Netbox-specific configuration
+# netbox2: online populated using asset-manager
 api_url = "http://172.16.15.61:8000"
 api_token = "11ff5d2484c3f34b3618e4de3156ce699298bc3f"
+# netbox-max: manually populated by Max
 #api_url = "http://192.168.1.21:8000"
 #api_token = "e3689f9cc3b4d7a094611e64e5f7be671e3a5522"

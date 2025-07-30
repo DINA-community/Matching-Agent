@@ -11,6 +11,9 @@ from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
 
+class data_consistency_problem(Exception):
+    """consistency with netbox data detected"""
+    pass
 
 class Base(AsyncAttrs, DeclarativeBase):
     metadata = MetaData(schema="cacheDB")
@@ -93,7 +96,7 @@ class DeviceType(Base):
             if obj:
                 return obj.id
             else:
-                return None
+                raise data_consistency_problem("Manufacturer not found")
 
         stmt = select(DeviceType).where(DeviceType.nb_id == self.nb_id)
         result = await session.execute(stmt)
@@ -159,7 +162,7 @@ class Software(Base):
             if obj:
                 return obj.id
             else:
-                return None
+                raise data_consistency_problem("Manufacturer not found")
 
         stmt = select(Software).where(Software.nb_id == self.nb_id)
         result = await session.execute(stmt)
@@ -223,7 +226,7 @@ class Device(Base):
             if obj:
                 return obj.id
             else:
-                return None
+                raise data_consistency_problem("DeviceType not found")
 
         stmt = select(Device).where(Device.nb_id == self.nb_id)
         result = await session.execute(stmt)
@@ -309,7 +312,7 @@ class ProductRelationship(Base):
             if obj:
                 return obj.id
             else:
-                return None
+                raise data_consistency_problem("Device of Software not found")
 
         stmt = select(ProductRelationship).where(ProductRelationship.nb_id == self.nb_id)
         result = await session.execute(stmt)
@@ -364,7 +367,7 @@ class File(Base):
             if obj:
                 return(obj.id)
             else:
-                return None
+                raise data_consistency_problem("Software not found")
 
         stmt = select(File).where(File.nb_id == self.nb_id)
         result = await session.execute(stmt)
@@ -408,7 +411,7 @@ class Hash(Base):
             if obj:
                 return obj.id
             else:
-                return None
+                raise data_consistency_problem("File not found")
 
         stmt = select(Hash).where(Hash.nb_id == self.nb_id)
         result = await session.execute(stmt)
