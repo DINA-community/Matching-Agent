@@ -79,8 +79,8 @@ class NetboxDataSource(DataSourcePlugin):
             if source_type and target_type:
                 results.append(ProductRelationship(nb_id=x.id,nb_source_id=x.source_id,source_type=source_type,nb_target_id=x.destination_id,target_type=target_type,category=int(x.category),last_seen=starttime))
 
-        logger.info(f"DATA: {results}")
-        await asyncio.sleep(1)
+        #logger.info(f"DATA: {results}")
+        await asyncio.sleep(10)
         return results
 
     def endpoint_info(self) -> str:

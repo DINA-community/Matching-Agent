@@ -46,7 +46,7 @@ class CacheDB:
         async with AsyncSession(self.engine) as session:
             async with session.begin():
                 for asset in data:
-                    logger.info(f"DATA: {asset}")
+                    #logger.info(f"DATA: {asset}")
                     await asset.create_or_update(session)
                 await session.commit()
                 await session.close()
@@ -65,51 +65,50 @@ class CacheDB:
             result = await session.execute(select(Manufacturer))
             all_objects = result.scalars().all()
             for x in all_objects:
-                logger.info(f"DELETE Manufacturer: {x.name} {x.last_seen}")
                 if x.last_seen < starttime:
-                    logger.info(f"DELETE Manufacturer: {x.name} {x.last_seen}")
+                    logger.info(f"DELETED: {x} {x.name} {x.last_seen}")
                     await session.delete(x)
 
             result = await session.execute(select(DeviceType))
             all_objects = result.scalars().all()
             for x in all_objects:
                 if x.last_seen < starttime:
-                    logger.info(f"DELETE DeviceType: {x.model} {x.last_seen}")
+                    logger.info(f"DELETED: {x} {x.model_number} {x.last_seen}")
                     await session.delete(x)
 
             result = await session.execute(select(Device))
             all_objects = result.scalars().all()
             for x in all_objects:
                 if x.last_seen < starttime:
-                    logger.info(f"DELETE Device: {x.name} {x.last_seen}")
+                    logger.info(f"DELETED: {x} {x.name} {x.last_seen}")
                     await session.delete(x)
 
             result = await session.execute(select(Software))
             all_objects = result.scalars().all()
             for x in all_objects:
                 if x.last_seen < starttime:
-                    logger.info(f"DELETE Software: {x.name} {x.last_seen}")
+                    logger.info(f"DELETED: {x} {x.name} {x.last_seen}")
                     await session.delete(x)
 
             result = await session.execute(select(Hash))
             all_objects = result.scalars().all()
             for x in all_objects:
                 if x.last_seen < starttime:
-                    logger.info(f"DELETE Hash: {x.name} {x.last_seen}")
+                    logger.info(f"DELETED: {x} {x.id} {x.last_seen}")
                     await session.delete(x)
 
             result = await session.execute(select(File))
             all_objects = result.scalars().all()
             for x in all_objects:
                 if x.last_seen < starttime:
-                    logger.info(f"DELETE File: {x.name} {x.last_seen}")
+                    logger.info(f"DELETED: {x} {x.filename} {x.last_seen}")
                     await session.delete(x)
 
             result = await session.execute(select(ProductRelationship))
             all_objects = result.scalars().all()
             for x in all_objects:
                 if x.last_seen < starttime:
-                    logger.info(f"DELETE ProductRelationship: {x.id} {x.last_seen}")
+                    logger.info(f"DELETED: {x} {x.id} {x.last_seen}")
                     await session.delete(x)
 
             await session.commit()

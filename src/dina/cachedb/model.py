@@ -22,15 +22,12 @@ class AssetSynchronizer(Base):
     last_run: Mapped[float] = mapped_column(Float)
 
     async def create_or_update(self, session) -> None:
-        logger.info(f"CREATE-OR-UPDATE: {self.id}")
         stmt = select(AssetSynchronizer)
         result = await session.execute(stmt)
         obj = result.scalar_one_or_none()
         if obj:
-            #logger.info(f"RELATIONSHIP ATTR: {obj.name}  {obj.device_types} {obj.software}")
             setattr(obj, "last_run", self.last_run)
         else:
-            #logger.info("CREATE")
             session.add(self)
         return obj
 
@@ -48,20 +45,22 @@ class Manufacturer(Base):
     software: Mapped[List["Software"]] = relationship(back_populates="manufacturer")
 
     async def create_or_update(self, session) -> None:
-        logger.info(f"CREATE-OR-UPDATE: {self.name}")
+        updated = False
         stmt = select(Manufacturer).where(Manufacturer.nb_id == self.nb_id)
         #stmt = select(Manufacturer).options(selectinload(Manufacturer.device_types)).options(selectinload(Manufacturer.software)).where(
         #    Manufacturer.nb_id == self.nb_id)
         result = await session.execute(stmt)
         obj = result.scalar_one_or_none()
         if obj:
-            #logger.info(f"RELATIONSHIP ATTR: {obj.name}  {obj.device_types} {obj.software}")
             if obj.name != self.name:
                 setattr(obj, "name", self.name)
+                updated = True
             setattr(obj, "last_seen", self.last_seen)
+            if updated:
+                logger.info(f"UPDATED: {self} {self.name}")
         else:
-            #logger.info("CREATE")
             session.add(self)
+            logger.info(f"CREATED: {self} {self.name}")
         return obj
 
 class DeviceType(Base):
@@ -86,7 +85,7 @@ class DeviceType(Base):
     devices: Mapped[List["Device"]] = relationship(back_populates="device_type")
 
     async def create_or_update(self, session) -> None:
-
+        updated = False
         async def find_manufacturer_key(nb_key):
             stmt = select(Manufacturer).where(Manufacturer.nb_id == nb_key)
             result = await session.execute(stmt)
@@ -96,32 +95,38 @@ class DeviceType(Base):
             else:
                 return None
 
-        logger.info(f"CREATE-OR-UPDATE: {self.model_number}")
         stmt = select(DeviceType).where(DeviceType.nb_id == self.nb_id)
         result = await session.execute(stmt)
         obj = result.scalar_one_or_none()
         manu_id = await find_manufacturer_key(self.nb_manu_id)
         if obj:
-            #logger.info(f"FOUND: {obj.nb_id} {obj.model_number}")
             if obj.model_number != self.model_number:
                 setattr(obj, "model_number", self.model_number)
+                updated = True
             if obj.part_number != self.part_number:
                 setattr(obj, "part_number", self.part_number)
             if obj.device_family != self.device_family:
                 setattr(obj, "device_family", self.device_family)
+                updated = True
             if obj.cpe != self.cpe:
                 setattr(obj, "cpe", self.cpe)
+                updated = True
             if obj.hardware_version != self.hardware_version:
                 setattr(obj, "hardware_version", self.hardware_version)
+                updated = True
             if obj.hardware_name != self.hardware_name:
                 setattr(obj, "hardware_name", self.hardware_name)
+                updated = True
             if obj.manufacturer_id != manu_id:
                 setattr(obj, "manufacturer_id", manu_id)
+                updated = True
             setattr(obj, "last_seen", self.last_seen)
+            if updated:
+                logger.info(f"UPDATED: {self} {self.model_number}")
         else:
-            #logger.info("CREATE")
             self.manufacturer_id = manu_id
             session.add(self)
+            logger.info(f"CREATED: {self} {self.model_number}")
         return obj
 
 class Software(Base):
@@ -146,7 +151,7 @@ class Software(Base):
     csaf_products: Mapped[List["CsafProduct"]] = relationship(back_populates="software")
 
     async def create_or_update(self, session) -> None:
-
+        updated = False
         async def find_manufacturer_key(nb_key):
             stmt = select(Manufacturer).where(Manufacturer.nb_id == nb_key)
             result = await session.execute(stmt)
@@ -156,33 +161,40 @@ class Software(Base):
             else:
                 return None
 
-        logger.info(f"CREATE-OR-UPDATE: {self.name}")
         stmt = select(Software).where(Software.nb_id == self.nb_id)
         result = await session.execute(stmt)
         obj = result.scalar_one_or_none()
         manu_id = await find_manufacturer_key(self.nb_manu_id)
         if obj:
-            #logger.info(f"FOUND: {obj.nb_id} {obj.name}")
             if obj.name != self.name:
                 setattr(obj, "name", self.name)
+                updated = True
             if obj.version != self.version:
                 setattr(obj, "version", self.version)
+                updated = True
             if obj.cpe != self.cpe:
                 setattr(obj, "cpe", self.cpe)
+                updated = True
             if obj.purl != self.purl:
                 setattr(obj, "purl", self.purl)
+                updated = True
             if obj.sbom_urls != self.sbom_urls:
                 setattr(obj, "sbom_urls", self.sbom_urls)
+                updated = True
             if obj.manufacturer_id != manu_id:
                 setattr(obj, "manufacturer_id", manu_id)
+                updated = True
             setattr(obj, "last_seen", self.last_seen)
+            if updated:
+                logger.info(f"UPDATED: {self} {self.name}")
         else:
-            #logger.info("CREATE")
             self.manufacturer_id = manu_id
             session.add(self)
             await session.flush()
             the_asset = Asset(software_id=self.id,last_seen=self.last_seen)
             session.add(the_asset)
+            logger.info(f"CREATED: {self} {self.name}")
+            logger.info(f"CREATED: {the_asset} {the_asset.id}")
         return obj
 
 class Device(Base):
@@ -203,7 +215,7 @@ class Device(Base):
     csaf_products: Mapped[List["CsafProduct"]] = relationship(back_populates="device")
 
     async def create_or_update(self, session) -> None:
-
+        updated = False
         async def find_devicetype_key(nb_key):
             stmt = select(DeviceType).where(DeviceType.nb_id == nb_key)
             result = await session.execute(stmt)
@@ -213,27 +225,31 @@ class Device(Base):
             else:
                 return None
 
-        logger.info(f"CREATE-OR-UPDATE: {self.name}")
         stmt = select(Device).where(Device.nb_id == self.nb_id)
         result = await session.execute(stmt)
         obj = result.scalar_one_or_none()
         devicetype_id = await find_devicetype_key(self.nb_devicetype_id)
         if obj:
-            #logger.info(f"FOUND: {obj.nb_id} {obj.name}")
             if obj.name != self.name:
                 setattr(obj, "name", self.name)
+                updated = True
             if obj.serial != self.serial:
                 setattr(obj, "serial", self.serial)
+                updated = True
             if obj.device_type_id != devicetype_id:
                 setattr(obj, "device_type_id", devicetype_id)
+                updated = True
             setattr(obj, "last_seen", self.last_seen)
+            if updated:
+                logger.info(f"UPDATED: {self} {self.name}")
         else:
-            #logger.info("CREATE")
             self.device_type_id = devicetype_id
             session.add(self)
             await session.flush()
             the_asset = Asset(device_id=self.id,last_seen=self.last_seen)
             session.add(the_asset)
+            logger.info(f"CREATED: {self} {self.name}")
+            logger.info(f"CREATED: {the_asset} {the_asset.id}")
         return obj
 
 class Asset(Base):
@@ -280,7 +296,7 @@ class ProductRelationship(Base):
             return None
 
     async def create_or_update(self, session) -> None:
-
+        updated = False
         async def find_related_key(nb_key, the_type):
             if the_type == 'Device':
                 stmt = select(Device).where(Device.nb_id == nb_key)
@@ -295,30 +311,35 @@ class ProductRelationship(Base):
             else:
                 return None
 
-        logger.info(f"CREATE-OR-UPDATE: {self.source_type}")
         stmt = select(ProductRelationship).where(ProductRelationship.nb_id == self.nb_id)
         result = await session.execute(stmt)
         obj = result.scalar_one_or_none()
         source_id = await find_related_key(self.nb_source_id, self.source_type)
         target_id = await find_related_key(self.nb_target_id, self.target_type)
         if obj:
-            # logger.info(f"FOUND: {obj.nb_id} {obj.name}")
             if obj.source_id != source_id:
                 setattr(obj, "source_id", source_id)
+                updated = True
             if obj.target_id != target_id:
                 setattr(obj, "target_id", target_id)
+                updated = True
             if obj.source_type != self.source_type:
                 setattr(obj, "source_type", self.source_type)
+                updated = True
             if obj.target_type != self.target_type:
                 setattr(obj, "target_type", self.target_type)
+                updated = True
             if obj.category != self.category:
                 setattr(obj, "category", self.category)
+                updated = True
             setattr(obj, "last_seen", self.last_seen)
+            if updated:
+                logger.info(f"UPDATED: {self}")
         else:
-            # logger.info("CREATE")
             self.source_id = source_id
             self.target_id = target_id
             session.add(self)
+            logger.info(f"CREATED: {self} {self.id}")
         return obj
 
 class File(Base):
@@ -335,7 +356,7 @@ class File(Base):
     hashes: Mapped[List["Hash"]] = relationship(back_populates="file")
 
     async def create_or_update(self, session) -> None:
-
+        updated = False
         async def find_software_key(nb_key):
             stmt = select(Software).where(Software.nb_id == nb_key)
             result = await session.execute(stmt)
@@ -345,22 +366,24 @@ class File(Base):
             else:
                 return None
 
-        logger.info(f"CREATE-OR-UPDATE: {self.filename}")
         stmt = select(File).where(File.nb_id == self.nb_id)
         result = await session.execute(stmt)
         obj = result.scalar_one_or_none()
         software_id = await find_software_key(self.nb_software_id)
         if obj:
-            #logger.info(f"FOUND: {obj.nb_id} {obj.name}")
             if obj.filename != self.filename:
                 setattr(obj, "filename", self.filename)
+                updated = True
             if obj.software_id != software_id:
                 setattr(obj, "software_id", software_id)
+                updated = True
             setattr(obj, "last_seen", self.last_seen)
+            if updated:
+                logger.info(f"UPDATED: {self} {self.filename}")
         else:
-            #logger.info("CREATE")
             self.software_id = software_id
             session.add(self)
+            logger.info(f"CREATED: {self} {self.filename}")
         return obj
 
 class Hash(Base):
@@ -377,7 +400,7 @@ class Hash(Base):
     file: Mapped["File"] = relationship(back_populates="hashes")
 
     async def create_or_update(self, session) -> None:
-
+        updated = False
         async def find_file_key(nb_key):
             stmt = select(File).where(File.nb_id == nb_key)
             result = await session.execute(stmt)
@@ -387,7 +410,6 @@ class Hash(Base):
             else:
                 return None
 
-        logger.info(f"CREATE-OR-UPDATE: {self.id}")
         stmt = select(Hash).where(Hash.nb_id == self.nb_id)
         result = await session.execute(stmt)
         obj = result.scalar_one_or_none()
@@ -396,15 +418,20 @@ class Hash(Base):
             #logger.info(f"FOUND: {obj.nb_id} {obj.name}")
             if obj.algorithm != self.algorithm:
                 setattr(obj, "algorithm", self.name)
+                updated = True
             if obj.value != self.value:
                 setattr(obj, "value", self.serial)
+                updated = True
             if obj.file_id != file_id:
                 setattr(obj, "file_id", file_id)
+                updated = True
             setattr(obj, "last_seen", self.last_seen)
+            if updated:
+                logger.info(f"UPDATED: {self} {self.id}")
         else:
-            #logger.info("CREATE")
             self.file_id = file_id
             session.add(self)
+            logger.info(f"CREATED: {self} {self.id}")
         return obj
 
 class CsafDocument(Base):
