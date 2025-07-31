@@ -213,6 +213,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+datasource-isduba = [
+    { name = "dina-plugins-datasource-isduba-fetcher" },
+]
 datasource-netbox = [
     { name = "dina-plugins-datasource-netbox-fetcher" },
 ]
@@ -237,6 +240,7 @@ requires-dist = [
     { name = "aiohttp", specifier = ">=3.12.13" },
     { name = "asyncpg", specifier = ">=0.30.0" },
     { name = "colorlog", specifier = ">=6.9.0" },
+    { name = "dina-plugins-datasource-isduba-fetcher", marker = "extra == 'datasource-isduba'", editable = "plugins/asset_source/isduba" },
     { name = "dina-plugins-datasource-netbox-fetcher", marker = "extra == 'datasource-netbox'", editable = "plugins/asset_source/netbox" },
     { name = "dina-plugins-datasource-sample", marker = "extra == 'datasource-sample'", editable = "plugins/asset_source/sample" },
     { name = "dina-plugins-preprocessing-identity", marker = "extra == 'preprocessor-identity'", editable = "plugins/preprocessing/identity" },
@@ -248,7 +252,7 @@ requires-dist = [
     { name = "ruff", specifier = ">=0.12.0" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.0" },
 ]
-provides-extras = ["datasource-netbox", "datasource-sample", "preprocessor-identity"]
+provides-extras = ["datasource-netbox", "datasource-isduba", "datasource-sample", "preprocessor-identity"]
 
 [package.metadata.requires-dev]
 dev = [
