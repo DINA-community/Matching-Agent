@@ -77,6 +77,8 @@ class PluginLoadError(Exception):
 
 
 class BaseSynchronizer(ABC):
+    starttime = 0
+
     def __init__(
         self, cache_db: CacheDB, data_source_plugin_configs: Path, config_file: Path
     ):
@@ -267,7 +269,6 @@ class BaseSynchronizer(ABC):
                 logger.error("TaskGroup exception:", exc_info=e)
 
     async def fetch_data_task(self, source: DataSourcePlugin):
-        """Perform a collection of data from a single data source."""
         while True:
             self.pending_data.extend(await source.fetch_data())
 
@@ -299,6 +300,7 @@ class BaseSynchronizer(ABC):
                 logger.info(f"Storing {len(self.preprocessed_data)} items in cacheDB")
                 # TODO: Re-enable once the rest is stable enough
                 await self.cache_db.store(self.preprocessed_data)
+                await self.cache_db.check_delete()
                 self.preprocessed_data.clear()
             else:
                 await asyncio.sleep(0.1)

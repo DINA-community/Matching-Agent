@@ -32,9 +32,6 @@ datasource-sample = [
 preprocessor-identity = [
     "dina-plugins-preprocessing-identity",
 ]
-preprocessor-netbox = [
-    "dina-plugins-preprocessing-netbox",
-]
 
 [project.scripts]
 assetsync = "dina.assetsync.main:main"
