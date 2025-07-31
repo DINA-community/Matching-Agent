@@ -9,3 +9,4 @@ update_interval = 60
 url = "http://endpoint.sample.com/"
 username = "username"
 password = "password"
+verify_ssl = True
