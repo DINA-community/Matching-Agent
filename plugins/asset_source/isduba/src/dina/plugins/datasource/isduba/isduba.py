@@ -13,7 +13,7 @@ class IsdubaDataSource(DataSourcePlugin):
         super().__init__(config)
         # Extract configuration values
         try:
-            plugin_config = self.config["DataSource"]["YourPluginSection"]
+            plugin_config = self.config["DataSource"]["ISDuBA"]
             self.some_param = plugin_config["some_param"]
             # Add other configuration parameters as needed
         except KeyError:

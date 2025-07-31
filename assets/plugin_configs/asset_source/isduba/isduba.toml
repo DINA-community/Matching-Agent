@@ -5,5 +5,7 @@ plugin_name = "isduba_fetcher"
 timeout_seconds = 30
 update_interval = 60
 
-[DataSource.YourPluginSection]
-some_param = "hello"
+[DataSource.ISDuBA]
+url = "http://endpoint.sample.com/"
+username = "username"
+password = "password"
