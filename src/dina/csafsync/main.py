@@ -24,7 +24,9 @@ class CSAFSynchronizer(BaseSynchronizer):
         """
         cache_db = CacheDB()
         super().__init__(
-            cache_db, Path("./assets/plugin_configs/"), Path("./assets/csafsync.toml")
+            cache_db,
+            Path("./assets/plugin_configs/asset_source/isduba/"),
+            Path("./assets/csafsync.toml"),
         )
         # TODO: Initialize connections to asset databases and the cache database.
         # TODO: Find the appropriate transformer plugins.
