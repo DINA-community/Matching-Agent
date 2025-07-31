@@ -19,8 +19,7 @@ dependencies = [
     "httpx",
     "python-dateutil",
     "ruff>=0.12.0",
-    "mypy>=1.16.1",
-    "isduba-client",
+    "mypy>=1.16.1"
 ]
 
 [project.optional-dependencies]
@@ -50,16 +49,15 @@ members = [
     "plugins/asset_source/isduba",
     "plugins/asset_source/netbox",
     "plugins/asset_source/sample",
-    "plugins/preprocessing/identity",
-    "plugins/preprocessing/netbox"
+    "plugins/preprocessing/identity"
 ]
 
 [tool.uv.sources]
 "dina.plugins.datasource.netbox_fetcher" = { workspace = true }
+"dina.plugins.datasource.isduba_fetcher" = { workspace = true }
 dina-plugins-datasource-sample = { workspace = true }
 dina-plugins-preprocessing-identity = { workspace = true }
 dina-plugins-preprocessing-netbox = { workspace = true }
-isduba-client = { workspace = true }
 
 [tool.ruff]
 exclude = ["plugins/asset_source/netbox/src/dina/plugins/datasource/netbox/api_client"]
