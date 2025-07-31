@@ -20,7 +20,7 @@ packages = ["src/dina"]
 
 # A datasource plugin must specify the correct DataSource class as an entry-point.
 [project.entry-points."dina.plugins.datasource"]
-sample = "dina.plugins.datasource.isduba.isduba:IsdubaDataSource"
+isduba_fetcher = "dina.plugins.datasource.isduba.isduba:IsdubaDataSource"
 
 [build-system]
 requires = ["hatchling"]
