@@ -44,7 +44,7 @@ uv sync --all-extras
 
 to set up the local dev environment.
 
-Generate the [ISDuBA API](ISDuBA-API.md).
+Generate the [ISDuBA API](plugins/asset_source/isduba/README.md).
 
 ### Setting up git pre-commit hooks
 

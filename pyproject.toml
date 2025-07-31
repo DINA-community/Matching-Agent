@@ -16,7 +16,6 @@ dependencies = [
     "hatchling>=1.27.0",
     "sqlalchemy[asyncio]>=2.0.0",
     "openapi-python-client",
-    "openapi-generator-cli",
     "httpx",
     "python-dateutil",
     "ruff>=0.12.0",
@@ -48,11 +47,11 @@ packages = ["src/dina"]
 
 [tool.uv.workspace]
 members = [
+    "plugins/asset_source/isduba",
     "plugins/asset_source/netbox",
     "plugins/asset_source/sample",
     "plugins/preprocessing/identity",
-    "plugins/preprocessing/netbox",
-    "plugins/asset_source/isduba/src/dina/plugins/datasource/isduba/api_client",
+    "plugins/preprocessing/netbox"
 ]
 
 [tool.uv.sources]
