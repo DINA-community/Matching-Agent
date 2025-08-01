@@ -108,11 +108,6 @@ class IsdubaDataSource(DataSourcePlugin):
                         limit=limit,
                         offset=offset,
                     )
-                    logger.trace(
-                        "The response of DefaultApi->documents_get:\n\n{}\n".format(
-                            api_response
-                        )
-                    )
 
                     if not api_response:
                         break
