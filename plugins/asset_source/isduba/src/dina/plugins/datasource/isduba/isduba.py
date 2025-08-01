@@ -7,7 +7,7 @@ from dina.synchronizer.base import DataSourcePlugin
 
 
 # from .api_client.isduba_client.rest import ApiException
-import requests
+import httpx
 from .api_client.isduba_client import Configuration
 from .api_client.isduba_client import ApiClient
 from .api_client.isduba_client import DefaultApi
@@ -45,7 +45,7 @@ class IsdubaDataSource(DataSourcePlugin):
         )
         logger.trace("Fetching bearer token from {}".format(token_url))
         token = (
-            requests.post(
+            httpx.post(
                 token_url,
                 data={
                     "grant_type": "password",
