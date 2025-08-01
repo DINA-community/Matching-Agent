@@ -1,10 +1,20 @@
 # import asyncio
 from typing import List, Union
-
-from dina.cachedb.model import CsafDocument, Asset
+from dina.cachedb.model import (
+    Manufacturer,
+    DeviceType,
+    Device,
+    Software,
+    CsafProduct,
+    File,
+    Asset,
+    CsafProductTree,
+    Hash,
+    Match,
+    CsafDocument,
+)
 from dina.common import logging
 from dina.synchronizer.base import DataSourcePlugin
-
 import httpx
 import isduba_api_client
 
@@ -74,60 +84,74 @@ class IsdubaDataSource(DataSourcePlugin):
             # Create an instance of the API class
             api_instance = isduba_api_client.DefaultApi(api_client)
 
-            logger.trace("Requesting application information...")
-            # Returns application information.
-            try:
-                api_response = api_instance.about_get()
-                logger.trace(
-                    "The response of DefaultApi->about_get:\n\n{}\n\n".format(
-                        api_response
+            ret = []
+            limit = 10
+            offset = 0
+            while True:
+                # Return documents.
+                try:
+                    # Return a list of documents
+                    logger.trace("Requesting list of documents...")
+                    advisories = None  # bool | Return advisories (optional)
+                    query = None  # str | Document query (optional)
+                    columns = None  # str | Columns (optional)
+                    orders = None  # str | Ordering (optional)
+                    count = None  # bool | Enable counting (optional)
+                    # limit = 10  # int | Maximum documents (optional)
+                    # offset = None  # int | Offset (optional)
+                    api_response = api_instance.documents_get(
+                        advisories=advisories,
+                        query=query,
+                        columns=columns,
+                        orders=orders,
+                        count=count,
+                        limit=limit,
+                        offset=offset,
                     )
-                )
-            except Exception as e:
-                raise Exception(
-                    "Exception when calling DefaultApi->about_get:\n\n%s" % e
-                )
-
-            # Return documents.
-            try:
-                # Return a list of documents
-                logger.trace("Requesting list of documents...")
-                advisories = None  # bool | Return advisories (optional)
-                query = None  # str | Document query (optional)
-                columns = None  # str | Columns (optional)
-                orders = None  # str | Ordering (optional)
-                count = None  # bool | Enable counting (optional)
-                limit = 1  # int | Maximum documents (optional)
-                offset = None  # int | Offset (optional)
-                api_response = api_instance.documents_get(
-                    advisories=advisories,
-                    query=query,
-                    columns=columns,
-                    orders=orders,
-                    count=count,
-                    limit=limit,
-                    offset=offset,
-                )
-                logger.trace(
-                    "The response of DefaultApi->documents_get:\n\n{}\n".format(
-                        api_response
+                    logger.trace(
+                        "The response of DefaultApi->documents_get:\n\n{}\n".format(
+                            api_response
+                        )
                     )
-                )
 
-                # Returns the document with given id.
-                logger.trace("Requesting document with first ID...")
-                id = api_response.documents[0]["id"]
-                api_response = api_instance.documents_id_get(id)
-                logger.trace(
-                    "The response of DefaultApi->documents_id_get:\n\n{}\n".format(
-                        api_response
+                    for doc in api_response.documents[0]["id"]:
+                        id = doc["id"]
+                        api_response = api_instance.documents_id_get(id)
+
+                        # extract data from api_response here:
+                        manufacturer = Manufacturer()
+                        device_type = DeviceType()
+                        device = Device()
+                        software = Software()
+                        csaf_product = CsafProduct()
+                        file = File()
+                        asset = Asset()
+                        csaf_product_tree = CsafProductTree()
+                        hash = Hash()
+                        match = Match()
+                        csaf_document = CsafDocument()
+
+                        manufacturer
+                        device_type
+                        device
+                        software
+                        csaf_product
+                        file
+                        asset
+                        csaf_product_tree
+                        hash
+                        match
+                        csaf_document
+
+                        # only return csaf_document; other objects are contained in it.
+                        ret.append(csaf_document)
+
+                except Exception as e:
+                    raise Exception(
+                        "Exception when calling DefaultApi->documents_get:\n\n%s" % e
                     )
-                )
 
-            except Exception as e:
-                raise Exception(
-                    "Exception when calling DefaultApi->documents_get:\n\n%s" % e
-                )
+                offset += limit
 
         # Return a list of Asset or CsafDocument objects
-        return []
+        return ret
