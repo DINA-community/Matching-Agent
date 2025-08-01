@@ -5,20 +5,8 @@ from dina.cachedb.model import CsafDocument, Asset
 from dina.common import logging
 from dina.synchronizer.base import DataSourcePlugin
 
-
-# from .api_client.isduba_client.rest import ApiException
 import httpx
 import isduba_api_client
-
-# from .api_client.openapi_client.configuration import Configuration
-# from .api_client.openapi_client import Configuration
-# import dina.plugins.datasource.isduba_fetcher.isduba_client
-# from dina.plugins.datasource.isduba.api_client import Configuration
-# import dina.plugins.datasource.isduba.api_client
-# import dina.plugins.datasource.isduba.api_client.isduba_client.configuration
-# from dina.plugins.datasource.isduba.api_client import Configuration
-# from dina.plugins.datasource.isduba.api_client import ApiClient
-# from dina.plugins.datasource.isduba.api_client import DefaultApi
 
 
 logger = logging.get_logger(__name__)
