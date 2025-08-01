@@ -78,8 +78,11 @@ class IsdubaDataSource(DataSourcePlugin):
             # Returns application information.
             try:
                 api_response = api_instance.about_get()
-                logger.trace("The response of DefaultApi->about_get:")
-                logger.trace(api_response)
+                logger.trace(
+                    "The response of DefaultApi->about_get:\n\n{}\n\n".format(
+                        api_response
+                    )
+                )
             except Exception as e:
                 raise Exception(
                     "Exception when calling DefaultApi->about_get:\n\n%s" % e
@@ -105,15 +108,21 @@ class IsdubaDataSource(DataSourcePlugin):
                     limit=limit,
                     offset=offset,
                 )
-                logger.trace("The response of DefaultApi->documents_get:")
-                logger.trace(api_response)
+                logger.trace(
+                    "The response of DefaultApi->documents_get:\n\n{}\n".format(
+                        api_response
+                    )
+                )
 
                 # Returns the document with given id.
                 logger.trace("Requesting document with first ID...")
                 id = api_response.documents[0]["id"]
                 api_response = api_instance.documents_id_get(id)
-                logger.trace("The response of DefaultApi->documents_id_get:")
-                logger.trace(api_response)
+                logger.trace(
+                    "The response of DefaultApi->documents_id_get:\n\n{}\n".format(
+                        api_response
+                    )
+                )
 
             except Exception as e:
                 raise Exception(
