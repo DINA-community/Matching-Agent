@@ -114,6 +114,9 @@ class IsdubaDataSource(DataSourcePlugin):
                         )
                     )
 
+                    if not api_response:
+                        break
+
                     for doc in api_response.documents[0]["id"]:
                         id = doc["id"]
                         api_response = api_instance.documents_id_get(id)
