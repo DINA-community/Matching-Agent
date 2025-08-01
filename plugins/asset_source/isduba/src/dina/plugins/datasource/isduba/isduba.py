@@ -74,7 +74,7 @@ class IsdubaDataSource(DataSourcePlugin):
             # Create an instance of the API class
             api_instance = isduba_api_client.DefaultApi(api_client)
 
-            logger.trace("\nRequesting application information...\n")
+            logger.trace("Requesting application information...")
             # Returns application information.
             try:
                 api_response = api_instance.about_get()
