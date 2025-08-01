@@ -10,7 +10,7 @@ from dina.cachedb.model import (
     Asset,
     CsafProductTree,
     Hash,
-    Match,
+    #   Match,
     CsafDocument,
 )
 from dina.common import logging
@@ -119,31 +119,26 @@ class IsdubaDataSource(DataSourcePlugin):
                         api_response = api_instance.documents_id_get(id)
 
                         # extract data from api_response here:
-                        manufacturer = Manufacturer()
-                        device_type = DeviceType()
-                        device = Device()
-                        software = Software()
-                        csaf_product = CsafProduct()
-                        file = File()
-                        asset = Asset()
-                        csaf_product_tree = CsafProductTree()
+                        manufacturer = Manufacturer(name="")
+                        device_type = DeviceType(manufacturer=manufacturer)
+                        device = Device(device_type=device_type)
+                        software = Software(
+                            manufacturer=manufacturer, files=[], assets=[]
+                        )
+                        csaf_product = CsafProduct(device=device)
                         hash = Hash()
-                        match = Match()
-                        csaf_document = CsafDocument()
+                        file = File(software=software, hashes=hash)
+                        software.files.append(file)
+                        asset = Asset(software=software, device=device)
+                        software.assets.append(asset)
+                        csaf_product_tree = CsafProductTree(csaf_product=csaf_product)
+                        csaf_product.csaf_product_trees.append(csaf_product_tree)
+                        # match = Match()
+                        csaf_document = CsafDocument(
+                            id=id, csaf_product_trees=[csaf_product_tree], matches=[]
+                        )
 
-                        manufacturer
-                        device_type
-                        device
-                        software
-                        csaf_product
-                        file
-                        asset
-                        csaf_product_tree
-                        hash
-                        match
-                        csaf_document
-
-                        # only return csaf_document; other objects are contained in it.
+                        # only return csaf_document; other objects are contained therein.
                         ret.append(csaf_document)
 
                 except Exception as e:
