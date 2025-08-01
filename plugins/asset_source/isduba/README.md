@@ -32,10 +32,10 @@
   
 - Generate the python client for the ISDuBA API:
   ```
-  uv run openapi-generator-cli generate -i isduba-api.json -g python -o src/dina/plugins/datasource/isduba/api_client --package-name isduba_client
+  uv run openapi-generator-cli generate -i isduba-api.json -g python -o src/dina/plugins/datasource/isduba/api_client --package-name isduba_api_client
   ```
   
 - Install the client:
   ```
-  uv add plugins/asset_source/isduba/src/dina/plugins/datasource/isduba/api_client
+  uv add src/dina/plugins/datasource/isduba/api_client
   ```

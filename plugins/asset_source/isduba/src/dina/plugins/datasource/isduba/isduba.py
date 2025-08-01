@@ -8,9 +8,17 @@ from dina.synchronizer.base import DataSourcePlugin
 
 # from .api_client.isduba_client.rest import ApiException
 import httpx
-from .api_client.isduba_client import Configuration
-from .api_client.isduba_client import ApiClient
-from .api_client.isduba_client import DefaultApi
+import isduba_api_client
+
+# from .api_client.openapi_client.configuration import Configuration
+# from .api_client.openapi_client import Configuration
+# import dina.plugins.datasource.isduba_fetcher.isduba_client
+# from dina.plugins.datasource.isduba.api_client import Configuration
+# import dina.plugins.datasource.isduba.api_client
+# import dina.plugins.datasource.isduba.api_client.isduba_client.configuration
+# from dina.plugins.datasource.isduba.api_client import Configuration
+# from dina.plugins.datasource.isduba.api_client import ApiClient
+# from dina.plugins.datasource.isduba.api_client import DefaultApi
 
 
 logger = logging.get_logger(__name__)
@@ -22,7 +30,10 @@ class IsdubaDataSource(DataSourcePlugin):
         # Extract configuration values
         try:
             plugin_config = self.config["DataSource"]["ISDuBA"]
-            self.some_param = plugin_config["some_param"]
+            self.username = plugin_config["username"]
+            self.password = plugin_config["password"]
+            self.verify_ssl = plugin_config["verify_ssl"]
+            self.url = plugin_config["url"]
             # Add other configuration parameters as needed
         except KeyError:
             raise KeyError("Missing required configuration parameter")
@@ -41,7 +52,7 @@ class IsdubaDataSource(DataSourcePlugin):
         # await asyncio.sleep(1)
 
         token_url = "{}:8081/realms/isduba/protocol/openid-connect/token".format(
-            self.some_param["url"]
+            self.url
         )
         logger.trace("Fetching bearer token from {}".format(token_url))
         token = (
@@ -50,30 +61,30 @@ class IsdubaDataSource(DataSourcePlugin):
                 data={
                     "grant_type": "password",
                     "client_id": "auth",
-                    "username": self.some_param["username"],
-                    "password": self.some_param["password"],
+                    "username": self.username,
+                    "password": self.password,
                 },
-                verify=self.some_param["verify_ssl"],
+                verify=self.verify_ssl,
             )
             .json()
             .get("access_token")
         )
 
-        api_url = "{}/api".format(self.some_param["url"])
+        api_url = "{}/api".format(self.url)
         logger.trace("Creating client for API at {}".format(api_url))
         # Defining the host is optional and defaults to /api
         # See configuration.py for a list of all supported configuration parameters.
-        configuration = Configuration(
+        configuration = isduba_api_client.Configuration(
             host=api_url,
             api_key={"bearerAuth": token},
             api_key_prefix={"bearerAuth": "Bearer"},
         )
-        configuration.verify_ssl = self.some_param["verify_ssl"]
+        configuration.verify_ssl = self.verify_ssl
 
         # Enter a context with an instance of the API client
-        with ApiClient(configuration) as api_client:
+        with isduba_api_client.ApiClient(configuration) as api_client:
             # Create an instance of the API class
-            api_instance = DefaultApi(api_client)
+            api_instance = isduba_api_client.DefaultApi(api_client)
 
             logger.trace("\nRequesting application information...\n")
             # Returns application information.

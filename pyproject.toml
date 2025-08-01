@@ -50,7 +50,8 @@ members = [
     "plugins/asset_source/isduba",
     "plugins/asset_source/netbox",
     "plugins/asset_source/sample",
-    "plugins/preprocessing/identity"
+    "plugins/preprocessing/identity",
+    "plugins/asset_source/isduba/src/dina/plugins/datasource/isduba/api_client",
 ]
 
 [tool.uv.sources]
