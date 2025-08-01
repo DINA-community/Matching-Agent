@@ -25,7 +25,7 @@ class CSAFSynchronizer(BaseSynchronizer):
         cache_db = CacheDB()
         super().__init__(
             cache_db,
-            Path("./assets/plugin_configs/asset_source/isduba/"),
+            Path("./assets/plugin_configs/asset_source/isduba/active/"),
             Path("./assets/csafsync.toml"),
         )
         # TODO: Initialize connections to asset databases and the cache database.
