@@ -28,7 +28,7 @@ class IsdubaDataSource(DataSourcePlugin):
 
     def endpoint_info(self) -> str:
         """Return information about the data source endpoint."""
-        return "http://endpoint.sample.com/"
+        return self.url
 
     async def fetch_data(self) -> List[Union[Asset, CsafDocument]]:
         """Fetch data from the data source and return it as a list of Assets or CsafDocuments."""
