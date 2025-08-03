@@ -160,7 +160,7 @@ class Software(Base):
     )
 
     manufacturer: Mapped["Manufacturer"] = relationship(back_populates="software")
-    assets: Mapped[List["Asset"]] = relationship(back_populates="software")
+    assets: Mapped[List["Asset"]] = relationship(back_populates="software",cascade="all")
     files: Mapped[List["File"]] = relationship(back_populates="software")
     csaf_products: Mapped[List["CsafProduct"]] = relationship(back_populates="software")
 
@@ -227,7 +227,7 @@ class Device(Base):
     )
 
     device_type: Mapped["DeviceType"] = relationship(back_populates="devices")
-    assets: Mapped[List["Asset"]] = relationship(back_populates="device")
+    assets: Mapped[List["Asset"]] = relationship(back_populates="device",cascade="all")
     csaf_products: Mapped[List["CsafProduct"]] = relationship(back_populates="device")
 
     async def create_or_update(self, session) -> None:
