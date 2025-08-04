@@ -109,10 +109,10 @@ class IsdubaDataSource(DataSourcePlugin):
                         offset=offset,
                     )
 
-                    if not api_response:
+                    if not api_response.documents:
                         break
 
-                    for doc in api_response.documents[0]["id"]:
+                    for doc in api_response.documents:
                         id = doc["id"]
                         api_response = api_instance.documents_id_get(id)
 
