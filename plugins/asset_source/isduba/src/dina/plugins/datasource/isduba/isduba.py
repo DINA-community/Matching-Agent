@@ -1,16 +1,16 @@
 # import asyncio
 from typing import List, Union
 from dina.cachedb.model import (
-    Manufacturer,
-    DeviceType,
-    Device,
-    Software,
-    CsafProduct,
-    File,
+    # Manufacturer,
+    # DeviceType,
+    # Device,
+    # Software,
+    # CsafProduct,
+    # File,
     Asset,
-    CsafProductTree,
-    Hash,
-    #   Match,
+    # CsafProductTree,
+    # Hash,
+    # #   Match,
     CsafDocument,
 )
 from dina.common import logging
@@ -85,9 +85,11 @@ class IsdubaDataSource(DataSourcePlugin):
             api_instance = isduba_api_client.DefaultApi(api_client)
 
             ret = []
-            limit = 10
+            limit = 100000
             offset = 0
             while True:
+                logger.trace("offset: {}".format(offset))
+
                 # Return documents.
                 try:
                     # Return a list of documents
@@ -112,32 +114,32 @@ class IsdubaDataSource(DataSourcePlugin):
                     if not api_response.documents:
                         break
 
-                    for doc in api_response.documents:
-                        id = doc["id"]
-                        api_response = api_instance.documents_id_get(id)
+                        # for doc in api_response.documents:
+                        #     id = doc["id"]
+                        #     api_response = api_instance.documents_id_get(id)
 
-                        # extract data from api_response here:
-                        manufacturer = Manufacturer(name="")
-                        device_type = DeviceType(manufacturer=manufacturer)
-                        device = Device(device_type=device_type)
-                        software = Software(
-                            manufacturer=manufacturer, files=[], assets=[]
-                        )
-                        csaf_product = CsafProduct(device=device)
-                        hash = Hash()
-                        file = File(software=software, hashes=hash)
-                        software.files.append(file)
-                        asset = Asset(software=software, device=device)
-                        software.assets.append(asset)
-                        csaf_product_tree = CsafProductTree(csaf_product=csaf_product)
-                        csaf_product.csaf_product_trees.append(csaf_product_tree)
-                        # match = Match()
-                        csaf_document = CsafDocument(
-                            id=id, csaf_product_trees=[csaf_product_tree], matches=[]
-                        )
+                        #     # extract data from api_response here:
+                        #     manufacturer = Manufacturer(name="")
+                        #     device_type = DeviceType(manufacturer=manufacturer)
+                        #     device = Device(device_type=device_type)
+                        #     software = Software(
+                        #         manufacturer=manufacturer, files=[], assets=[]
+                        #     )
+                        #     csaf_product = CsafProduct(device=device)
+                        #     hash = Hash()
+                        #     file = File(software=software, hashes=hash)
+                        #     software.files.append(file)
+                        #     asset = Asset(software=software, device=device)
+                        #     software.assets.append(asset)
+                        #     csaf_product_tree = CsafProductTree(csaf_product=csaf_product)
+                        #     csaf_product.csaf_product_trees.append(csaf_product_tree)
+                        #     # match = Match()
+                        #     csaf_document = CsafDocument(
+                        #         id=id, csaf_product_trees=[csaf_product_tree], matches=[]
+                        #     )
 
-                        # only return csaf_document; other objects are contained therein.
-                        ret.append(csaf_document)
+                        # # only return csaf_document; other objects are contained therein.
+                        # ret.append(csaf_document)
 
                 except Exception as e:
                     raise Exception(
