@@ -17,6 +17,8 @@ from dina.common import logging
 from dina.synchronizer.base import DataSourcePlugin
 import httpx
 import isduba_api_client
+from .connector import get_product_info_list
+from .datamodels import ProductInfo
 
 
 logger = logging.get_logger(__name__)
@@ -85,7 +87,7 @@ class IsdubaDataSource(DataSourcePlugin):
             api_instance = isduba_api_client.DefaultApi(api_client)
 
             ret = []
-            limit = 100000
+            limit = 1
             offset = 0
             while True:
                 logger.trace("offset: {}".format(offset))
@@ -114,16 +116,18 @@ class IsdubaDataSource(DataSourcePlugin):
                     if not api_response.documents:
                         break
 
-                        # for doc in api_response.documents:
-                        #     id = doc["id"]
-                        #     api_response = api_instance.documents_id_get(id)
+                    for doc in api_response.documents:
+                        id = doc["id"]
+                        api_response = api_instance.documents_id_get(id)
+                        product_info_list: List[List[ProductInfo]] = get_product_info_list(api_response["product_tree"]["branches"])
+                        logger.info("Products: {}".format(product_info_list))
 
-                        #     # extract data from api_response here:
+                            # extract data from api_response here:
                         #     manufacturer = Manufacturer(name="")
                         #     device_type = DeviceType(manufacturer=manufacturer)
                         #     device = Device(device_type=device_type)
                         #     software = Software(
-                        #         manufacturer=manufacturer, files=[], assets=[]
+                            #     manufacturer=manufacturer, files=[], assets=[]
                         #     )
                         #     csaf_product = CsafProduct(device=device)
                         #     hash = Hash()
@@ -134,19 +138,18 @@ class IsdubaDataSource(DataSourcePlugin):
                         #     csaf_product_tree = CsafProductTree(csaf_product=csaf_product)
                         #     csaf_product.csaf_product_trees.append(csaf_product_tree)
                         #     # match = Match()
-                        #     csaf_document = CsafDocument(
-                        #         id=id, csaf_product_trees=[csaf_product_tree], matches=[]
-                        #     )
+                        csaf_document = CsafDocument(
+                                csaf_product_trees=[], matches=[]
+                            )
 
-                        # # only return csaf_document; other objects are contained therein.
-                        # ret.append(csaf_document)
-
+                        # only return csaf_document; other objects are contained therein.
+                        ret.append(csaf_document)
                 except Exception as e:
                     raise Exception(
                         "Exception when calling DefaultApi->documents_get:\n\n%s" % e
                     )
 
-                offset += limit
+                # offset += limit
 
         # Return a list of Asset or CsafDocument objects
         return ret
