@@ -24,7 +24,7 @@ def extract_cpe_part(cpe: str) -> str:
 
     return None
 
-def convert_into_database_formate(csaf_product_tree: CsafProductTree):
+def convert_into_database_format(csaf_product_tree: CsafProductTree):
     document: CsafDocument = csaf_product_tree.csaf_document
     product_list_infos: List[List[ProductInfo]] = csaf_product_tree.product_list
 

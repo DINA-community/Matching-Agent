@@ -4,7 +4,10 @@ from typing import List
 from .datamodels import ProductInfo, FileHash, Hash, ProductIdentificationHelper, ProductVersion, ProductVersionRange, Product, CsafDocument, CsafProductTree
 import copy
 
-def get_product_info_list(document, branches) -> CsafProductTree:
+def get_csaf_product_tree(document, branches) -> CsafProductTree:
+    if document is None or branches is None:
+        return None
+    
     csaf_document = CsafDocument()
     product_list: List[List[ProductInfo]] = []
 

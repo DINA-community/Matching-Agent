@@ -17,8 +17,8 @@ from dina.common import logging
 from dina.synchronizer.base import DataSourcePlugin
 import httpx
 import isduba_api_client
-from .connector import get_product_info_list
-from .converter import convert_into_database_formate
+from .connector import get_csaf_product_tree
+from .converter import convert_into_database_format
 from .datamodels import CsafProductTree
 
 
@@ -90,6 +90,7 @@ class IsdubaDataSource(DataSourcePlugin):
             ret = []
             limit = 1
             offset = 0
+            
             while True:
                 logger.trace("offset: {}".format(offset))
 
@@ -120,10 +121,10 @@ class IsdubaDataSource(DataSourcePlugin):
                     for doc in api_response.documents:
                         id = doc["id"]
                         api_response = api_instance.documents_id_get(id)
-                        csaf_product_tree: CsafProductTree = get_product_info_list(api_response["document"], api_response["product_tree"]["branches"])
+                        csaf_product_tree: CsafProductTree = get_csaf_product_tree(api_response["document"], api_response["product_tree"]["branches"])
         
                         if csaf_product_tree != None: 
-                            convert_into_database_formate(csaf_product_tree)
+                            convert_into_database_format(csaf_product_tree)
 
                             # extract data from api_response here:
                         #     manufacturer = Manufacturer(name="")
