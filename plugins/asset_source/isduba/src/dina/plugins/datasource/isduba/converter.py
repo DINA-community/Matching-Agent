@@ -88,4 +88,12 @@ def convert_into_database_format(product_tree: ProductTree):
 
                     # if helper.serial_numbers is not None and isinstance(helper.serial_numbers, list):
                     #     device.serial = ", ".join(helper.serial_numbers)
-                print(part)
+                    
+                    # device_id = None
+                    # csaf_product = CsafProduct()
+                    # csaf_product.device_id = device_id
+
+                    # csaf_product_id = None
+                    # csaf_product_tree = CsafProductTree()
+                    # csaf_product_tree.csaf_product_id = csaf_product_id
+                    # csaf_product_tree.csaf_document_id = document_id
