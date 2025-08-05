@@ -18,7 +18,8 @@ from dina.synchronizer.base import DataSourcePlugin
 import httpx
 import isduba_api_client
 from .connector import get_product_info_list
-from .datamodels import ProductInfo
+from .converter import convert_into_database_formate
+from .datamodels import CsafProductTree
 
 
 logger = logging.get_logger(__name__)
@@ -119,8 +120,10 @@ class IsdubaDataSource(DataSourcePlugin):
                     for doc in api_response.documents:
                         id = doc["id"]
                         api_response = api_instance.documents_id_get(id)
-                        product_info_list: List[List[ProductInfo]] = get_product_info_list(api_response["product_tree"]["branches"])
-                        logger.info("Products: {}".format(product_info_list))
+                        csaf_product_tree: CsafProductTree = get_product_info_list(api_response["document"], api_response["product_tree"]["branches"])
+        
+                        if csaf_product_tree != None: 
+                            convert_into_database_formate(csaf_product_tree)
 
                             # extract data from api_response here:
                         #     manufacturer = Manufacturer(name="")

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import List, Optional
 
 @dataclass
 class FileHash:
@@ -43,3 +43,16 @@ class ProductInfo:
     product_version_range: Optional[ProductVersionRange] = None
     product_version: Optional[ProductVersion] = None
     product: Optional[Product] = None
+
+@dataclass
+class CsafDocument:
+    url: Optional[str] = None
+    title: Optional[str] = None
+    version: Optional[str] = None
+    lang: Optional[str] = None
+    publisher: Optional[str] = None
+
+@dataclass
+class CsafProductTree:
+    csaf_document: Optional[CsafDocument] = None
+    product_list: Optional[List[List[ProductInfo]]] = None

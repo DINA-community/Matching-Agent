@@ -1,16 +1,34 @@
 
 from typing import List
-from .datamodels import ProductInfo, FileHash, Hash, ProductIdentificationHelper, ProductVersion, ProductVersionRange, Product
+
+from .datamodels import ProductInfo, FileHash, Hash, ProductIdentificationHelper, ProductVersion, ProductVersionRange, Product, CsafDocument, CsafProductTree
 import copy
 
-def get_product_info_list(branches) -> List[List[ProductInfo]]:
+def get_product_info_list(document, branches) -> CsafProductTree:
+    csaf_document = CsafDocument()
     product_list: List[List[ProductInfo]] = []
 
-    for branch in branches:
-        product: List[ProductInfo] = get_product_info(branch)
-        product_list.append(product)
+    if document and (title:= document["title"]):
+        csaf_document.title = title
+    
+    if document and (version:= document["csaf_version"]):
+        csaf_document.version = version
+
+    if document and (lang:= document["lang"]):
+        csaf_document.lang = lang
+
+    if document and (references:= document["references"]) and (first:= references[0]) and (url:= first["url"]):
+        csaf_document.url = url
+
+    if document and (publisher:= document["publisher"]) and (p_name:= publisher["name"]):
+        csaf_document.publisher = p_name
+
+    if branches != None:
+        for branch in branches:
+            product: List[ProductInfo] = get_product_info(branch)
+            product_list.append(product)
         
-    return product_list
+    return CsafProductTree(csaf_document=csaf_document, product_list=product_list)
 
 def get_file_hash(file_hashes_value) -> FileHash:
     file_hash = FileHash()
