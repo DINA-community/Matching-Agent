@@ -15,6 +15,11 @@ class Hash:
 class ProductIdentificationHelper:
     hashes: Optional[Hash] = None
     cpe: Optional[str] = None
+    purl: Optional[str] = None
+    model_numbers: Optional[List[str]] = None
+    skus: Optional[List[str]] = None
+    sbom_urls: Optional[List[str]] = None
+    serial_numbers: Optional[List[str]] = None
 
 @dataclass
 class Product:

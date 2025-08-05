@@ -46,10 +46,18 @@ def get_file_hash(file_hashes_value) -> FileHash:
 
     return file_hash
 
-def get_product_identification_helper(product_identification_helper_value: str) -> ProductIdentificationHelper:
+def get_product_identification_helper(product_identification_helper_value) -> ProductIdentificationHelper:
+    if product_identification_helper_value == None: 
+        return None
+    
     product_identification_helper = ProductIdentificationHelper()
     hashes_value = product_identification_helper_value.get("hashes")
     cpe = product_identification_helper_value.get("cpe")
+    purl = product_identification_helper_value.get("purl")
+    model_numbers = product_identification_helper_value.get("model_numbers")
+    skus = product_identification_helper_value.get("skus")
+    sbom_urls = product_identification_helper_value.get("sbom_urls")
+    serial_numbers = product_identification_helper_value.get("serial_numbers")
 
     if hashes_value != None:
         hashes = Hash()
@@ -63,8 +71,24 @@ def get_product_identification_helper(product_identification_helper_value: str) 
             hashes.file_hashes = get_file_hash(file_hashes_value)
         
         product_identification_helper.hashes = hashes
+
     if cpe != None:
         product_identification_helper.cpe = cpe
+    
+    if purl != None:
+        product_identification_helper.purl = purl
+    
+    if model_numbers != None: 
+        product_identification_helper.model_numbers = model_numbers
+    
+    if skus != None: 
+        product_identification_helper.skus = skus
+    
+    if sbom_urls != None: 
+        product_identification_helper.sbom_urls = sbom_urls
+
+    if serial_numbers != None: 
+        product_identification_helper.serial_numbers = serial_numbers
     
     return product_identification_helper
 
