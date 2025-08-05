@@ -16,12 +16,9 @@ def extract_cpe_part(cpe: str) -> str:
     if parts[1].startswith("/"):
         return parts[1].lstrip("/")
 
-    if len(parts) > 2 and parts[1] == "2.3":
+    if len(parts) > 2 and parts[0] == "cpe":
         return parts[2]
-
-    if len(parts) > 2 and parts[1] == "*":
-        return parts[2]
-
+    
     return None
 
 def convert_into_database_format(csaf_product_tree: CsafProductTree):
