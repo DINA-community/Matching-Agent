@@ -1,11 +1,12 @@
 from dataclasses import dataclass
-from typing import List, Union, Optional
+from typing import List, Optional
 import logging
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncEngine
 from sqlalchemy.sql.ddl import CreateSchema
 from dina.cachedb.model import (
     Base,
+    CsafProductTree,
     Manufacturer,
     DeviceType,
     Device,
@@ -13,10 +14,8 @@ from dina.cachedb.model import (
     File,
     Hash,
     ProductRelationship,
-    AssetSynchronizer,
-    CsafDocument,
+    AssetSynchronizer
 )
-from dina.cachedb.model import data_consistency_problem
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +41,7 @@ class CacheDB:
             await conn.execute(CreateSchema("cacheDB", if_not_exists=True))
             await conn.run_sync(Base.metadata.create_all)
 
-    async def store(self, data: List[Union[Manufacturer, CsafDocument]]) -> None:
+    async def store(self, data: List[Manufacturer | CsafProductTree]) -> None:
         """
         Stores a list of assets or CSAF documents into the database. This function ensures
         the provided data is added to the database in a single transaction using the
@@ -56,16 +55,19 @@ class CacheDB:
         """
         async with AsyncSession(self.engine) as session:
             async with session.begin():
-                for asset in data:
-                    # logger.info(f"DATA: {asset}")
-                    try:
-                        await asset.create_or_update(session)
-                    except data_consistency_problem as e:
-                        logger.error(
-                            f"Data consistency problem when processing: {asset} {e} "
-                        )
+                session.add_all(data)
                 await session.commit()
-                await session.close()
+
+                # TODO: for assetsync
+                # for asset in data:
+                #     # logger.info(f"DATA: {asset}")
+                #     try:
+                #         await asset.create_or_update(session)
+                #     except data_consistency_problem as e:
+                #         logger.error(
+                #             f"Data consistency problem when processing: {asset} {e} "
+                #         )
+                # await session.close()
 
     async def check_delete(self):
         async with AsyncSession(self.engine) as session:

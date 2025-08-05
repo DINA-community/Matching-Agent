@@ -1,18 +1,5 @@
 # import asyncio
 from typing import List, Union
-from dina.cachedb.model import (
-    # Manufacturer,
-    # DeviceType,
-    # Device,
-    # Software,
-    # CsafProduct,
-    # File,
-    Asset,
-    # CsafProductTree,
-    # Hash,
-    # #   Match,
-    CsafDocument,
-)
 from dina.common import logging
 from dina.synchronizer.base import DataSourcePlugin
 import httpx
@@ -21,9 +8,10 @@ from .connector import get_csaf_product_tree
 from .converter import convert_into_database_format
 from .datamodels import CsafProductTree
 
+# import urllib3
 
 logger = logging.get_logger(__name__)
-
+# urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 class IsdubaDataSource(DataSourcePlugin):
     def __init__(self, config):
@@ -43,14 +31,13 @@ class IsdubaDataSource(DataSourcePlugin):
         """Return information about the data source endpoint."""
         return self.url
 
-    async def fetch_data(self) -> List[Union[Asset, CsafDocument]]:
+    async def fetch_data(self) -> List[Union[CsafProductTree]]:
         """Fetch data from the data source and return it as a list of Assets or CsafDocuments."""
         # Implement your data fetching logic here
         # This is where you would connect to your data source and retrieve data
 
         # Fetch data from ISDuBA
         logger.trace("IsdubaDataSource: Fetching data from ISDuBA")
-        # await asyncio.sleep(1)
 
         token_url = "{}:8081/realms/isduba/protocol/openid-connect/token".format(
             self.url
@@ -81,14 +68,14 @@ class IsdubaDataSource(DataSourcePlugin):
             api_key_prefix={"bearerAuth": "Bearer"},
         )
         configuration.verify_ssl = self.verify_ssl
+        ret = []
 
         # Enter a context with an instance of the API client
         with isduba_api_client.ApiClient(configuration) as api_client:
             # Create an instance of the API class
             api_instance = isduba_api_client.DefaultApi(api_client)
 
-            ret = []
-            limit = 1
+            limit = 2
             offset = 0
             
             while True:
@@ -121,39 +108,22 @@ class IsdubaDataSource(DataSourcePlugin):
                     for doc in api_response.documents:
                         id = doc["id"]
                         api_response = api_instance.documents_id_get(id)
-                        csaf_product_tree: CsafProductTree = get_csaf_product_tree(api_response["document"], api_response["product_tree"]["branches"])
+                        csaf_product_tree = get_csaf_product_tree(api_response["document"], api_response["product_tree"]["branches"])
         
                         if csaf_product_tree != None: 
-                            convert_into_database_format(csaf_product_tree)
+                            tree = convert_into_database_format(csaf_product_tree)
 
-                            # extract data from api_response here:
-                        #     manufacturer = Manufacturer(name="")
-                        #     device_type = DeviceType(manufacturer=manufacturer)
-                        #     device = Device(device_type=device_type)
-                        #     software = Software(
-                            #     manufacturer=manufacturer, files=[], assets=[]
-                        #     )
-                        #     csaf_product = CsafProduct(device=device)
-                        #     hash = Hash()
-                        #     file = File(software=software, hashes=hash)
-                        #     software.files.append(file)
-                        #     asset = Asset(software=software, device=device)
-                        #     software.assets.append(asset)
-                        #     csaf_product_tree = CsafProductTree(csaf_product=csaf_product)
-                        #     csaf_product.csaf_product_trees.append(csaf_product_tree)
-                        #     # match = Match()
-                        csaf_document = CsafDocument(
-                                csaf_product_trees=[], matches=[]
-                            )
+                            for t in tree:
+                                ret.append(t)
 
-                        # only return csaf_document; other objects are contained therein.
-                        ret.append(csaf_document)
+                    offset += limit
+                    
+                    break # TODO: stop the process for csafsync
+                            
                 except Exception as e:
                     raise Exception(
                         "Exception when calling DefaultApi->documents_get:\n\n%s" % e
                     )
-
-                # offset += limit
-
+                
         # Return a list of Asset or CsafDocument objects
         return ret

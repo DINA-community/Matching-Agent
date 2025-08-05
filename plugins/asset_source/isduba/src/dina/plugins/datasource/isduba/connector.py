@@ -124,7 +124,7 @@ def get_product(branch_product) -> Product:
     if product_id != None:
         product.product_id = product_id
     
-    if product_identification_helper != None: 
+    if product_identification_helper != None:
         product.product_identification_helper = get_product_identification_helper(product_identification_helper)
 
     return product

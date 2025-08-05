@@ -271,6 +271,7 @@ class BaseSynchronizer(ABC):
     async def fetch_data_task(self, source: DataSourcePlugin):
         while True:
             self.pending_data.extend(await source.fetch_data())
+            break # TODO: stop the process
 
     async def preprocess_data_task(self):
         """Process data using the loaded preprocessor plugins."""
@@ -293,6 +294,8 @@ class BaseSynchronizer(ABC):
             else:
                 await asyncio.sleep(0.1)
 
+            break # TODO: stop the process
+
     async def store_data_task(self):
         """Store the preprocessed data."""
         while True:
@@ -300,10 +303,13 @@ class BaseSynchronizer(ABC):
                 logger.info(f"Storing {len(self.preprocessed_data)} items in cacheDB")
                 # TODO: Re-enable once the rest is stable enough
                 await self.cache_db.store(self.preprocessed_data)
-                await self.cache_db.check_delete()
+                # TODO: for assetsync
+                # await self.cache_db.check_delete()
                 self.preprocessed_data.clear()
             else:
                 await asyncio.sleep(0.1)
+
+            break # TODO: stop the process
 
     async def cleanup(self):
         await self.cache_db.disconnect()

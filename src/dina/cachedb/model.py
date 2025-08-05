@@ -27,8 +27,8 @@ class Base(AsyncAttrs, DeclarativeBase):
 
 class AssetSynchronizer(Base):
     __tablename__ = "assetsync"
-    id: Mapped[int] = mapped_column(primary_key=True)
-    last_run: Mapped[float] = mapped_column(Float)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    last_run: Mapped[float| None] = mapped_column(Float, nullable=True)
 
     async def create_or_update(self, session) -> None:
         stmt = select(AssetSynchronizer)
@@ -44,9 +44,9 @@ class AssetSynchronizer(Base):
 class Manufacturer(Base):
     __tablename__ = "manufacturer"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    nb_id: Mapped[int] = mapped_column(Integer)
-    last_seen: Mapped[float] = mapped_column(Float)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nb_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
+    last_seen: Mapped[float| None] = mapped_column(Float, nullable=True)
     name: Mapped[str] = mapped_column(Text)
 
     device_types: Mapped[List["DeviceType"]] = relationship(
@@ -77,19 +77,19 @@ class Manufacturer(Base):
 class DeviceType(Base):
     __tablename__ = "device_type"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    nb_id: Mapped[int] = mapped_column(Integer)
-    last_seen: Mapped[float] = mapped_column(Float)
-    nb_manu_id: Mapped[int] = mapped_column(Integer)
-    model: Mapped[str] = mapped_column(Text)
-    model_number: Mapped[str | None] = mapped_column(Text)
-    part_number: Mapped[str | None] = mapped_column(Text)
-    device_family: Mapped[str | None] = mapped_column(Text)
-    cpe: Mapped[str | None] = mapped_column(Text)
-    hardware_version: Mapped[str | None] = mapped_column(Text)
-    hardware_name: Mapped[str | None] = mapped_column(Text)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nb_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
+    last_seen: Mapped[float| None] = mapped_column(Float, nullable=True)
+    nb_manu_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
+    model: Mapped[str| None] = mapped_column(Text, nullable=True)
+    model_number: Mapped[str | None] = mapped_column(Text, nullable=True)
+    part_number: Mapped[str | None] = mapped_column(Text, nullable=True)
+    device_family: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cpe: Mapped[str | None] = mapped_column(Text, nullable=True)
+    hardware_version: Mapped[str | None] = mapped_column(Text, nullable=True)
+    hardware_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     manufacturer_id: Mapped[int | None] = mapped_column(
-        ForeignKey("cacheDB.manufacturer.id")
+        ForeignKey("cacheDB.manufacturer.id"), nullable=True
     )
 
     manufacturer: Mapped["Manufacturer"] = relationship(back_populates="device_types")
@@ -145,17 +145,17 @@ class DeviceType(Base):
 class Software(Base):
     __tablename__ = "software"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    nb_id: Mapped[int] = mapped_column(Integer)
-    last_seen: Mapped[float] = mapped_column(Float)
-    nb_manu_id: Mapped[int] = mapped_column(Integer)
-    name: Mapped[str] = mapped_column(Text)
-    version: Mapped[str | None] = mapped_column(Text)
-    cpe: Mapped[str | None] = mapped_column(Text)
-    purl: Mapped[str | None] = mapped_column(Text)
-    sbom_urls: Mapped[List[str] | None] = mapped_column(JSON)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nb_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
+    last_seen: Mapped[float| None] = mapped_column(Float, nullable=True)
+    nb_manu_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
+    name: Mapped[str| None] = mapped_column(Text, nullable=True)
+    version: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cpe: Mapped[str | None] = mapped_column(Text, nullable=True)
+    purl: Mapped[str | None] =mapped_column(Text, nullable=True)
+    sbom_urls: Mapped[List[str] | None] = mapped_column(JSON, nullable=True)
     manufacturer_id: Mapped[int | None] = mapped_column(
-        ForeignKey("cacheDB.manufacturer.id")
+        ForeignKey("cacheDB.manufacturer.id"), nullable=True
     )
 
     manufacturer: Mapped["Manufacturer"] = relationship(back_populates="software")
@@ -215,14 +215,14 @@ class Software(Base):
 class Device(Base):
     __tablename__ = "device"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    nb_id: Mapped[int] = mapped_column(Integer)
-    last_seen: Mapped[float] = mapped_column(Float)
-    nb_devicetype_id: Mapped[int] = mapped_column(Integer)
-    name: Mapped[str | None] = mapped_column(Text)
-    serial: Mapped[str | None] = mapped_column(Text)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nb_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
+    last_seen: Mapped[float| None] = mapped_column(Float, nullable=True)
+    nb_devicetype_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
+    name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    serial: Mapped[str | None] = mapped_column(Text, nullable=True)
     device_type_id: Mapped[int | None] = mapped_column(
-        ForeignKey("cacheDB.device_type.id")
+        ForeignKey("cacheDB.device_type.id"), nullable=True
     )
 
     device_type: Mapped["DeviceType"] = relationship(back_populates="devices")
@@ -272,10 +272,10 @@ class Device(Base):
 class Asset(Base):
     __tablename__ = "asset"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    last_seen: Mapped[float] = mapped_column(Float)
-    device_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.device.id"))
-    software_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.software.id"))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    last_seen: Mapped[float | None] = mapped_column(Float, nullable=True)
+    device_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.device.id"), nullable=True)
+    software_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.software.id"), nullable=True)
 
     device: Mapped["Device"] = relationship(back_populates="assets")
     software: Mapped["Software"] = relationship(back_populates="assets")
@@ -285,7 +285,7 @@ class Asset(Base):
 class ProductRelationship(Base):
     __tablename__ = "productrelationship"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     nb_id: Mapped[int] = mapped_column(Integer)
     last_seen: Mapped[float] = mapped_column(Float)
     nb_source_id: Mapped[int] = mapped_column(Integer)
@@ -366,12 +366,12 @@ class ProductRelationship(Base):
 class File(Base):
     __tablename__ = "file"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    nb_id: Mapped[int] = mapped_column(Integer)
-    last_seen: Mapped[float] = mapped_column(Float)
-    nb_software_id: Mapped[int] = mapped_column(Integer)
-    filename: Mapped[str]
-    software_id: Mapped[int] = mapped_column(ForeignKey("cacheDB.software.id"))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nb_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
+    last_seen: Mapped[float| None] = mapped_column(Float, nullable=True)
+    nb_software_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
+    filename: Mapped[str| None] = mapped_column(Text, nullable=True)
+    software_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.software.id"), nullable=True)
 
     software: Mapped["Software"] = relationship(back_populates="files")
     hashes: Mapped[List["Hash"]] = relationship(back_populates="file")
@@ -412,13 +412,13 @@ class File(Base):
 class Hash(Base):
     __tablename__ = "hash"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    nb_id: Mapped[int] = mapped_column(Integer)
-    last_seen: Mapped[float] = mapped_column(Float)
-    nb_file_id: Mapped[int] = mapped_column(Integer)
-    algorithm: Mapped[str] = mapped_column(Text)
-    value: Mapped[str] = mapped_column(Text)
-    file_id: Mapped[int] = mapped_column(ForeignKey("cacheDB.file.id"))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nb_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
+    last_seen: Mapped[float| None] = mapped_column(Float, nullable=True)
+    nb_file_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
+    algorithm: Mapped[str| None] = mapped_column(Text, nullable=True)
+    value: Mapped[str| None] = mapped_column(Text, nullable=True)
+    file_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.file.id"), nullable=True)
 
     file: Mapped["File"] = relationship(back_populates="hashes")
 
@@ -462,12 +462,12 @@ class Hash(Base):
 class CsafDocument(Base):
     __tablename__ = "csaf_document"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    url: Mapped[str] = mapped_column(Text)
-    title: Mapped[str] = mapped_column(Text)
-    version: Mapped[str] = mapped_column(Text)
-    lang: Mapped[str]
-    publisher: Mapped[str | None] = mapped_column(Text)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    title: Mapped[str | None] = mapped_column(Text, nullable=True)
+    version: Mapped[str | None] = mapped_column(Text, nullable=True)
+    lang: Mapped[str | None] = mapped_column(Text, nullable=True)
+    publisher: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     matches: Mapped[List["Match"]] = relationship(back_populates="csaf_document")
     csaf_product_trees: Mapped[List["CsafProductTree"]] = relationship(
@@ -478,9 +478,9 @@ class CsafDocument(Base):
 class CsafProduct(Base):
     __tablename__ = "csaf_product"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    device_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.device.id"))
-    software_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.software.id"))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    device_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.device.id"), nullable=True)
+    software_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.software.id"), nullable=True)
 
     device: Mapped["Device"] = relationship(back_populates="csaf_products")
     software: Mapped["Software"] = relationship(back_populates="csaf_products")
@@ -492,7 +492,7 @@ class CsafProduct(Base):
 class CsafProductTree(Base):
     __tablename__ = "csaf_product_tree"
 
-    id: Mapped[str] = mapped_column(primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     csaf_document_id: Mapped[int] = mapped_column(
         ForeignKey("cacheDB.csaf_document.id")
     )
@@ -509,7 +509,7 @@ class CsafProductTree(Base):
 class Match(Base):
     __tablename__ = "match"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     score: Mapped[float]
     status: Mapped[str] = mapped_column(Text)
     time: Mapped[datetime.datetime]
