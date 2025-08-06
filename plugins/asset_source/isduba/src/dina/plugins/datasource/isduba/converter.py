@@ -1,3 +1,4 @@
+import time
 from dina.cachedb.database import Device, DeviceType
 from dina.cachedb.model import CsafDocument, CsafProduct, CsafProductTree, Manufacturer, Software
 from dina.common import logging
@@ -26,6 +27,8 @@ def extract_cpe_part(cpe: str) -> str:
 async def convert_into_database_format(product_tree: ProductTree) -> List[CsafProductTree]:
     if product_tree.csaf_document == None:
         return None
+    
+    starttime = time.time()
     
     csaf_product_tree_list: List[CsafProductTree] = []
 
@@ -61,6 +64,7 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[CsafPr
                     software.cpe = cpe
                     software.version = pv.name
                     software.manufacturer = manufacturer
+                    software.last_seen = starttime
 
                     csaf_product = CsafProduct()
                     csaf_product.software = software
@@ -83,6 +87,7 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[CsafPr
                     device_type.hardware_name = p.name # duplicate value 
                     device_type.hardware_version = pv.name
                     device_type.device_family = product.product_family
+                    device_type.last_seen = starttime
 
                     if helper.skus is not None and isinstance(helper.skus, list):
                         device_type.part_number = ", ".join(helper.skus)
@@ -92,7 +97,8 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[CsafPr
                                             
                     device = Device()
                     device.device_type = device_type
-                    device.name =  p.name # duplicate value 
+                    device.name =  p.name # duplicate value
+                    device.last_seen = starttime
 
                     if helper.serial_numbers is not None and isinstance(helper.serial_numbers, list):
                         device.serial = ", ".join(helper.serial_numbers)

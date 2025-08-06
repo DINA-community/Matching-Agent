@@ -1,17 +1,16 @@
-# import asyncio
-from typing import List, Union
+from typing import List
 from dina.common import logging
 from dina.synchronizer.base import DataSourcePlugin
 import httpx
 import isduba_api_client
-from .connector import get_csaf_product_tree
-from .converter import convert_into_database_format
+# from .connector import get_csaf_product_tree
+# from .converter import convert_into_database_format
 from .datamodels import CsafProductTree
 
 # import urllib3
+# urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.get_logger(__name__)
-# urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 class IsdubaDataSource(DataSourcePlugin):
     def __init__(self, config):
@@ -31,7 +30,7 @@ class IsdubaDataSource(DataSourcePlugin):
         """Return information about the data source endpoint."""
         return self.url
 
-    async def fetch_data(self) -> List[Union[CsafProductTree]]:
+    async def fetch_data(self) -> List[CsafProductTree]:
         """Fetch data from the data source and return it as a list of Assets or CsafDocuments."""
         # Implement your data fetching logic here
         # This is where you would connect to your data source and retrieve data

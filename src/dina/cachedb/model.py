@@ -79,7 +79,7 @@ class DeviceType(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     nb_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
-    last_seen: Mapped[float| None] = mapped_column(Float, nullable=True)
+    last_seen: Mapped[float] = mapped_column(Float)
     nb_manu_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
     model: Mapped[str| None] = mapped_column(Text, nullable=True)
     model_number: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -147,7 +147,7 @@ class Software(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     nb_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
-    last_seen: Mapped[float| None] = mapped_column(Float, nullable=True)
+    last_seen: Mapped[float] = mapped_column(Float)
     nb_manu_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
     name: Mapped[str| None] = mapped_column(Text, nullable=True)
     version: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -217,7 +217,7 @@ class Device(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     nb_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
-    last_seen: Mapped[float| None] = mapped_column(Float, nullable=True)
+    last_seen: Mapped[float] = mapped_column(Float)
     nb_devicetype_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
     name: Mapped[str | None] = mapped_column(Text, nullable=True)
     serial: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -273,7 +273,7 @@ class Asset(Base):
     __tablename__ = "asset"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    last_seen: Mapped[float | None] = mapped_column(Float, nullable=True)
+    last_seen: Mapped[float] = mapped_column(Float)
     device_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.device.id"), nullable=True)
     software_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.software.id"), nullable=True)
 
@@ -368,7 +368,7 @@ class File(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     nb_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
-    last_seen: Mapped[float| None] = mapped_column(Float, nullable=True)
+    last_seen: Mapped[float] = mapped_column(Float)
     nb_software_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
     filename: Mapped[str| None] = mapped_column(Text, nullable=True)
     software_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.software.id"), nullable=True)
@@ -414,7 +414,7 @@ class Hash(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     nb_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
-    last_seen: Mapped[float| None] = mapped_column(Float, nullable=True)
+    last_seen: Mapped[float] = mapped_column(Float)
     nb_file_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
     algorithm: Mapped[str| None] = mapped_column(Text, nullable=True)
     value: Mapped[str| None] = mapped_column(Text, nullable=True)
