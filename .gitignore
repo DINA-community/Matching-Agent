@@ -206,5 +206,5 @@ src/.DS_Store
 # ISDuBA API
 plugins/asset_source/isduba/src/dina/plugins/datasource/isduba/isduba-api.json
 plugins/asset_source/isduba/src/dina/plugins/datasource/isduba/api_client
-plugins/asset_source/isduba/src/dina/plugins/datasource/isduba/pyproject.toml
+plugins/asset_source/isduba/pyproject.toml
 assets/plugin_configs/asset_source/isduba/active/isduba.toml
