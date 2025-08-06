@@ -5,7 +5,6 @@ requires-python = ">=3.13"
 [manifest]
 members = [
     "dina-matcher",
-    "dina-plugins-datasource-isduba-fetcher",
     "dina-plugins-datasource-netbox-fetcher",
     "dina-plugins-datasource-sample",
     "dina-plugins-preprocessing-identity",
@@ -206,7 +205,6 @@ dependencies = [
     { name = "hatchling" },
     { name = "httpx" },
     { name = "mypy" },
-    { name = "openapi-generator-cli" },
     { name = "openapi-python-client" },
     { name = "python-dateutil" },
     { name = "ruff" },
@@ -214,9 +212,6 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-datasource-isduba = [
-    { name = "dina-plugins-datasource-isduba-fetcher" },
-]
 datasource-netbox = [
     { name = "dina-plugins-datasource-netbox-fetcher" },
 ]
@@ -241,20 +236,18 @@ requires-dist = [
     { name = "aiohttp", specifier = ">=3.12.13" },
     { name = "asyncpg", specifier = ">=0.30.0" },
     { name = "colorlog", specifier = ">=6.9.0" },
-    { name = "dina-plugins-datasource-isduba-fetcher", marker = "extra == 'datasource-isduba'", editable = "plugins/asset_source/isduba" },
     { name = "dina-plugins-datasource-netbox-fetcher", marker = "extra == 'datasource-netbox'", editable = "plugins/asset_source/netbox" },
     { name = "dina-plugins-datasource-sample", marker = "extra == 'datasource-sample'", editable = "plugins/asset_source/sample" },
     { name = "dina-plugins-preprocessing-identity", marker = "extra == 'preprocessor-identity'", editable = "plugins/preprocessing/identity" },
     { name = "hatchling", specifier = ">=1.27.0" },
     { name = "httpx" },
     { name = "mypy", specifier = ">=1.16.1" },
-    { name = "openapi-generator-cli" },
     { name = "openapi-python-client" },
     { name = "python-dateutil" },
     { name = "ruff", specifier = ">=0.12.0" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.0" },
 ]
-provides-extras = ["datasource-netbox", "datasource-isduba", "datasource-sample", "preprocessor-identity"]
+provides-extras = ["datasource-netbox", "datasource-sample", "preprocessor-identity"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -263,21 +256,6 @@ dev = [
     { name = "pytest", specifier = ">=8.4.1" },
     { name = "pytest-cov", specifier = ">=6.2.1" },
     { name = "ruff", specifier = ">=0.11.13" },
-]
-
-[[package]]
-name = "dina-plugins-datasource-isduba-fetcher"
-version = "0.1.0"
-source = { editable = "plugins/asset_source/isduba" }
-dependencies = [
-    { name = "dina-matcher" },
-    { name = "openapi-generator-cli" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "dina-matcher", editable = "." },
-    { name = "openapi-generator-cli" },
 ]
 
 [[package]]
@@ -619,15 +597,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/43/16/fc88b08840de0e0a72a2f9d8c6bae36be573e475a6326ae854bcc549fc45/nodeenv-1.9.1.tar.gz", hash = "sha256:6ec12890a2dab7946721edbfbcd91f3319c6ccc9aec47be7c7e6b7011ee6645f", size = 47437, upload-time = "2024-06-04T18:44:11.171Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d2/1d/1b658dbd2b9fa9c4c9f32accbfc0205d532c8c6194dc0f2a4c0428e7128a/nodeenv-1.9.1-py2.py3-none-any.whl", hash = "sha256:ba11c9782d29c27c70ffbdda2d7415098754709be8a7056d79a737cd901155c9", size = 22314, upload-time = "2024-06-04T18:44:08.352Z" },
-]
-
-[[package]]
-name = "openapi-generator-cli"
-version = "7.14.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/57/23/70b408c3565d5cb93ee9f7605654902cdd2a3e3891739859ec304dbd7519/openapi_generator_cli-7.14.0.tar.gz", hash = "sha256:48b5478a83ee09dfd38018da3e1661acafd2ce06627aecce0ec10a66cbd1aa00", size = 27205268, upload-time = "2025-06-26T01:44:11.787Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/9e/5e/0aca9db4760a6b7d66a2b51dfc04073dcede1b1be505f0e6a30cc2f45b1c/openapi_generator_cli-7.14.0-py3-none-any.whl", hash = "sha256:fbf7b606671fd939ab1ee185942396aa4ba88f8ec211a30a47ce02f81855778e", size = 27219227, upload-time = "2025-06-26T01:44:06.756Z" },
 ]
 
 [[package]]

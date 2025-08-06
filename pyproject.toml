@@ -16,7 +16,7 @@ dependencies = [
     "hatchling>=1.27.0",
     "sqlalchemy[asyncio]>=2.0.0",
     "openapi-python-client",
-    "openapi-generator-cli",
+    #"openapi-generator-cli",
     "httpx",
     "python-dateutil",
     "ruff>=0.12.0",
