@@ -4,7 +4,7 @@ from typing import List
 from .datamodels import ProductInfo, FileHash, Hash, ProductIdentificationHelper, ProductVersion, ProductVersionRange, Product, CsafDocument, CsafProductTree
 import copy
 
-def get_csaf_product_tree(document, branches) -> CsafProductTree:
+async def get_csaf_product_tree(document, branches) -> CsafProductTree:
     if document is None or branches is None:
         return None
     
@@ -28,12 +28,12 @@ def get_csaf_product_tree(document, branches) -> CsafProductTree:
 
     if branches != None:
         for branch in branches:
-            product: List[ProductInfo] = get_product_info(branch)
+            product: List[ProductInfo] = await get_product_info(branch)
             product_list.append(product)
         
     return CsafProductTree(csaf_document=csaf_document, product_list=product_list)
 
-def get_file_hash(file_hashes_value) -> FileHash:
+async def get_file_hash(file_hashes_value) -> FileHash:
     file_hash = FileHash()
     algorithm = file_hashes_value.get("algorithm")
     value = file_hashes_value.get("value")
@@ -46,7 +46,7 @@ def get_file_hash(file_hashes_value) -> FileHash:
 
     return file_hash
 
-def get_product_identification_helper(product_identification_helper_value) -> ProductIdentificationHelper:
+async def get_product_identification_helper(product_identification_helper_value) -> ProductIdentificationHelper:
     if product_identification_helper_value == None: 
         return None
     
@@ -68,7 +68,7 @@ def get_product_identification_helper(product_identification_helper_value) -> Pr
             hashes.filename = filename
 
         if file_hashes_value != None:
-            hashes.file_hashes = get_file_hash(file_hashes_value)
+            hashes.file_hashes = await get_file_hash(file_hashes_value)
         
         product_identification_helper.hashes = hashes
 
@@ -92,27 +92,27 @@ def get_product_identification_helper(product_identification_helper_value) -> Pr
     
     return product_identification_helper
 
-def get_product_version(name: str, sub_branch) -> ProductVersion:
+async def get_product_version(name: str, sub_branch) -> ProductVersion:
     product_version = ProductVersion()
     product_version.name = name
     branch_product = sub_branch.get("product")
 
     if branch_product != None:
-        product_version.product = get_product(branch_product)
+        product_version.product = await get_product(branch_product)
     
     return product_version
 
-def get_product_version_range(name: str, sub_branch) -> ProductVersionRange:
+async def get_product_version_range(name: str, sub_branch) -> ProductVersionRange:
     product_version_range = ProductVersionRange()
     product_version_range.name = name
     branch_product = sub_branch.get("product")
 
     if branch_product != None:
-        product_version_range.product = get_product(branch_product)
+        product_version_range.product = await get_product(branch_product)
     
     return product_version_range
 
-def get_product(branch_product) -> Product:
+async def get_product(branch_product) -> Product:
     product_name = branch_product.get("name")
     product_id = branch_product.get("product_id")
     product_identification_helper = branch_product.get("product_identification_helper")
@@ -125,14 +125,14 @@ def get_product(branch_product) -> Product:
         product.product_id = product_id
     
     if product_identification_helper != None:
-        product.product_identification_helper = get_product_identification_helper(product_identification_helper)
+        product.product_identification_helper = await get_product_identification_helper(product_identification_helper)
 
     return product
     
-def get_product_info(sub_branch) -> List[ProductInfo]:
+async def get_product_info(sub_branch) -> List[ProductInfo]:
     result: List[ProductInfo] = []
 
-    def process_branch(current_branch, base_info: ProductInfo):
+    async def process_branch(current_branch, base_info: ProductInfo):
         info = copy.deepcopy(base_info)
         category = current_branch.get("category")
         name = current_branch.get("name")
@@ -152,19 +152,19 @@ def get_product_info(sub_branch) -> List[ProductInfo]:
         elif category == "host_name":
             info.host_name = name
         elif category == "product_version_range":
-            info.product_version_range = get_product_version_range(name, current_branch)
+            info.product_version_range = await get_product_version_range(name, current_branch)
         elif category == "product_version":
-            info.product_version = get_product_version(name, current_branch)
+            info.product_version = await get_product_version(name, current_branch)
 
         if branch_product:
-            info.product = get_product(branch_product)
+            info.product = await get_product(branch_product)
 
         if sub_branches:
             for child in sub_branches:
-                process_branch(child, info)
+                await process_branch(child, info)
         else:
             result.append(info)
 
-    process_branch(sub_branch, ProductInfo())
+    await process_branch(sub_branch, ProductInfo())
 
     return result

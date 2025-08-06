@@ -23,7 +23,7 @@ def extract_cpe_part(cpe: str) -> str:
     
     return None
 
-def convert_into_database_format(product_tree: ProductTree) -> List[CsafProductTree]:
+async def convert_into_database_format(product_tree: ProductTree) -> List[CsafProductTree]:
     if product_tree.csaf_document == None:
         return None
     
@@ -58,7 +58,6 @@ def convert_into_database_format(product_tree: ProductTree) -> List[CsafProductT
                     
                     software = Software()
                     software.name = p.name
-                    software.manufacturer = manufacturer
                     software.cpe = cpe
                     software.version = pv.name
                     software.manufacturer = manufacturer

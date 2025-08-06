@@ -108,16 +108,16 @@ class IsdubaDataSource(DataSourcePlugin):
                     for doc in api_response.documents:
                         id = doc["id"]
                         api_response = api_instance.documents_id_get(id)
-                        csaf_product_tree = get_csaf_product_tree(api_response["document"], api_response["product_tree"]["branches"])
+                        csaf_product_tree = await get_csaf_product_tree(api_response["document"], api_response["product_tree"]["branches"])
         
                         if csaf_product_tree != None: 
-                            tree = convert_into_database_format(csaf_product_tree)
+                            tree = await convert_into_database_format(csaf_product_tree)
 
                             for t in tree:
                                 ret.append(t)
 
                     offset += limit
-                    
+
                     break # TODO: stop the process for csafsync
                             
                 except Exception as e:
