@@ -1,0 +1,25 @@
+#!/bin/bash
+
+isduba_url=$(grep '^url' assets/plugin_configs/asset_source/isduba/active/isduba.toml | sed -E 's/url *= *"(.*)"/\1/')
+cd plugins/asset_source/isduba
+curl -o isduba-api.json --insecure https://${isduba_url}/swagger/doc.json
+sed -i \
+    -e 's/Apache 2.0/Apache-2.0/g' \
+    -e 's/"host": ""/"host": "https:\/\/<host:port>"/g' \
+    -e 's/"additionalProperties": {}/"additionalProperties": true/g' \
+    -e "$(wc -l < isduba-api.json)s/$/,/" \
+    -e '$i\
+    "securityDefinitions": {\
+        "bearerAuth": {\
+            "name": "Authorization",\
+            "in": "header",\
+            "type": "apiKey",\
+            "description": "JWT Authorization header"\
+        }\
+    },\
+    "security": [ { "bearerAuth": [] } ]' \
+    isduba-api.json
+cp pyproject_start.toml pyproject.toml
+uv sync --all-extras
+uv run openapi-generator-cli generate -i isduba-api.json -g python -o src/dina/plugins/datasource/isduba/api_client --package-name isduba_api_client
+uv add src/dina/plugins/datasource/isduba/api_client
