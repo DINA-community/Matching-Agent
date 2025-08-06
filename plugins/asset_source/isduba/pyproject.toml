@@ -12,7 +12,6 @@ requires-python = ">=3.13"
 # All data source plugins depend on the base matcher package. Feel free to add any additional dependencies.
 dependencies = [
     "dina.matcher",
-    "isduba-api-client",
     "openapi-generator-cli",
 ]
 
@@ -29,4 +28,3 @@ build-backend = "hatchling.build"
 
 [tool.uv.sources]
 "dina.matcher" = { workspace = true }
-isduba-api-client = { workspace = true }
