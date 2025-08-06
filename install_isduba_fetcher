@@ -23,3 +23,4 @@ cp pyproject_start.toml pyproject.toml
 uv sync --all-extras
 uv run openapi-generator-cli generate -i isduba-api.json -g python -o src/dina/plugins/datasource/isduba/api_client --package-name isduba_api_client
 uv add src/dina/plugins/datasource/isduba/api_client
+cd ../../../
