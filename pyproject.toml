@@ -25,7 +25,7 @@ dependencies = [
 
 [project.optional-dependencies]
 datasource-netbox = ["dina.plugins.datasource.netbox_fetcher"]
-datasource-isduba = ["dina.plugins.datasource.isduba_fetcher"]
+#:datasource-isduba = ["dina.plugins.datasource.isduba_fetcher"]
 datasource-sample = [
     "dina-plugins-datasource-sample",
 ]
@@ -48,16 +48,16 @@ packages = ["src/dina"]
 
 [tool.uv.workspace]
 members = [
-    "plugins/asset_source/isduba",
+#    "plugins/asset_source/isduba",
     "plugins/asset_source/netbox",
     "plugins/asset_source/sample",
     "plugins/preprocessing/identity",
-    "plugins/asset_source/isduba/src/dina/plugins/datasource/isduba/api_client"
+#    "plugins/asset_source/isduba/src/dina/plugins/datasource/isduba/api_client"
 ]
 
 [tool.uv.sources]
 "dina.plugins.datasource.netbox_fetcher" = { workspace = true }
-"dina.plugins.datasource.isduba_fetcher" = { workspace = true }
+#"dina.plugins.datasource.isduba_fetcher" = { workspace = true }
 dina-plugins-datasource-sample = { workspace = true }
 dina-plugins-preprocessing-identity = { workspace = true }
 dina-plugins-preprocessing-netbox = { workspace = true }
