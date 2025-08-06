@@ -28,7 +28,7 @@ class Base(AsyncAttrs, DeclarativeBase):
 class AssetSynchronizer(Base):
     __tablename__ = "assetsync"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    last_run: Mapped[float| None] = mapped_column(Float, nullable=True)
+    last_run: Mapped[float] = mapped_column(Float)
 
     async def create_or_update(self, session) -> None:
         stmt = select(AssetSynchronizer)
@@ -46,7 +46,7 @@ class Manufacturer(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     nb_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
-    last_seen: Mapped[float| None] = mapped_column(Float, nullable=True)
+    last_seen: Mapped[float] = mapped_column(Float)
     name: Mapped[str] = mapped_column(Text)
 
     device_types: Mapped[List["DeviceType"]] = relationship(

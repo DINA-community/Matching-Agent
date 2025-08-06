@@ -58,6 +58,7 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[CsafPr
                     if m_name:= product.manufacturer:
                         manufacturer = Manufacturer()
                         manufacturer.name = m_name
+                        manufacturer.last_seen = starttime
                     
                     software = Software()
                     software.name = p.name
