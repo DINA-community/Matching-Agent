@@ -68,6 +68,7 @@ class CacheDB:
                         logger.error(
                             f"Data consistency problem when processing: {asset} {e} "
                         )
+                await session.commit()
                 await session.close()
 
     async def check_delete(self):
