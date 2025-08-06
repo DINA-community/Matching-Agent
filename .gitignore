@@ -207,4 +207,5 @@ src/.DS_Store
 plugins/asset_source/isduba/src/dina/plugins/datasource/isduba/isduba-api.json
 plugins/asset_source/isduba/src/dina/plugins/datasource/isduba/api_client
 plugins/asset_source/isduba/pyproject.toml
+plugins/asset_source/isduba/uv.lock
 assets/plugin_configs/asset_source/isduba/active/isduba.toml
