@@ -20,6 +20,7 @@ sed -i \
     },\
     "security": [ { "bearerAuth": [] } ]' \
     isduba-api.json
+cp pyproject_start.toml pyproject.toml
 uv add openapi-generator-cli
 uv run openapi-generator-cli generate -i isduba-api.json -g python -o src/dina/plugins/datasource/isduba/api_client --package-name isduba_api_client
 #uv add src/dina/plugins/datasource/isduba/api_client
