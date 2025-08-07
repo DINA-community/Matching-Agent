@@ -1,15 +1,15 @@
 import datetime
 import logging
-from sqlalchemy import Float
-
-# from sqlalchemy import ForeignKey
-from sqlalchemy.ext.asyncio import AsyncAttrs
 from typing import List
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-from sqlalchemy import select
+
+from sqlalchemy import Float, ForeignKey, select
 
 # from sqlalchemy.orm import selectinload
-from sqlalchemy import Text, ForeignKey, MetaData, Integer, JSON
+from sqlalchemy import Text, MetaData, Integer, JSON
+
+# from sqlalchemy import ForeignKey
+from sqlalchemy.ext.asyncio import AsyncAttrs, AsyncSession
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,6 @@ class data_consistency_problem(Exception):
 
 class Base(AsyncAttrs, DeclarativeBase):
     metadata = MetaData(schema="cacheDB")
-    pass
 
 
 class AssetSynchronizer(Base):
@@ -30,58 +29,45 @@ class AssetSynchronizer(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     last_run: Mapped[float] = mapped_column(Float)
 
-    async def create_or_update(self, session) -> None:
-        stmt = select(AssetSynchronizer)
-        result = await session.execute(stmt)
-        obj = result.scalar_one_or_none()
-        if obj:
-            setattr(obj, "last_run", self.last_run)
-        else:
-            session.add(self)
-        return obj
-
 
 class Manufacturer(Base):
     __tablename__ = "manufacturer"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    nb_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
     last_seen: Mapped[float] = mapped_column(Float)
     name: Mapped[str] = mapped_column(Text)
 
-    device_types: Mapped[List["DeviceType"]] = relationship(
-        back_populates="manufacturer"
-    )
-    software: Mapped[List["Software"]] = relationship(back_populates="manufacturer")
-
-    async def create_or_update(self, session) -> None:
-        updated = False
-        stmt = select(Manufacturer).where(Manufacturer.nb_id == self.nb_id)
-        # stmt = select(Manufacturer).options(selectinload(Manufacturer.device_types)).options(selectinload(Manufacturer.software)).where(
-        #    Manufacturer.nb_id == self.nb_id)
+    async def create_or_renew(
+        self, session: AsyncSession, timestamp: float
+    ) -> "Manufacturer":
+        # Check if the asset already exists and is unchanged
+        stmt = select(Manufacturer).where(
+            Manufacturer.name == self.name,
+        )
         result = await session.execute(stmt)
-        obj = result.scalar_one_or_none()
-        if obj:
-            if obj.name != self.name:
-                setattr(obj, "name", self.name)
-                updated = True
-            setattr(obj, "last_seen", self.last_seen)
-            if updated:
-                logger.info(f"UPDATED: {self} {self.name}")
+
+        if manufacturer := result.scalar_one_or_none():
+            # We found an unchanged entry. Update the timestamp
+            manufacturer.last_seen = timestamp
+            logger.debug(
+                f"Updated existing manufacturer {manufacturer.id} with timestamp {timestamp}"
+            )
+            return manufacturer
         else:
+            # The asset has changed. We need to create a new entry for the updated version.
+            self.last_seen = timestamp
             session.add(self)
-            logger.info(f"CREATED: {self} {self.name}")
-        return obj
+            logger.debug("Created new manufacturer")
+            return self
 
 
 class DeviceType(Base):
     __tablename__ = "device_type"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    nb_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
+    nb_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     last_seen: Mapped[float] = mapped_column(Float)
-    nb_manu_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
-    model: Mapped[str| None] = mapped_column(Text, nullable=True)
+    model: Mapped[str | None] = mapped_column(Text, nullable=True)
     model_number: Mapped[str | None] = mapped_column(Text, nullable=True)
     part_number: Mapped[str | None] = mapped_column(Text, nullable=True)
     device_family: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -92,181 +78,151 @@ class DeviceType(Base):
         ForeignKey("cacheDB.manufacturer.id"), nullable=True
     )
 
-    manufacturer: Mapped["Manufacturer"] = relationship(back_populates="device_types")
-    devices: Mapped[List["Device"]] = relationship(back_populates="device_type")
+    manufacturer: Mapped["Manufacturer"] = relationship()
 
-    async def create_or_update(self, session) -> None:
-        updated = False
+    async def create_or_renew(
+        self, session: AsyncSession, timestamp: float
+    ) -> "DeviceType":
+        # First update the dependent objects. If they changed, we need to create a new asset.
+        if self.manufacturer:
+            self.manufacturer = await self.manufacturer.create_or_renew(
+                session, timestamp
+            )
+            await session.flush()
+            self.manufacturer_id = self.manufacturer.id
 
-        async def find_manufacturer_key(nb_key):
-            stmt = select(Manufacturer).where(Manufacturer.nb_id == nb_key)
-            result = await session.execute(stmt)
-            obj = result.scalar_one_or_none()
-            if obj:
-                return obj.id
-            else:
-                raise data_consistency_problem("Manufacturer not found")
-
-        stmt = select(DeviceType).where(DeviceType.nb_id == self.nb_id)
+        # Check if the asset already exists and is unchanged
+        stmt = select(DeviceType).where(
+            DeviceType.nb_id == self.nb_id,
+            DeviceType.model == self.model,
+            DeviceType.model_number == self.model_number,
+            DeviceType.part_number == self.part_number,
+            DeviceType.device_family == self.device_family,
+            DeviceType.cpe == self.cpe,
+            DeviceType.hardware_version == self.hardware_version,
+            DeviceType.hardware_name == self.hardware_name,
+            DeviceType.manufacturer_id == self.manufacturer_id,
+        )
         result = await session.execute(stmt)
-        obj = result.scalar_one_or_none()
-        manu_id = await find_manufacturer_key(self.nb_manu_id)
-        if obj:
-            if obj.model_number != self.model_number:
-                setattr(obj, "model_number", self.model_number)
-                updated = True
-            if obj.part_number != self.part_number:
-                setattr(obj, "part_number", self.part_number)
-            if obj.device_family != self.device_family:
-                setattr(obj, "device_family", self.device_family)
-                updated = True
-            if obj.cpe != self.cpe:
-                setattr(obj, "cpe", self.cpe)
-                updated = True
-            if obj.hardware_version != self.hardware_version:
-                setattr(obj, "hardware_version", self.hardware_version)
-                updated = True
-            if obj.hardware_name != self.hardware_name:
-                setattr(obj, "hardware_name", self.hardware_name)
-                updated = True
-            if obj.manufacturer_id != manu_id:
-                setattr(obj, "manufacturer_id", manu_id)
-                updated = True
-            setattr(obj, "last_seen", self.last_seen)
-            if updated:
-                logger.info(f"UPDATED: {self} {self.model_number}")
+
+        if device_type := result.scalar_one_or_none():
+            # We found an unchanged entry. Update the timestamp
+            device_type.last_seen = timestamp
+            logger.debug(
+                f"Updated existing device_type {device_type.id} with timestamp {timestamp}"
+            )
+            return device_type
         else:
-            self.manufacturer_id = manu_id
+            # The asset has changed. We need to create a new entry for the updated version.
+            self.last_seen = timestamp
             session.add(self)
-            logger.info(f"CREATED: {self} {self.model_number}")
-        return obj
+            logger.debug("Created new device_type")
+            return self
 
 
 class Software(Base):
     __tablename__ = "software"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    nb_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
+    nb_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     last_seen: Mapped[float] = mapped_column(Float)
-    nb_manu_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
-    name: Mapped[str| None] = mapped_column(Text, nullable=True)
+    name: Mapped[str | None] = mapped_column(Text, nullable=True)
     version: Mapped[str | None] = mapped_column(Text, nullable=True)
     cpe: Mapped[str | None] = mapped_column(Text, nullable=True)
-    purl: Mapped[str | None] =mapped_column(Text, nullable=True)
+    purl: Mapped[str | None] = mapped_column(Text, nullable=True)
     sbom_urls: Mapped[List[str] | None] = mapped_column(JSON, nullable=True)
     manufacturer_id: Mapped[int | None] = mapped_column(
         ForeignKey("cacheDB.manufacturer.id"), nullable=True
     )
 
-    manufacturer: Mapped["Manufacturer"] = relationship(back_populates="software")
-    assets: Mapped[List["Asset"]] = relationship(back_populates="software",cascade="all")
-    files: Mapped[List["File"]] = relationship(back_populates="software")
-    csaf_products: Mapped[List["CsafProduct"]] = relationship(back_populates="software")
+    manufacturer: Mapped["Manufacturer"] = relationship()
+    files: Mapped[List["File"]] = relationship()
 
-    async def create_or_update(self, session) -> None:
-        updated = False
-
-        async def find_manufacturer_key(nb_key):
-            stmt = select(Manufacturer).where(Manufacturer.nb_id == nb_key)
-            result = await session.execute(stmt)
-            obj = result.scalar_one_or_none()
-            if obj:
-                return obj.id
-            else:
-                raise data_consistency_problem("Manufacturer not found")
-
-        stmt = select(Software).where(Software.nb_id == self.nb_id)
-        result = await session.execute(stmt)
-        obj = result.scalar_one_or_none()
-        manu_id = await find_manufacturer_key(self.nb_manu_id)
-        if obj:
-            if obj.name != self.name:
-                setattr(obj, "name", self.name)
-                updated = True
-            if obj.version != self.version:
-                setattr(obj, "version", self.version)
-                updated = True
-            if obj.cpe != self.cpe:
-                setattr(obj, "cpe", self.cpe)
-                updated = True
-            if obj.purl != self.purl:
-                setattr(obj, "purl", self.purl)
-                updated = True
-            if obj.sbom_urls != self.sbom_urls:
-                setattr(obj, "sbom_urls", self.sbom_urls)
-                updated = True
-            if obj.manufacturer_id != manu_id:
-                setattr(obj, "manufacturer_id", manu_id)
-                updated = True
-            setattr(obj, "last_seen", self.last_seen)
-            if updated:
-                logger.info(f"UPDATED: {self} {self.name}")
-        else:
-            self.manufacturer_id = manu_id
-            session.add(self)
+    async def create_or_renew(
+        self, session: AsyncSession, timestamp: float
+    ) -> "Software":
+        # First update the dependent objects. If they changed, we need to create a new asset.
+        if await self.awaitable_attrs.manufacturer:
+            self.manufacturer = await (
+                await self.awaitable_attrs.manufacturer
+            ).create_or_renew(session, timestamp)
             await session.flush()
-            the_asset = Asset(software_id=self.id, last_seen=self.last_seen)
-            session.add(the_asset)
-            logger.info(f"CREATED: {self} {self.name}")
-            logger.info(f"CREATED: {the_asset} {the_asset.id}")
-        return obj
+            self.manufacturer_id = self.manufacturer.id
+
+        # Check if the asset already exists and is unchanged
+        stmt = select(Software).where(
+            Software.nb_id == self.nb_id,
+            Software.name == self.name,
+            Software.version == self.version,
+            Software.cpe == self.cpe,
+            Software.purl == self.purl,
+            Software.sbom_urls == self.sbom_urls,
+            Software.manufacturer_id == self.manufacturer_id,
+        )
+        result = await session.execute(stmt)
+
+        if software := result.scalar_one_or_none():
+            # We found an unchanged entry. Update the timestamp
+            software.last_seen = timestamp
+            logger.debug(
+                f"Updated existing software {software.id} with timestamp {timestamp}"
+            )
+            return software
+        else:
+            # The asset has changed. We need to create a new entry for the updated version.
+            self.last_seen = timestamp
+            session.add(self)
+            logger.debug("Created new software")
+            return self
 
 
 class Device(Base):
     __tablename__ = "device"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    nb_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
+    nb_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     last_seen: Mapped[float] = mapped_column(Float)
-    nb_devicetype_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
     name: Mapped[str | None] = mapped_column(Text, nullable=True)
     serial: Mapped[str | None] = mapped_column(Text, nullable=True)
     device_type_id: Mapped[int | None] = mapped_column(
         ForeignKey("cacheDB.device_type.id"), nullable=True
     )
 
-    device_type: Mapped["DeviceType"] = relationship(back_populates="devices")
-    assets: Mapped[List["Asset"]] = relationship(back_populates="device",cascade="all")
-    csaf_products: Mapped[List["CsafProduct"]] = relationship(back_populates="device")
+    device_type: Mapped["DeviceType"] = relationship()
 
-    async def create_or_update(self, session) -> None:
-        updated = False
-
-        async def find_devicetype_key(nb_key):
-            stmt = select(DeviceType).where(DeviceType.nb_id == nb_key)
-            result = await session.execute(stmt)
-            obj = result.scalar_one_or_none()
-            if obj:
-                return obj.id
-            else:
-                raise data_consistency_problem("DeviceType not found")
-
-        stmt = select(Device).where(Device.nb_id == self.nb_id)
-        result = await session.execute(stmt)
-        obj = result.scalar_one_or_none()
-        devicetype_id = await find_devicetype_key(self.nb_devicetype_id)
-        if obj:
-            if obj.name != self.name:
-                setattr(obj, "name", self.name)
-                updated = True
-            if obj.serial != self.serial:
-                setattr(obj, "serial", self.serial)
-                updated = True
-            if obj.device_type_id != devicetype_id:
-                setattr(obj, "device_type_id", devicetype_id)
-                updated = True
-            setattr(obj, "last_seen", self.last_seen)
-            if updated:
-                logger.info(f"UPDATED: {self} {self.name}")
-        else:
-            self.device_type_id = devicetype_id
-            session.add(self)
+    async def create_or_renew(
+        self, session: AsyncSession, timestamp: float
+    ) -> "Device":
+        # First update the dependent objects. If they changed, we need to create a new asset.
+        if self.device_type:
+            self.device_type = await self.device_type.create_or_renew(
+                session, timestamp
+            )
             await session.flush()
-            the_asset = Asset(device_id=self.id, last_seen=self.last_seen)
-            session.add(the_asset)
-            logger.info(f"CREATED: {self} {self.name}")
-            logger.info(f"CREATED: {the_asset} {the_asset.id}")
-        return obj
+            self.device_type_id = self.device_type.id
+
+        # Check if the asset already exists and is unchanged
+        stmt = select(Device).where(
+            Device.nb_id == self.nb_id,
+            Device.name == self.name,
+            Device.serial == self.serial,
+            Device.device_type_id == self.device_type_id,
+        )
+        result = await session.execute(stmt)
+
+        if device := result.scalar_one_or_none():
+            # We found an unchanged entry. Update the timestamp
+            device.last_seen = timestamp
+            logger.debug(
+                f"Updated existing device {device.id} with timestamp {timestamp}"
+            )
+            return device
+        else:
+            # The asset has changed. We need to create a new entry for the updated version.
+            self.last_seen = timestamp
+            session.add(self)
+            logger.debug("Created new device")
+            return self
 
 
 class Asset(Base):
@@ -274,12 +230,47 @@ class Asset(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     last_seen: Mapped[float] = mapped_column(Float)
-    device_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.device.id"), nullable=True)
-    software_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.software.id"), nullable=True)
+    device_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cacheDB.device.id"), nullable=True
+    )
+    software_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cacheDB.software.id"), nullable=True
+    )
 
-    device: Mapped["Device"] = relationship(back_populates="assets")
-    software: Mapped["Software"] = relationship(back_populates="assets")
-    matches: Mapped[List["Match"]] = relationship(back_populates="asset")
+    device: Mapped["Device"] = relationship()
+    software: Mapped["Software"] = relationship()
+
+    async def create_or_renew(self, session: AsyncSession, timestamp: float) -> "Asset":
+        # First update the dependent objects. If they changed, we need to create a new asset.
+        if self.device:
+            self.device = await self.device.create_or_renew(session, timestamp)
+        if self.software:
+            self.software = await self.software.create_or_renew(session, timestamp)
+        await session.flush()
+        if self.device:
+            self.device_id = self.device.id
+        if self.software:
+            self.software_id = self.software.id
+
+        # Check if the asset already exists and is unchanged
+        stmt = select(Asset).where(
+            Asset.device_id == self.device_id, Asset.software_id == self.software_id
+        )
+        result = await session.execute(stmt)
+
+        if asset := result.scalar_one_or_none():
+            # We found an unchanged entry. Update the timestamp
+            asset.last_seen = timestamp
+            logger.debug(
+                f"Updated existing asset {asset.id} with timestamp {timestamp}"
+            )
+            return asset
+        else:
+            # The asset has changed. We need to create a new entry for the updated version.
+            self.last_seen = timestamp
+            session.add(self)
+            logger.debug("Created new asset")
+            return self
 
 
 class ProductRelationship(Base):
@@ -312,151 +303,36 @@ class ProductRelationship(Base):
         else:
             return None
 
-    async def create_or_update(self, session) -> None:
-        updated = False
-
-        async def find_related_key(nb_key, the_type):
-            if the_type == "Device":
-                stmt = select(Device).where(Device.nb_id == nb_key)
-            elif the_type == "Software":
-                stmt = select(Software).where(Software.nb_id == nb_key)
-            else:
-                return None
-            result = await session.execute(stmt)
-            obj = result.scalar_one_or_none()
-            if obj:
-                return obj.id
-            else:
-                raise data_consistency_problem("Device of Software not found")
-
-        stmt = select(ProductRelationship).where(
-            ProductRelationship.nb_id == self.nb_id
-        )
-        result = await session.execute(stmt)
-        obj = result.scalar_one_or_none()
-        source_id = await find_related_key(self.nb_source_id, self.source_type)
-        target_id = await find_related_key(self.nb_target_id, self.target_type)
-        if obj:
-            if obj.source_id != source_id:
-                setattr(obj, "source_id", source_id)
-                updated = True
-            if obj.target_id != target_id:
-                setattr(obj, "target_id", target_id)
-                updated = True
-            if obj.source_type != self.source_type:
-                setattr(obj, "source_type", self.source_type)
-                updated = True
-            if obj.target_type != self.target_type:
-                setattr(obj, "target_type", self.target_type)
-                updated = True
-            if obj.category != self.category:
-                setattr(obj, "category", self.category)
-                updated = True
-            setattr(obj, "last_seen", self.last_seen)
-            if updated:
-                logger.info(f"UPDATED: {self}")
-        else:
-            self.source_id = source_id
-            self.target_id = target_id
-            session.add(self)
-            logger.info(f"CREATED: {self} {self.id}")
-        return obj
-
 
 class File(Base):
     __tablename__ = "file"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    nb_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
+    nb_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     last_seen: Mapped[float] = mapped_column(Float)
-    nb_software_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
-    filename: Mapped[str| None] = mapped_column(Text, nullable=True)
-    software_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.software.id"), nullable=True)
+    nb_software_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    filename: Mapped[str | None] = mapped_column(Text, nullable=True)
+    software_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cacheDB.software.id"), nullable=True
+    )
 
-    software: Mapped["Software"] = relationship(back_populates="files")
     hashes: Mapped[List["Hash"]] = relationship(back_populates="file")
-
-    async def create_or_update(self, session) -> None:
-        updated = False
-
-        async def find_software_key(nb_key):
-            stmt = select(Software).where(Software.nb_id == nb_key)
-            result = await session.execute(stmt)
-            obj = result.scalar_one_or_none()
-            if obj:
-                return obj.id
-            else:
-                raise data_consistency_problem("Software not found")
-
-        stmt = select(File).where(File.nb_id == self.nb_id)
-        result = await session.execute(stmt)
-        obj = result.scalar_one_or_none()
-        software_id = await find_software_key(self.nb_software_id)
-        if obj:
-            if obj.filename != self.filename:
-                setattr(obj, "filename", self.filename)
-                updated = True
-            if obj.software_id != software_id:
-                setattr(obj, "software_id", software_id)
-                updated = True
-            setattr(obj, "last_seen", self.last_seen)
-            if updated:
-                logger.info(f"UPDATED: {self} {self.filename}")
-        else:
-            self.software_id = software_id
-            session.add(self)
-            logger.info(f"CREATED: {self} {self.filename}")
-        return obj
 
 
 class Hash(Base):
     __tablename__ = "hash"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    nb_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
+    nb_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     last_seen: Mapped[float] = mapped_column(Float)
-    nb_file_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
-    algorithm: Mapped[str| None] = mapped_column(Text, nullable=True)
-    value: Mapped[str| None] = mapped_column(Text, nullable=True)
-    file_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.file.id"), nullable=True)
+    nb_file_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    algorithm: Mapped[str | None] = mapped_column(Text, nullable=True)
+    value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    file_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cacheDB.file.id"), nullable=True
+    )
 
     file: Mapped["File"] = relationship(back_populates="hashes")
-
-    async def create_or_update(self, session) -> None:
-        updated = False
-
-        async def find_file_key(nb_key):
-            stmt = select(File).where(File.nb_id == nb_key)
-            result = await session.execute(stmt)
-            obj = result.scalar_one_or_none()
-            if obj:
-                return obj.id
-            else:
-                raise data_consistency_problem("File not found")
-
-        stmt = select(Hash).where(Hash.nb_id == self.nb_id)
-        result = await session.execute(stmt)
-        obj = result.scalar_one_or_none()
-        file_id = await find_file_key(self.nb_file_id)
-        if obj:
-            # logger.info(f"FOUND: {obj.nb_id} {obj.name}")
-            if obj.algorithm != self.algorithm:
-                setattr(obj, "algorithm", self.name)
-                updated = True
-            if obj.value != self.value:
-                setattr(obj, "value", self.serial)
-                updated = True
-            if obj.file_id != file_id:
-                setattr(obj, "file_id", file_id)
-                updated = True
-            setattr(obj, "last_seen", self.last_seen)
-            if updated:
-                logger.info(f"UPDATED: {self} {self.id}")
-        else:
-            self.file_id = file_id
-            session.add(self)
-            logger.info(f"CREATED: {self} {self.id}")
-        return obj
 
 
 class CsafDocument(Base):
@@ -469,21 +345,29 @@ class CsafDocument(Base):
     lang: Mapped[str | None] = mapped_column(Text, nullable=True)
     publisher: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    matches: Mapped[List["Match"]] = relationship(back_populates="csaf_document")
     csaf_product_trees: Mapped[List["CsafProductTree"]] = relationship(
         back_populates="csaf_document"
     )
+
+    async def create_or_renew(
+        self, session: AsyncSession, timestamp: float
+    ) -> "CsafDocument":
+        return self
 
 
 class CsafProduct(Base):
     __tablename__ = "csaf_product"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    device_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.device.id"), nullable=True)
-    software_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.software.id"), nullable=True)
+    device_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cacheDB.device.id"), nullable=True
+    )
+    software_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cacheDB.software.id"), nullable=True
+    )
 
-    device: Mapped["Device"] = relationship(back_populates="csaf_products")
-    software: Mapped["Software"] = relationship(back_populates="csaf_products")
+    device: Mapped["Device"] = relationship()
+    software: Mapped["Software"] = relationship()
     csaf_product_trees: Mapped[List["CsafProductTree"]] = relationship(
         back_populates="csaf_product"
     )
@@ -513,8 +397,11 @@ class Match(Base):
     score: Mapped[float]
     status: Mapped[str] = mapped_column(Text)
     time: Mapped[datetime.datetime]
-    csaf_id: Mapped[int] = mapped_column(ForeignKey("cacheDB.csaf_document.id"))
+
+    csaf_product_tree_id: Mapped[int] = mapped_column(
+        ForeignKey("cacheDB.csaf_product_tree.id")
+    )
     asset_id: Mapped[int] = mapped_column(ForeignKey("cacheDB.asset.id"))
 
-    csaf_document: Mapped["CsafDocument"] = relationship(back_populates="matches")
-    asset: Mapped["Asset"] = relationship(back_populates="matches")
+    csaf_product_tree: Mapped["CsafProductTree"] = relationship()
+    asset: Mapped["Asset"] = relationship()

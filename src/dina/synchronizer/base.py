@@ -301,7 +301,7 @@ class BaseSynchronizer(ABC):
                 # TODO: Re-enable once the rest is stable enough
                 await self.cache_db.store(self.preprocessed_data)
                 # TODO: for assetsync
-                await self.cache_db.check_delete()
+                # await self.cache_db.check_delete()
                 self.preprocessed_data.clear()
             else:
                 await asyncio.sleep(0.1)
