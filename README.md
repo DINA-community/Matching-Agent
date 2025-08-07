@@ -36,6 +36,12 @@ Create the development database:
 docker compose -f dev/docker-compose.yml up -d
 ```
 
+Install the ISDuBA fetcher plugin:
+
+```
+./install_isduba_fetcher
+```
+
 Install the dependencies with uv by running in your terminal or inside pycharm (double tap `<Ctrl>` and enter the command)
 
 ```shell
@@ -43,8 +49,6 @@ uv sync --all-extras
 ```
 
 to set up the local dev environment.
-
-Generate the [ISDuBA API](plugins/asset_source/isduba/README.md).
 
 ### Setting up git pre-commit hooks
 

@@ -1,4 +1,6 @@
-# Generating the ISDuBA API
+# ISDuBA API
+
+The installation script of the ISDuBA fetcher plugin in the root directory of this project includes the following steps among others:
 
 - Download the swagger file of the ISDuBA API and store it as isduba-api.json:
   ```
