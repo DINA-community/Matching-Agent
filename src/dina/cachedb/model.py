@@ -4,7 +4,7 @@ from sqlalchemy import Float
 
 # from sqlalchemy import ForeignKey
 from sqlalchemy.ext.asyncio import AsyncAttrs
-from typing import List
+from typing import List, Optional
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import select
 
@@ -40,25 +40,20 @@ class AssetSynchronizer(Base):
             session.add(self)
         return obj
 
-
 class Manufacturer(Base):
     __tablename__ = "manufacturer"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    nb_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
+    nb_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     last_seen: Mapped[float] = mapped_column(Float)
     name: Mapped[str] = mapped_column(Text)
 
-    device_types: Mapped[List["DeviceType"]] = relationship(
-        back_populates="manufacturer"
-    )
+    device_types: Mapped[List["DeviceType"]] = relationship(back_populates="manufacturer")
     software: Mapped[List["Software"]] = relationship(back_populates="manufacturer")
 
     async def create_or_update(self, session) -> None:
         updated = False
         stmt = select(Manufacturer).where(Manufacturer.nb_id == self.nb_id)
-        # stmt = select(Manufacturer).options(selectinload(Manufacturer.device_types)).options(selectinload(Manufacturer.software)).where(
-        #    Manufacturer.nb_id == self.nb_id)
         result = await session.execute(stmt)
         obj = result.scalar_one_or_none()
         if obj:
@@ -73,26 +68,24 @@ class Manufacturer(Base):
             logger.info(f"CREATED: {self} {self.name}")
         return obj
 
-
 class DeviceType(Base):
     __tablename__ = "device_type"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    nb_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
+    nb_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     last_seen: Mapped[float] = mapped_column(Float)
-    nb_manu_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
-    model: Mapped[str| None] = mapped_column(Text, nullable=True)
-    model_number: Mapped[str | None] = mapped_column(Text, nullable=True)
-    part_number: Mapped[str | None] = mapped_column(Text, nullable=True)
-    device_family: Mapped[str | None] = mapped_column(Text, nullable=True)
-    cpe: Mapped[str | None] = mapped_column(Text, nullable=True)
-    hardware_version: Mapped[str | None] = mapped_column(Text, nullable=True)
-    hardware_name: Mapped[str | None] = mapped_column(Text, nullable=True)
-    manufacturer_id: Mapped[int | None] = mapped_column(
-        ForeignKey("cacheDB.manufacturer.id"), nullable=True
-    )
+    nb_manu_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    model: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    model_number: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    part_number: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    device_family: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    cpe: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    hardware_version: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    hardware_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    manufacturer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("manufacturer.id"), nullable=True)
 
-    manufacturer: Mapped["Manufacturer"] = relationship(back_populates="device_types")
+    manufacturer: Mapped[Optional["Manufacturer"]] = relationship(back_populates="device_types")
+    
     devices: Mapped[List["Device"]] = relationship(back_populates="device_type")
 
     async def create_or_update(self, session) -> None:
@@ -141,27 +134,26 @@ class DeviceType(Base):
             logger.info(f"CREATED: {self} {self.model_number}")
         return obj
 
-
 class Software(Base):
     __tablename__ = "software"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    nb_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
+    nb_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     last_seen: Mapped[float] = mapped_column(Float)
-    nb_manu_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
-    name: Mapped[str| None] = mapped_column(Text, nullable=True)
-    version: Mapped[str | None] = mapped_column(Text, nullable=True)
-    cpe: Mapped[str | None] = mapped_column(Text, nullable=True)
-    purl: Mapped[str | None] =mapped_column(Text, nullable=True)
-    sbom_urls: Mapped[List[str] | None] = mapped_column(JSON, nullable=True)
-    manufacturer_id: Mapped[int | None] = mapped_column(
-        ForeignKey("cacheDB.manufacturer.id"), nullable=True
-    )
+    nb_manu_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    version: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    cpe: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    purl: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    sbom_urls: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    manufacturer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("manufacturer.id"), nullable=True)
+    file_id: Mapped[Optional[int]] = mapped_column(ForeignKey("file.id"), nullable=True)
 
-    manufacturer: Mapped["Manufacturer"] = relationship(back_populates="software")
-    assets: Mapped[List["Asset"]] = relationship(back_populates="software",cascade="all")
-    files: Mapped[List["File"]] = relationship(back_populates="software")
-    csaf_products: Mapped[List["CsafProduct"]] = relationship(back_populates="software")
+    manufacturer: Mapped[Optional["Manufacturer"]] = relationship(back_populates="software")
+    file: Mapped[Optional["File"]] = relationship(back_populates="software")
+
+    asset: Mapped[Optional["Asset"]] = relationship(back_populates="software", cascade="all, delete-orphan")
+    csaf_product: Mapped[Optional["CsafProduct"]] = relationship(back_populates="software")
 
     async def create_or_update(self, session) -> None:
         updated = False
@@ -211,23 +203,21 @@ class Software(Base):
             logger.info(f"CREATED: {the_asset} {the_asset.id}")
         return obj
 
-
 class Device(Base):
     __tablename__ = "device"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    nb_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
+    nb_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     last_seen: Mapped[float] = mapped_column(Float)
-    nb_devicetype_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
-    name: Mapped[str | None] = mapped_column(Text, nullable=True)
-    serial: Mapped[str | None] = mapped_column(Text, nullable=True)
-    device_type_id: Mapped[int | None] = mapped_column(
-        ForeignKey("cacheDB.device_type.id"), nullable=True
-    )
+    nb_devicetype_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    serial: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    device_type_id: Mapped[Optional[int]] = mapped_column(ForeignKey("device_type.id"), nullable=True)
 
-    device_type: Mapped["DeviceType"] = relationship(back_populates="devices")
-    assets: Mapped[List["Asset"]] = relationship(back_populates="device",cascade="all")
-    csaf_products: Mapped[List["CsafProduct"]] = relationship(back_populates="device")
+    device_type: Mapped[Optional["DeviceType"]] = relationship(back_populates="devices")
+    
+    csaf_product: Mapped[Optional["CsafProduct"]] = relationship(back_populates="device")
+    asset: Mapped[Optional["Asset"]] = relationship(back_populates="device", cascade="all, delete-orphan")
 
     async def create_or_update(self, session) -> None:
         updated = False
@@ -268,19 +258,18 @@ class Device(Base):
             logger.info(f"CREATED: {the_asset} {the_asset.id}")
         return obj
 
-
 class Asset(Base):
     __tablename__ = "asset"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     last_seen: Mapped[float] = mapped_column(Float)
-    device_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.device.id"), nullable=True)
-    software_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.software.id"), nullable=True)
+    device_id: Mapped[Optional[int]] = mapped_column(ForeignKey("device.id"), nullable=True)
+    software_id: Mapped[Optional[int]] = mapped_column(ForeignKey("software.id"), nullable=True)
 
-    device: Mapped["Device"] = relationship(back_populates="assets")
-    software: Mapped["Software"] = relationship(back_populates="assets")
+    device: Mapped[Optional["Device"]] = relationship(back_populates="asset")
+    software: Mapped[Optional["Software"]] = relationship(back_populates="asset")
+
     matches: Mapped[List["Match"]] = relationship(back_populates="asset")
-
 
 class ProductRelationship(Base):
     __tablename__ = "productrelationship"
@@ -367,14 +356,15 @@ class File(Base):
     __tablename__ = "file"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    nb_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
+    nb_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     last_seen: Mapped[float] = mapped_column(Float)
-    nb_software_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
-    filename: Mapped[str| None] = mapped_column(Text, nullable=True)
-    software_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.software.id"), nullable=True)
+    nb_software_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    filename: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    hash_id: Mapped[Optional[int]] = mapped_column(ForeignKey("cacheDB.hash.id"), nullable=True)
 
-    software: Mapped["Software"] = relationship(back_populates="files")
-    hashes: Mapped[List["Hash"]] = relationship(back_populates="file")
+    hash: Mapped[Optional["Hash"]] = relationship(back_populates="files")
+    
+    software: Mapped[List["Software"]] = relationship(back_populates="file")
 
     async def create_or_update(self, session) -> None:
         updated = False
@@ -413,14 +403,13 @@ class Hash(Base):
     __tablename__ = "hash"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    nb_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
+    nb_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     last_seen: Mapped[float] = mapped_column(Float)
-    nb_file_id: Mapped[int| None] = mapped_column(Integer, nullable=True)
-    algorithm: Mapped[str| None] = mapped_column(Text, nullable=True)
-    value: Mapped[str| None] = mapped_column(Text, nullable=True)
-    file_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.file.id"), nullable=True)
+    nb_file_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    algorithm: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    file: Mapped["File"] = relationship(back_populates="hashes")
+    files: Mapped[List["File"]] = relationship(back_populates="hash")
 
     async def create_or_update(self, session) -> None:
         updated = False
@@ -463,58 +452,56 @@ class CsafDocument(Base):
     __tablename__ = "csaf_document"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    url: Mapped[str | None] = mapped_column(Text, nullable=True)
-    title: Mapped[str | None] = mapped_column(Text, nullable=True)
-    version: Mapped[str | None] = mapped_column(Text, nullable=True)
-    lang: Mapped[str | None] = mapped_column(Text, nullable=True)
-    publisher: Mapped[str | None] = mapped_column(Text, nullable=True)
+    url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    title: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    version: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    lang: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    publisher: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    matches: Mapped[List["Match"]] = relationship(back_populates="csaf_document")
-    csaf_product_trees: Mapped[List["CsafProductTree"]] = relationship(
+    csaf_product_tree: Mapped["CsafProductTree"] = relationship(
         back_populates="csaf_document"
     )
-
 
 class CsafProduct(Base):
     __tablename__ = "csaf_product"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    device_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.device.id"), nullable=True)
-    software_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.software.id"), nullable=True)
+    device_id: Mapped[Optional[int]] = mapped_column(ForeignKey("cacheDB.device.id"), nullable=True)
+    software_id: Mapped[Optional[int]] = mapped_column(ForeignKey("cacheDB.software.id"), nullable=True)
 
-    device: Mapped["Device"] = relationship(back_populates="csaf_products")
-    software: Mapped["Software"] = relationship(back_populates="csaf_products")
+    device: Mapped[Optional["Device"]] = relationship(back_populates="csaf_product")
+    software: Mapped[Optional["Software"]] = relationship(back_populates="csaf_product")
+
     csaf_product_trees: Mapped[List["CsafProductTree"]] = relationship(
         back_populates="csaf_product"
     )
+
+    matches: Mapped[List["Match"]] = relationship(back_populates="csaf_product")
 
 
 class CsafProductTree(Base):
     __tablename__ = "csaf_product_tree"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    csaf_document_id: Mapped[int] = mapped_column(
-        ForeignKey("cacheDB.csaf_document.id")
-    )
-    csaf_product_id: Mapped[int] = mapped_column(ForeignKey("cacheDB.csaf_product.id"))
+    csaf_document_id: Mapped[int] = mapped_column(ForeignKey("cacheDB.csaf_document.id"), nullable=False)
+    csaf_product_id: Mapped[int] = mapped_column(ForeignKey("cacheDB.csaf_product.id"), nullable=False)
 
     csaf_document: Mapped["CsafDocument"] = relationship(
+        back_populates="csaf_product_tree"
+    )
+    csaf_product: Mapped[List["CsafProduct"]] = relationship(
         back_populates="csaf_product_trees"
     )
-    csaf_product: Mapped["CsafProduct"] = relationship(
-        back_populates="csaf_product_trees"
-    )
-
 
 class Match(Base):
     __tablename__ = "match"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    score: Mapped[float]
-    status: Mapped[str] = mapped_column(Text)
-    time: Mapped[datetime.datetime]
-    csaf_id: Mapped[int] = mapped_column(ForeignKey("cacheDB.csaf_document.id"))
-    asset_id: Mapped[int] = mapped_column(ForeignKey("cacheDB.asset.id"))
+    score: Mapped[float] = mapped_column(nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    time: Mapped[datetime.datetime] = mapped_column(nullable=False)
+    csaf_product_id: Mapped[int] = mapped_column(ForeignKey("cacheDB.csaf_product.id"), nullable=False)
+    asset_id: Mapped[int] = mapped_column(ForeignKey("cacheDB.asset.id"), nullable=False)
 
-    csaf_document: Mapped["CsafDocument"] = relationship(back_populates="matches")
+    csaf_product: Mapped["CsafProduct"] = relationship(back_populates="matches")
     asset: Mapped["Asset"] = relationship(back_populates="matches")
