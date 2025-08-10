@@ -56,10 +56,9 @@ class CacheDB:
         async with AsyncSession(self.engine) as session:
             async with session.begin():
                 # TODO: for csafsync
-                session.add_all(data)
-                await session.commit()
+                # session.add_all(data)
+                # await session.commit()
 
-                """
                 # TODO: for assetsync
                 for asset in data:
                     # logger.info(f"DATA: {asset}")
@@ -70,7 +69,6 @@ class CacheDB:
                             f"Data consistency problem when processing: {asset} {e} "
                         )
                 await session.commit()
-                """
                 await session.close()
 
     async def check_delete(self):
