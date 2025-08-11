@@ -70,7 +70,7 @@ class IsdubaDataSource(DataSourcePlugin):
         ret = []
 
         # Enter a context with an instance of the API client
-        # with isduba_api_client.ApiClient(configuration) as api_client:
+        # async with isduba_api_client.ApiClient(configuration) as api_client:
         #     # Create an instance of the API class
         #     api_instance = isduba_api_client.DefaultApi(api_client)
 
@@ -91,7 +91,7 @@ class IsdubaDataSource(DataSourcePlugin):
         #             count = None  # bool | Enable counting (optional)
         #             # limit = 10  # int | Maximum documents (optional)
         #             # offset = None  # int | Offset (optional)
-        #             api_response = api_instance.documents_get(
+        #             api_response = await api_instance.documents_get(
         #                 advisories=advisories,
         #                 query=query,
         #                 columns=columns,
@@ -106,7 +106,7 @@ class IsdubaDataSource(DataSourcePlugin):
 
         #             for doc in api_response.documents:
         #                 id = doc["id"]
-        #                 api_response = api_instance.documents_id_get(id)
+        #                 api_response = await api_instance.documents_id_get(id)
         #                 csaf_product_tree = await get_csaf_product_tree(api_response["document"], api_response["product_tree"]["branches"])
         
         #                 if csaf_product_tree != None: 
@@ -123,6 +123,8 @@ class IsdubaDataSource(DataSourcePlugin):
         #             raise Exception(
         #                 "Exception when calling DefaultApi->documents_get:\n\n%s" % e
         #             )
+            
+        #     await api_client.close()
                 
         # Return a list of Asset or CsafDocument objects
         return ret
