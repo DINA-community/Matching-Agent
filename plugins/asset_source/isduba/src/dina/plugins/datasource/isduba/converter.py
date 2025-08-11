@@ -26,10 +26,9 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[CsafPr
     
     for product_list in product_tree.product_list:
         for product in product_list:
-            # Additional fields like `purl`, `model_numbers`, `skus`, and `serial_numbers` can be added for extended product identification. 
             cpe, helper, product_version, products = get_product_values(product)
 
-            if cpe == "a" or cpe == "o":
+            if (cpe == "a" or cpe == "o") or (helper.purl and helper.purl.startswith("pkg:")):
                 logger.info("Software")
                 manufacturer = None
                 
@@ -62,7 +61,7 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[CsafPr
                 csaf_product_tree.csaf_document = csaf_document
                 csaf_product_tree_list.append(csaf_product_tree)
 
-            elif cpe == "h":
+            elif cpe == "h" or helper.serial_numbers or helper.model_numbers or helper.skus:
                 logger.info("Device")
                 manufacturer = None
 
