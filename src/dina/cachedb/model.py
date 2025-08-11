@@ -351,6 +351,16 @@ class ProductRelationship(Base):
             logger.info(f"CREATED: {self} {self.id}")
         return obj
 
+class CsafProductRelationship(Base):
+    __tablename__ = "csaf_productrelationship"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    category: Mapped[int] = mapped_column(Integer)
+    csaf_product_source_id: Mapped[int] = mapped_column(ForeignKey("cacheDB.csaf_product.id"))
+    csaf_product_target_id: Mapped[int] = mapped_column(ForeignKey("cacheDB.csaf_product.id"))
+
+    csaf_product_source: Mapped["CsafProduct"] = relationship(back_populates="csaf_productrelationships_source")
+    csaf_product_target: Mapped["CsafProduct"] = relationship(back_populates="csaf_productrelationships_target")
 
 class File(Base):
     __tablename__ = "file"
@@ -477,7 +487,8 @@ class CsafProduct(Base):
     )
 
     matches: Mapped[List["Match"]] = relationship(back_populates="csaf_product")
-
+    csaf_productrelationships_source: Mapped[List["CsafProductRelationship"]] = relationship(back_populates="csaf_product_source")
+    csaf_productrelationships_target: Mapped[List["CsafProductRelationship"]] = relationship(back_populates="csaf_product_target")
 
 class CsafProductTree(Base):
     __tablename__ = "csaf_product_tree"
