@@ -1,6 +1,6 @@
 import time
 from dina.cachedb.database import Device, DeviceType
-from dina.cachedb.model import CsafDocument, CsafProduct, CsafProductTree, Manufacturer, Software
+from dina.cachedb.model import CsafDocument, CsafProduct, CsafProductTree, File, Hash, Manufacturer, Software
 from dina.common import logging
 from typing import List, Optional, Tuple
 from .datamodels import CsafDocument as Document, CsafProductTree as ProductTree, ProductIdentificationHelper, ProductInfo
@@ -37,6 +37,15 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[CsafPr
                     manufacturer = Manufacturer()
                     manufacturer.name = m_name
                     manufacturer.last_seen = starttime
+
+                # TODO: add Hashes and Files 
+                # hash = Hash()
+                # hash.algorithm = None
+                # hash.value = None
+
+                # file = File()
+                # file.hash = hash
+                # file.filename = None
                 
                 software = Software()
                 software.name = list_to_str(products)
