@@ -34,7 +34,7 @@ The installation script of the ISDuBA fetcher plugin in the root directory of th
   
 - Generate the python client for the ISDuBA API:
   ```
-  uv run openapi-generator-cli generate -i isduba-api.json -g python -o src/dina/plugins/datasource/isduba/api_client --package-name isduba_api_client
+  uv run openapi-generator-cli generate -i isduba-api.json -g python -o src/dina/plugins/datasource/isduba/api_client --package-name isduba_api_client --library asyncio
   ```
   
 - Install the client:
