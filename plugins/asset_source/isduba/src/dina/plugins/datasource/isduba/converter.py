@@ -28,7 +28,7 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[CsafPr
         for product in product_list:
             cpe, helper, product_version, products = get_product_values(product)
 
-            if (cpe == "a" or cpe == "o") or (helper.purl and helper.purl.startswith("pkg:")):
+            if (cpe == "a" or cpe == "o") or (helper and helper.purl and helper.purl.startswith("pkg:")):
                 logger.info("Software")
                 manufacturer = None
                 
@@ -61,7 +61,7 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[CsafPr
                 csaf_product_tree.csaf_document = csaf_document
                 csaf_product_tree_list.append(csaf_product_tree)
 
-            elif cpe == "h" or helper.serial_numbers or helper.model_numbers or helper.skus:
+            elif cpe == "h" or (helper and helper.serial_numbers) or (helper and helper.model_numbers) or (helper and helper.skus):
                 logger.info("Device")
                 manufacturer = None
 
