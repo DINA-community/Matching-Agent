@@ -68,6 +68,7 @@ class CacheDB:
                         logger.error(
                             f"Data consistency problem when processing: {asset} {e} "
                         )
+                await session.commit()
                 await session.close()
 
     async def check_delete(self):
@@ -79,54 +80,54 @@ class CacheDB:
                 starttime = obj.last_run
                 logger.info(f"DELETE {starttime}")
 
-            result = await session.execute(select(Manufacturer))
+            result = await session.execute(select(Manufacturer).where(Manufacturer.last_seen < starttime))
             all_objects = result.scalars().all()
             for x in all_objects:
-                if x.last_seen < starttime:
-                    logger.info(f"DELETED: {x} {x.name} {x.last_seen}")
-                    await session.delete(x)
+                #if x.last_seen < starttime:
+                logger.info(f"DELETED: {x} {x.name} {x.last_seen}")
+                await session.delete(x)
 
-            result = await session.execute(select(DeviceType))
+            result = await session.execute(select(DeviceType).where(DeviceType.last_seen < starttime))
             all_objects = result.scalars().all()
             for x in all_objects:
-                if x.last_seen < starttime:
-                    logger.info(f"DELETED: {x} {x.model_number} {x.last_seen}")
-                    await session.delete(x)
+                #if x.last_seen < starttime:
+                logger.info(f"DELETED: {x} {x.model_number} {x.last_seen}")
+                await session.delete(x)
 
-            result = await session.execute(select(Device))
+            result = await session.execute(select(Device).where(Device.last_seen < starttime))
             all_objects = result.scalars().all()
             for x in all_objects:
-                if x.last_seen < starttime:
-                    logger.info(f"DELETED: {x} {x.name} {x.last_seen}")
-                    await session.delete(x)
+                #if x.last_seen < starttime:
+                logger.info(f"DELETED: {x} {x.name} {x.last_seen}")
+                await session.delete(x)
 
-            result = await session.execute(select(Software))
+            result = await session.execute(select(Software).where(Software.last_seen < starttime))
             all_objects = result.scalars().all()
             for x in all_objects:
-                if x.last_seen < starttime:
-                    logger.info(f"DELETED: {x} {x.name} {x.last_seen}")
-                    await session.delete(x)
+                #if x.last_seen < starttime:
+                logger.info(f"DELETED: {x} {x.name} {x.last_seen}")
+                await session.delete(x)
 
-            result = await session.execute(select(Hash))
+            result = await session.execute(select(Hash).where(Hash.last_seen < starttime))
             all_objects = result.scalars().all()
             for x in all_objects:
-                if x.last_seen < starttime:
-                    logger.info(f"DELETED: {x} {x.id} {x.last_seen}")
-                    await session.delete(x)
+                #if x.last_seen < starttime:
+                logger.info(f"DELETED: {x} {x.id} {x.last_seen}")
+                await session.delete(x)
 
-            result = await session.execute(select(File))
+            result = await session.execute(select(File).where(File.last_seen < starttime))
             all_objects = result.scalars().all()
             for x in all_objects:
-                if x.last_seen < starttime:
-                    logger.info(f"DELETED: {x} {x.filename} {x.last_seen}")
-                    await session.delete(x)
+                #if x.last_seen < starttime:
+                logger.info(f"DELETED: {x} {x.filename} {x.last_seen}")
+                await session.delete(x)
 
-            result = await session.execute(select(ProductRelationship))
+            result = await session.execute(select(ProductRelationship).where(ProductRelationship.last_seen < starttime))
             all_objects = result.scalars().all()
             for x in all_objects:
-                if x.last_seen < starttime:
-                    logger.info(f"DELETED: {x} {x.id} {x.last_seen}")
-                    await session.delete(x)
+                #if x.last_seen < starttime:
+                logger.info(f"DELETED: {x} {x.id} {x.last_seen}")
+                await session.delete(x)
 
             await session.commit()
 
