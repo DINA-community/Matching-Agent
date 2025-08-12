@@ -626,9 +626,13 @@ class CsafProduct(Base):
     software_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("cacheDB.software.id"), nullable=True
     )
+    product_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("cacheDB.product.id"), nullable=True
+    )
 
     device: Mapped[Optional["Device"]] = relationship(back_populates="csaf_product")
     software: Mapped[Optional["Software"]] = relationship(back_populates="csaf_product")
+    product: Mapped[Optional["Product"]] = relationship(back_populates="csaf_product")
 
     csaf_product_trees: Mapped[List["CsafProductTree"]] = relationship(
         back_populates="csaf_product"
