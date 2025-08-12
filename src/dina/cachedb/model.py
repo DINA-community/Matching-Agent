@@ -188,10 +188,20 @@ class Product(Base):
             else:
                 raise data_consistency_problem("Manufacturer not found")
 
-        stmt = select(Software).where(Software.nb_id == self.nb_id)
+        async def find_devicetype_key(nb_key):
+            stmt = select(DeviceType).where(DeviceType.nb_id == nb_key)
+            result = await session.execute(stmt)
+            obj = result.scalar_one_or_none()
+            if obj:
+                return obj.id
+            else:
+                raise data_consistency_problem("DeviceType not found")
+
+        stmt = select(Product).where(Product.nb_id == self.nb_id)
         result = await session.execute(stmt)
         obj = result.scalar_one_or_none()
         manu_id = await find_manufacturer_key(self.nb_manu_id)
+        devicetype_id = await find_devicetype_key(self.nb_devicetype_id)
         if obj:
             if obj.name != self.name:
                 setattr(obj, "name", self.name)
@@ -211,11 +221,18 @@ class Product(Base):
             if obj.manufacturer_id != manu_id:
                 setattr(obj, "manufacturer_id", manu_id)
                 updated = True
+            if obj.serial != self.serial:
+                setattr(obj, "serial", self.serial)
+                updated = True
+            if obj.device_type_id != devicetype_id:
+                setattr(obj, "device_type_id", devicetype_id)
+                updated = True
             setattr(obj, "last_seen", self.last_seen)
             if updated:
                 logger.info(f"UPDATED: {self} {self.name}")
         else:
             self.manufacturer_id = manu_id
+            self.device_type_id = devicetype_id
             session.add(self)
             await session.flush()
             the_asset = Asset(software_id=self.id, last_seen=self.last_seen)
