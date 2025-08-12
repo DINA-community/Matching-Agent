@@ -53,6 +53,7 @@ class Manufacturer(Base):
         back_populates="manufacturer"
     )
     software: Mapped[List["Software"]] = relationship(back_populates="manufacturer")
+    products: Mapped[List["Product"]] = relationship(back_populates="manufacturer")
 
     async def create_or_update(self, session) -> None:
         updated = False
@@ -95,6 +96,7 @@ class DeviceType(Base):
     )
 
     devices: Mapped[List["Device"]] = relationship(back_populates="device_type")
+    products: Mapped[List["Product"]] = relationship(back_populates="device_type")
 
     async def create_or_update(self, session) -> None:
         updated = False
@@ -159,13 +161,14 @@ class Product(Base):
         ForeignKey("manufacturer.id"), nullable=True
     )
     manufacturer: Mapped[Optional["Manufacturer"]] = relationship(
-        back_populates="product"
+        back_populates="products"
     )
     file_id: Mapped[Optional[int]] = mapped_column(ForeignKey("file.id"), nullable=True)
-    file: Mapped[Optional["File"]] = relationship(back_populates="product")
-    asset: Mapped[Optional["Asset"]] = relationship(
-        back_populates="product", cascade="all, delete-orphan"
-    )
+    file: Mapped[Optional["File"]] = relationship(back_populates="products")
+    # asset: Mapped[Optional["Asset"]] = relationship(
+    #     back_populates="product", cascade="all, delete-orphan"
+    # )
+    csaf_product_id: Mapped[Optional[int]] = mapped_column(ForeignKey("csaf_product.id"), nullable=True)
     csaf_product: Mapped[Optional["CsafProduct"]] = relationship(
         back_populates="product"
     )
@@ -174,7 +177,7 @@ class Product(Base):
     device_type_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("device_type.id"), nullable=True
     )
-    device_type: Mapped[Optional["DeviceType"]] = relationship(back_populates="product")
+    device_type: Mapped[Optional["DeviceType"]] = relationship(back_populates="products")
 
     async def create_or_update(self, session) -> None:
         updated = False
@@ -518,6 +521,8 @@ class File(Base):
     hash: Mapped[Optional["Hash"]] = relationship(back_populates="files")
 
     software: Mapped[List["Software"]] = relationship(back_populates="file")
+    
+    products: Mapped[List["Product"]] = relationship(back_populates="file")
 
     async def create_or_update(self, session) -> None:
         updated = False
