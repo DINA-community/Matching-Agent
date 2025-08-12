@@ -478,6 +478,7 @@ class CsafProduct(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     device_id: Mapped[Optional[int]] = mapped_column(ForeignKey("cacheDB.device.id"), nullable=True)
     software_id: Mapped[Optional[int]] = mapped_column(ForeignKey("cacheDB.software.id"), nullable=True)
+    product_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     device: Mapped[Optional["Device"]] = relationship(back_populates="csaf_product")
     software: Mapped[Optional["Software"]] = relationship(back_populates="csaf_product")

@@ -21,12 +21,10 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[CsafPr
     csaf_document.lang = document.lang
     csaf_document.publisher = document.publisher
     csaf_document.version = document.version
-
-    csaf_product_tree_list.append(csaf_document)
     
     for product_list in product_tree.product_list:
         for product in product_list:
-            cpe, helper, product_version, products = get_product_values(product)
+            product_id, cpe, helper, product_version, products = get_product_values(product)
 
             if (cpe == "a" or cpe == "o") or (helper and helper.purl and helper.purl.startswith("pkg:")):
                 logger.info("Software")
@@ -54,6 +52,7 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[CsafPr
                 software.last_seen = starttime
 
                 csaf_product = CsafProduct()
+                csaf_product.product_id = product_id
                 csaf_product.software = software
 
                 csaf_product_tree = CsafProductTree()
@@ -93,6 +92,7 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[CsafPr
                     device.serial_numbers = helper.serial_numbers
 
                 csaf_product = CsafProduct()
+                csaf_product.product_id = product_id
                 csaf_product.device = device
 
                 csaf_product_tree = CsafProductTree()
@@ -108,47 +108,54 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[CsafPr
 def get_product_values(product: ProductInfo) -> Tuple[Optional[str], Optional[ProductIdentificationHelper], List, List]:
     cpe = None
     helper = None
+    product_id = None
     product_version = []
     products = []
        
-    if ((pv := product.product_version) and
-        (p := pv.product)):
+    if ((pv := product.product_version)):
+        
         if pv.name not in product_version:
             product_version.append(pv.name)
-        
-        if p.name not in products:
-            products.append(p.name)
-        
-        if (h := p.product_identification_helper):
-            helper = h
 
-            if (cpe := h.cpe):
-                cpe = extract_cpe_part(cpe)
+        if (p := pv.product):
+            product_id = p.product_id
+
+            if p.name not in products:
+                products.append(p.name)
+            
+            if (h := p.product_identification_helper):
+                helper = h
+
+                if (cpe := h.cpe):
+                    cpe = extract_cpe_part(cpe)
     
-    if ((pv := product.product_version_range) and
-        (p := pv.product)):
+    if ((pv := product.product_version_range)):
         if pv.name and pv.name not in product_version:
             product_version.append(pv.name)
-        
-        if p.name not in products:
-            products.append(p.name)
-        
-        if (h := p.product_identification_helper):
-            helper = h
 
-            if (cpe := h.cpe):
-                cpe = extract_cpe_part(cpe)
+        if(p := pv.product):
+            product_id = p.product_id
+
+            if p.name not in products:
+                products.append(p.name)
+            
+            if (h := p.product_identification_helper):
+                helper = h
+
+                if (cpe := h.cpe):
+                    cpe = extract_cpe_part(cpe)
     
     if ((p := product.product)):
         products.append(p.name)
-        
+        product_id = p.product_id
+
         if (h := p.product_identification_helper):
             helper = h
 
             if (cpe := h.cpe):
                 cpe = extract_cpe_part(cpe)
 
-    return (cpe, helper, product_version, products)
+    return (product_id, cpe, helper, product_version, products)
 
 def extract_cpe_part(cpe: str) -> str:
     if not cpe or not isinstance(cpe, str):
