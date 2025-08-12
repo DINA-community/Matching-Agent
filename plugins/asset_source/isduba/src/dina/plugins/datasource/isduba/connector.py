@@ -4,13 +4,16 @@ from typing import List
 from .datamodels import ProductInfo, FileHash, Hash, ProductIdentificationHelper, ProductVersion, ProductVersionRange, Product, CsafDocument, CsafProductTree
 import copy
 
-async def get_csaf_product_tree(document, branches) -> CsafProductTree:
+async def get_csaf_product_tree(url, document, branches) -> CsafProductTree:
     if document is None or branches is None:
         return None
     
     csaf_document = CsafDocument()
     product_list: List[List[ProductInfo]] = []
-
+    
+    if url:
+        csaf_document.url = url
+    
     if document and (title:= document["title"]):
         csaf_document.title = title
     
@@ -19,9 +22,6 @@ async def get_csaf_product_tree(document, branches) -> CsafProductTree:
 
     if document and (lang:= document["lang"]):
         csaf_document.lang = lang
-
-    if document and (references:= document["references"]) and (first:= references[0]) and (url:= first["url"]):
-        csaf_document.url = url
 
     if document and (publisher:= document["publisher"]) and (p_name:= publisher["name"]):
         csaf_document.publisher = p_name

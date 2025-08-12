@@ -106,8 +106,9 @@ class IsdubaDataSource(DataSourcePlugin):
 
         #             for doc in api_response.documents:
         #                 id = doc["id"]
+        #                 url = f"{self.url}/api/documents/{id}/csaf"
         #                 api_response = await api_instance.documents_id_get(id)
-        #                 csaf_product_tree = await get_csaf_product_tree(api_response["document"], api_response["product_tree"]["branches"])
+        #                 csaf_product_tree = await get_csaf_product_tree(url, api_response["document"], api_response["product_tree"]["branches"])
         
         #                 if csaf_product_tree != None: 
         #                     tree = await convert_into_database_format(csaf_product_tree)
