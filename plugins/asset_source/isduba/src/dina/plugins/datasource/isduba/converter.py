@@ -8,6 +8,7 @@ from dina.cachedb.model import (
     # Hash,
     Manufacturer,
     Software,
+    Product,
 )
 from dina.common import logging
 from typing import List, Optional, Tuple
@@ -137,12 +138,12 @@ async def convert_into_database_format(
                     manufacturer.name = m_name
                     manufacturer.last_seen = starttime
 
-                software = Software()
-                software.name = list_to_str(products)
-                software.cpe = cpe
-                software.version = product_version
-                software.manufacturer = manufacturer
-                software.last_seen = starttime
+                prod = Product()
+                prod.name = list_to_str(products)
+                prod.cpe = cpe
+                prod.version = product_version
+                prod.manufacturer = manufacturer
+                prod.last_seen = starttime
 
                 device_type = DeviceType()
                 device_type.manufacturer = manufacturer
@@ -160,18 +161,17 @@ async def convert_into_database_format(
                 ):
                     device_type.model_numbers = helper.model_numbers
 
-                device = Device()
-                device.device_type = device_type
-                device.name = list_to_str(products)  # duplicate value
-                device.last_seen = starttime
+                prod.device_type = device_type
+                prod.name = list_to_str(products)  # duplicate value
+                prod.last_seen = starttime
 
                 if helper.serial_numbers is not None and isinstance(
                     helper.serial_numbers, list
                 ):
-                    device.serial_numbers = helper.serial_numbers
+                    prod.serial_numbers = helper.serial_numbers
 
                 csaf_product = CsafProduct()
-                csaf_product.product = product
+                csaf_product.product = prod
 
                 csaf_product_tree = CsafProductTree()
                 csaf_product_tree.csaf_product = csaf_product
