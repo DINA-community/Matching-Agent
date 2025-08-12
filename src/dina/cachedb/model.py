@@ -359,8 +359,8 @@ class CsafProductRelationship(Base):
     csaf_product_source_id: Mapped[int] = mapped_column(ForeignKey("cacheDB.csaf_product.id"))
     csaf_product_target_id: Mapped[int] = mapped_column(ForeignKey("cacheDB.csaf_product.id"))
 
-    csaf_product_source: Mapped["CsafProduct"] = relationship(back_populates="csaf_productrelationships_source")
-    csaf_product_target: Mapped["CsafProduct"] = relationship(back_populates="csaf_productrelationships_target")
+    csaf_product_source: Mapped["CsafProduct"] = relationship(back_populates="csaf_productrelationships_source",foreign_keys=[csaf_product_source_id])
+    csaf_product_target: Mapped["CsafProduct"] = relationship(back_populates="csaf_productrelationships_target",foreign_keys=[csaf_product_target_id])
 
 class File(Base):
     __tablename__ = "file"
@@ -487,8 +487,8 @@ class CsafProduct(Base):
     )
 
     matches: Mapped[List["Match"]] = relationship(back_populates="csaf_product")
-    csaf_productrelationships_source: Mapped[List["CsafProductRelationship"]] = relationship(back_populates="csaf_product_source")
-    csaf_productrelationships_target: Mapped[List["CsafProductRelationship"]] = relationship(back_populates="csaf_product_target")
+    csaf_productrelationships_source: Mapped[List["CsafProductRelationship"]] = relationship(back_populates="csaf_product_source", foreign_keys="CsafProductRelationship.csaf_product_source_id")
+    csaf_productrelationships_target: Mapped[List["CsafProductRelationship"]] = relationship(back_populates="csaf_product_target", foreign_keys="CsafProductRelationship.csaf_product_target_id")
 
 class CsafProductTree(Base):
     __tablename__ = "csaf_product_tree"
