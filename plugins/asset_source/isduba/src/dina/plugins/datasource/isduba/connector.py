@@ -1,13 +1,18 @@
 
 from typing import List
 
-from .datamodels import ProductInfo, FileHash, Hash, ProductIdentificationHelper, ProductVersion, ProductVersionRange, Product, CsafDocument, CsafProductTree
+from .datamodels import ProductInfo, FileHash, Hash, ProductIdentificationHelper, ProductVersion, ProductVersionRange, Product, CsafDocument, CsafProductTree, Relationship
 import copy
 
-async def get_csaf_product_tree(url, document, branches) -> CsafProductTree:
-    if document is None or branches is None:
+async def get_csaf_product_tree(url, document, product_tree) -> CsafProductTree:
+    if document is None or product_tree is None:
         return None
     
+    branches = product_tree.get("branches")
+
+    if branches is None: 
+        return None
+        
     csaf_document = CsafDocument()
     product_list: List[List[ProductInfo]] = []
     
@@ -30,8 +35,20 @@ async def get_csaf_product_tree(url, document, branches) -> CsafProductTree:
         for branch in branches:
             product: List[ProductInfo] = await get_product_info(branch)
             product_list.append(product)
+
+    relationships = product_tree.get("relationships")
+
+    relationships_list = []
+
+    if relationships != None:
+        for r in relationships:
+            relationship = Relationship()
+            relationship.category = r.get("category")
+            relationship.product_reference = r.get("product_reference")
+            relationship.relates_to_product_reference = r.get("relates_to_product_reference")
+            relationships_list.append(relationship)
         
-    return CsafProductTree(csaf_document=csaf_document, product_list=product_list)
+    return CsafProductTree(csaf_document=csaf_document, product_list=product_list, relationships_list=relationships_list)
 
 async def get_file_hash(file_hashes_value) -> FileHash:
     file_hash = FileHash()

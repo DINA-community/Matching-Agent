@@ -58,6 +58,13 @@ class CsafDocument:
     publisher: Optional[str] = None
 
 @dataclass
+class Relationship:
+    category: None | str = None
+    product_reference: None | str = None
+    relates_to_product_reference: None | str = None
+
+@dataclass
 class CsafProductTree:
     csaf_document: Optional[CsafDocument] = None
     product_list: Optional[List[List[ProductInfo]]] = None
+    relationships_list: Optional[List[Relationship]] = None

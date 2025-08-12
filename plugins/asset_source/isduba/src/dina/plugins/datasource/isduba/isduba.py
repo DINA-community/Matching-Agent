@@ -1,11 +1,11 @@
-from typing import List
+from typing import List, Union
+from dina.cachedb.model import CsafProductRelationship, CsafProductTree
 from dina.common import logging
 from dina.synchronizer.base import DataSourcePlugin
 import httpx
 import isduba_api_client
 # from .connector import get_csaf_product_tree
 # from .converter import convert_into_database_format
-from .datamodels import CsafProductTree
 
 # import urllib3
 # urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -30,7 +30,7 @@ class IsdubaDataSource(DataSourcePlugin):
         """Return information about the data source endpoint."""
         return self.url
 
-    async def fetch_data(self) -> List[CsafProductTree]:
+    async def fetch_data(self) -> List[Union[CsafProductTree, CsafProductRelationship]]:
         """Fetch data from the data source and return it as a list of Assets or CsafDocuments."""
         # Implement your data fetching logic here
         # This is where you would connect to your data source and retrieve data
@@ -106,15 +106,16 @@ class IsdubaDataSource(DataSourcePlugin):
 
         #             for doc in api_response.documents:
         #                 id = doc["id"]
-        #                 url = f"{self.url}/api/documents/{id}/csaf"
+        #                 url = f"{self.url}/api/documents/{id}"
         #                 api_response = await api_instance.documents_id_get(id)
-        #                 csaf_product_tree = await get_csaf_product_tree(url, api_response["document"], api_response["product_tree"]["branches"])
-        
+        #                 csaf_product_tree: CsafProductTree = await get_csaf_product_tree(url, api_response["document"], api_response["product_tree"])
+
         #                 if csaf_product_tree != None: 
         #                     tree = await convert_into_database_format(csaf_product_tree)
 
         #                     for t in tree:
         #                         ret.append(t)
+        #                 break
 
         #             offset += limit
 

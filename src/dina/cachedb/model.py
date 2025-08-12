@@ -488,7 +488,7 @@ class CsafProductRelationship(Base):
     __tablename__ = "csaf_productrelationship"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    category: Mapped[int] = mapped_column(Integer)
+    category: Mapped[str] = mapped_column(Text)
     csaf_product_source_id: Mapped[int] = mapped_column(
         ForeignKey("cacheDB.csaf_product.id")
     )

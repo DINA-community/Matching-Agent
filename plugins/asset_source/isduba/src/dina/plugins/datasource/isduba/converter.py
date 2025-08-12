@@ -9,9 +9,10 @@ from dina.cachedb.model import (
     Manufacturer,
     Software,
     Product,
+    CsafProductRelationship
 )
 from dina.common import logging
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 from .datamodels import (
     CsafDocument as Document,
     CsafProductTree as ProductTree,
@@ -22,15 +23,13 @@ from .datamodels import (
 logger = logging.get_logger(__name__)
 
 
-async def convert_into_database_format(
-    product_tree: ProductTree,
-) -> List[CsafProductTree]:
+async def convert_into_database_format(product_tree: ProductTree) -> List[Union[CsafProductTree, CsafProductRelationship]]:
     if product_tree.csaf_document is None:
         return None
 
     starttime = time.time()
 
-    csaf_product_tree_list: List[CsafProductTree] = []
+    csaf_full_product_list: List[Union[CsafProductTree, CsafProductRelationship]] = []
 
     document: Document = product_tree.csaf_document
     csaf_document = CsafDocument()
@@ -38,14 +37,14 @@ async def convert_into_database_format(
     csaf_document.lang = document.lang
     csaf_document.publisher = document.publisher
     csaf_document.version = document.version
+
+    csaf_product_list: List[CsafProduct] = []
     
     for product_list in product_tree.product_list:
         for product in product_list:
-            product_id, cpe, helper, product_version, products = get_product_values(product)
+            product_id, cpe, helper, product_version, products = await get_product_values(product)
 
-            if (cpe == "a" or cpe == "o") or (
-                helper and helper.purl and helper.purl.startswith("pkg:")
-            ):
+            if (cpe == "a" or cpe == "o") or (helper and helper.purl and helper.purl.startswith("pkg:")):
                 logger.info("Software")
                 manufacturer = None
 
@@ -73,11 +72,12 @@ async def convert_into_database_format(
                 csaf_product = CsafProduct()
                 csaf_product.product_id = product_id
                 csaf_product.software = software
+                csaf_product_list.append(csaf_product)
 
                 csaf_product_tree = CsafProductTree()
                 csaf_product_tree.csaf_product = csaf_product
                 csaf_product_tree.csaf_document = csaf_document
-                csaf_product_tree_list.append(csaf_product_tree)
+                csaf_full_product_list.append(csaf_product_tree)
 
             elif (
                 cpe == "h"
@@ -101,10 +101,10 @@ async def convert_into_database_format(
                 device_type.device_family = product.product_family
                 device_type.last_seen = starttime
 
-                if helper.skus is not None and isinstance(helper.skus, list):
+                if helper and helper.skus is not None and isinstance(helper.skus, list):
                     device_type.part_numbers = helper.skus
 
-                if helper.model_numbers is not None and isinstance(
+                if helper and helper.model_numbers is not None and isinstance(
                     helper.model_numbers, list
                 ):
                     device_type.model_numbers = helper.model_numbers
@@ -114,7 +114,7 @@ async def convert_into_database_format(
                 device.name = list_to_str(products)  # duplicate value
                 device.last_seen = starttime
 
-                if helper.serial_numbers is not None and isinstance(
+                if helper and helper.serial_numbers is not None and isinstance(
                     helper.serial_numbers, list
                 ):
                     device.serial_numbers = helper.serial_numbers
@@ -122,13 +122,13 @@ async def convert_into_database_format(
                 csaf_product = CsafProduct()
                 csaf_product.product_id = product_id
                 csaf_product.device = device
+                csaf_product_list.append(csaf_product)
 
                 csaf_product_tree = CsafProductTree()
                 csaf_product_tree.csaf_product = csaf_product
                 csaf_product_tree.csaf_document = csaf_document
-                csaf_product_tree_list.append(csaf_product_tree)
-
-            elif cpe is not None:
+                csaf_full_product_list.append(csaf_product_tree)
+            elif cpe is None:
                 logger.info("Undefined Type")
 
                 manufacturer = None
@@ -153,10 +153,10 @@ async def convert_into_database_format(
                 device_type.device_family = product.product_family
                 device_type.last_seen = starttime
 
-                if helper.skus is not None and isinstance(helper.skus, list):
+                if helper and helper.skus is not None and isinstance(helper.skus, list):
                     device_type.part_numbers = helper.skus
 
-                if helper.model_numbers is not None and isinstance(
+                if helper and helper.model_numbers is not None and isinstance(
                     helper.model_numbers, list
                 ):
                     device_type.model_numbers = helper.model_numbers
@@ -165,33 +165,50 @@ async def convert_into_database_format(
                 prod.name = list_to_str(products)  # duplicate value
                 prod.last_seen = starttime
 
-                if helper.serial_numbers is not None and isinstance(
+                if helper and helper.serial_numbers is not None and isinstance(
                     helper.serial_numbers, list
                 ):
                     prod.serial_numbers = helper.serial_numbers
 
                 csaf_product = CsafProduct()
+                csaf_product.product_id = product_id
                 csaf_product.product = prod
+                csaf_product_list.append(csaf_product)
 
                 csaf_product_tree = CsafProductTree()
                 csaf_product_tree.csaf_product = csaf_product
                 csaf_product_tree.csaf_document = csaf_document
-                csaf_product_tree_list.append(csaf_product_tree)
+                csaf_full_product_list.append(csaf_product_tree)
+    
+    for relationship in product_tree.relationships_list:
+        product_reference: Optional[CsafProduct] = None
+        relates_to_product_reference: Optional[CsafProduct] = None
 
-    return csaf_product_tree_list
+        for csaf_product in csaf_product_list:
+            if csaf_product.product_id == relationship.product_reference:
+                product_reference = csaf_product
+            
+            if csaf_product.product_id == relationship.relates_to_product_reference:
+                relates_to_product_reference = csaf_product
 
+            if product_reference != None and relates_to_product_reference != None: 
+                relationship_value = CsafProductRelationship()
+                relationship_value.category = relationship.category
+                relationship_value.csaf_product_source = product_reference
+                relationship_value.csaf_product_target = relates_to_product_reference
+                csaf_full_product_list.append(relationship_value)
+                break
 
-def get_product_values(
-    product: ProductInfo,
-) -> Tuple[Optional[str], Optional[str], Optional[ProductIdentificationHelper], List, List]:
+    return csaf_full_product_list
+
+async def get_product_values(product: ProductInfo) -> Tuple[Optional[str], Optional[str], Optional[ProductIdentificationHelper], List, List]:
     cpe = None
     helper = None
     product_id = None
     product_version = []
     products = []
        
-    if pv := product.product_version:
-        
+    if product and (pv := product.product_version):
         if pv.name not in product_version:
             product_version.append(pv.name)
 
@@ -207,7 +224,7 @@ def get_product_values(
                 if (cpe := h.cpe):
                     cpe = extract_cpe_part(cpe)
     
-    if pv := product.product_version_range:
+    if product and (pv := product.product_version_range):
         if pv.name and pv.name not in product_version:
             product_version.append(pv.name)
 
@@ -223,7 +240,7 @@ def get_product_values(
                 if cpe := h.cpe:
                     cpe = extract_cpe_part(cpe)
 
-    if p := product.product:
+    if product and (p := product.product):
         products.append(p.name)
         product_id = p.product_id
 
