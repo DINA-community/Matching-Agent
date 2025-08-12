@@ -169,6 +169,12 @@ class Product(Base):
     csaf_product: Mapped[Optional["CsafProduct"]] = relationship(
         back_populates="product"
     )
+    nb_devicetype_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    serial_numbers: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    device_type_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("device_type.id"), nullable=True
+    )
+    device_type: Mapped[Optional["DeviceType"]] = relationship(back_populates="product")
 
     async def create_or_update(self, session) -> None:
         updated = False
