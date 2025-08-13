@@ -217,7 +217,7 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[Union[
             if csaf_product.product_name_id == relationship.relates_to_product_reference:
                 relates_to_product_reference = csaf_product
 
-            if product_reference != None and relates_to_product_reference != None: 
+            if product_reference is not None and relates_to_product_reference is not None: 
                 relationship_value = CsafProductRelationship()
                 relationship_value.category = relationship.category
                 relationship_value.csaf_product_source = product_reference

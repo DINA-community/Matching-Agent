@@ -31,7 +31,7 @@ async def get_csaf_product_tree(url, document, product_tree) -> CsafProductTree:
     if document and (publisher:= document["publisher"]) and (p_name:= publisher["name"]):
         csaf_document.publisher = p_name
 
-    if branches != None:
+    if branches is not None:
         for branch in branches:
             product: List[ProductInfo] = await get_product_info(branch)
             product_list.append(product)
@@ -40,7 +40,7 @@ async def get_csaf_product_tree(url, document, product_tree) -> CsafProductTree:
 
     relationships_list = []
 
-    if relationships != None:
+    if relationships is not None:
         for r in relationships:
             relationship = Relationship()
             relationship.category = r.get("category")
@@ -55,16 +55,16 @@ async def get_file_hash(file_hashes_value) -> FileHash:
     algorithm = file_hashes_value.get("algorithm")
     value = file_hashes_value.get("value")
     
-    if algorithm != None:
+    if algorithm is not None:
         file_hash.algorithm = algorithm
 
-    if value != None: 
+    if value is not None: 
         file_hash.value = value
 
     return file_hash
 
 async def get_product_identification_helper(product_identification_helper_value) -> ProductIdentificationHelper:
-    if product_identification_helper_value == None: 
+    if product_identification_helper_value is None: 
         return None
     
     product_identification_helper = ProductIdentificationHelper()
@@ -76,35 +76,35 @@ async def get_product_identification_helper(product_identification_helper_value)
     sbom_urls = product_identification_helper_value.get("sbom_urls")
     serial_numbers = product_identification_helper_value.get("serial_numbers")
 
-    if hashes_value != None:
+    if hashes_value is not None:
         hashes = Hash()
         filename = hashes_value.get("filename")
         file_hashes_value = hashes_value.get("file_hashes")
 
-        if filename != None:
+        if filename is not None:
             hashes.file_name = filename
 
-        if file_hashes_value != None:
+        if file_hashes_value is not None:
             hashes.file_hash = await get_file_hash(file_hashes_value)
         
         product_identification_helper.hashes = hashes
 
-    if cpe != None:
+    if cpe is not None:
         product_identification_helper.cpe = cpe
     
-    if purl != None:
+    if purl is not None:
         product_identification_helper.purl = purl
     
-    if model_numbers != None: 
+    if model_numbers is not None: 
         product_identification_helper.model_numbers = model_numbers
     
-    if skus != None: 
+    if skus is not None: 
         product_identification_helper.skus = skus
     
-    if sbom_urls != None: 
+    if sbom_urls is not None: 
         product_identification_helper.sbom_urls = sbom_urls
 
-    if serial_numbers != None: 
+    if serial_numbers is not None: 
         product_identification_helper.serial_numbers = serial_numbers
     
     return product_identification_helper
@@ -114,7 +114,7 @@ async def get_product_version(name: str, sub_branch) -> ProductVersion:
     product_version.name = name
     branch_product = sub_branch.get("product")
 
-    if branch_product != None:
+    if branch_product is not None:
         product_version.product = await get_product(branch_product)
     
     return product_version
@@ -124,7 +124,7 @@ async def get_product_version_range(name: str, sub_branch) -> ProductVersionRang
     product_version_range.name = name
     branch_product = sub_branch.get("product")
 
-    if branch_product != None:
+    if branch_product is not None:
         product_version_range.product = await get_product(branch_product)
     
     return product_version_range
@@ -135,13 +135,13 @@ async def get_product(branch_product) -> Product:
     product_identification_helper = branch_product.get("product_identification_helper")
     product = Product()
 
-    if product_name != None:
+    if product_name is not None:
         product.name = product_name
     
-    if product_id != None:
+    if product_id is not None:
         product.product_id = product_id
     
-    if product_identification_helper != None:
+    if product_identification_helper is not None:
         product.product_identification_helper = await get_product_identification_helper(product_identification_helper)
 
     return product

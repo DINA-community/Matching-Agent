@@ -16,7 +16,6 @@ from dina.cachedb.model import (
     ProductRelationship,
     AssetSynchronizer
 )
-from dina.cachedb.model import data_consistency_problem
 
 logger = logging.getLogger(__name__)
 
@@ -56,20 +55,20 @@ class CacheDB:
         async with AsyncSession(self.engine) as session:
             async with session.begin():
                 # TODO: for csafsync
-                # session.add_all(data)
-                # await session.commit()
+                session.add_all(data)
+                await session.commit()
 
                 # TODO: for assetsync
-                for asset in data:
-                    # logger.info(f"DATA: {asset}")
-                    try:
-                        await asset.create_or_update(session)
-                    except data_consistency_problem as e:
-                        logger.error(
-                            f"Data consistency problem when processing: {asset} {e} "
-                        )
-                await session.commit()
-                await session.close()
+                # for asset in data:
+                #     # logger.info(f"DATA: {asset}")
+                #     try:
+                #         await asset.create_or_update(session)
+                #     except data_consistency_problem as e:
+                #         logger.error(
+                #             f"Data consistency problem when processing: {asset} {e} "
+                #         )
+                # await session.commit()
+                # await session.close()
 
     async def check_delete(self):
         async with AsyncSession(self.engine) as session:
