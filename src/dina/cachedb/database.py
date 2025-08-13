@@ -14,11 +14,12 @@ from dina.cachedb.model import (
     File,
     Hash,
     ProductRelationship,
-    AssetSynchronizer
+    AssetSynchronizer,
 )
 from dina.cachedb.model import data_consistency_problem
 
 logger = logging.getLogger(__name__)
+
 
 class CacheDB:
     @dataclass
@@ -80,52 +81,68 @@ class CacheDB:
                 starttime = obj.last_run
                 logger.info(f"DELETE {starttime}")
 
-            result = await session.execute(select(Manufacturer).where(Manufacturer.last_seen < starttime))
+            result = await session.execute(
+                select(Manufacturer).where(Manufacturer.last_seen < starttime)
+            )
             all_objects = result.scalars().all()
             for x in all_objects:
-                #if x.last_seen < starttime:
+                # if x.last_seen < starttime:
                 logger.info(f"DELETED: {x} {x.name} {x.last_seen}")
                 await session.delete(x)
 
-            result = await session.execute(select(DeviceType).where(DeviceType.last_seen < starttime))
+            result = await session.execute(
+                select(DeviceType).where(DeviceType.last_seen < starttime)
+            )
             all_objects = result.scalars().all()
             for x in all_objects:
-                #if x.last_seen < starttime:
+                # if x.last_seen < starttime:
                 logger.info(f"DELETED: {x} {x.model_number} {x.last_seen}")
                 await session.delete(x)
 
-            result = await session.execute(select(Device).where(Device.last_seen < starttime))
+            result = await session.execute(
+                select(Device).where(Device.last_seen < starttime)
+            )
             all_objects = result.scalars().all()
             for x in all_objects:
-                #if x.last_seen < starttime:
+                # if x.last_seen < starttime:
                 logger.info(f"DELETED: {x} {x.name} {x.last_seen}")
                 await session.delete(x)
 
-            result = await session.execute(select(Software).where(Software.last_seen < starttime))
+            result = await session.execute(
+                select(Software).where(Software.last_seen < starttime)
+            )
             all_objects = result.scalars().all()
             for x in all_objects:
-                #if x.last_seen < starttime:
+                # if x.last_seen < starttime:
                 logger.info(f"DELETED: {x} {x.name} {x.last_seen}")
                 await session.delete(x)
 
-            result = await session.execute(select(Hash).where(Hash.last_seen < starttime))
+            result = await session.execute(
+                select(Hash).where(Hash.last_seen < starttime)
+            )
             all_objects = result.scalars().all()
             for x in all_objects:
-                #if x.last_seen < starttime:
+                # if x.last_seen < starttime:
                 logger.info(f"DELETED: {x} {x.id} {x.last_seen}")
                 await session.delete(x)
 
-            result = await session.execute(select(File).where(File.last_seen < starttime))
+            result = await session.execute(
+                select(File).where(File.last_seen < starttime)
+            )
             all_objects = result.scalars().all()
             for x in all_objects:
-                #if x.last_seen < starttime:
+                # if x.last_seen < starttime:
                 logger.info(f"DELETED: {x} {x.filename} {x.last_seen}")
                 await session.delete(x)
 
-            result = await session.execute(select(ProductRelationship).where(ProductRelationship.last_seen < starttime))
+            result = await session.execute(
+                select(ProductRelationship).where(
+                    ProductRelationship.last_seen < starttime
+                )
+            )
             all_objects = result.scalars().all()
             for x in all_objects:
-                #if x.last_seen < starttime:
+                # if x.last_seen < starttime:
                 logger.info(f"DELETED: {x} {x.id} {x.last_seen}")
                 await session.delete(x)
 

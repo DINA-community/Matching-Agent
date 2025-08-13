@@ -62,6 +62,7 @@ dina-plugins-preprocessing-netbox = { workspace = true }
 
 [tool.ruff]
 exclude = ["plugins/asset_source/netbox/src/dina/plugins/datasource/netbox/api_client"]
+respect-gitignore = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
