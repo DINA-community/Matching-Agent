@@ -4,8 +4,8 @@ from dina.cachedb.model import (
     CsafDocument,
     CsafProduct,
     CsafProductTree,
-    # File,
-    # Hash,
+    File,
+    Hash,
     Manufacturer,
     Software,
     Product,
@@ -53,14 +53,21 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[Union[
                     manufacturer.name = m_name
                     manufacturer.last_seen = starttime
 
-                # TODO: add Hashes and Files
-                # hash = Hash()
-                # hash.algorithm = None
-                # hash.value = None
+                files = []
 
-                # file = File()
-                # file.hash = hash
-                # file.filename = None
+                if helper and helper.hashes:
+                    for h in helper.hashes:
+                        hash = None
+
+                        if h.file_hash and h.file_hash.algorithm and h.file_hash.value:
+                            hash = Hash()
+                            hash.algorithm = h.file_hash.algorithm
+                            hash.value = h.file_hash.value
+
+                        file = File()
+                        file.hash = hash
+                        file.filename = h.file_name
+                        files.append(file)
 
                 software = Software()
                 software.name = list_to_str(products)
@@ -68,6 +75,7 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[Union[
                 software.version = product_version
                 software.manufacturer = manufacturer
                 software.last_seen = starttime
+                software.files = files
 
                 csaf_product = CsafProduct()
                 csaf_product.product_name_id = product_name_id
@@ -160,10 +168,28 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[Union[
                     helper.model_numbers, list
                 ):
                     device_type.model_numbers = helper.model_numbers
+                
+                files = []
+
+                if helper and helper.hashes:
+                    for h in helper.hashes:
+                        hash = None
+
+                        if h.file_hash and h.file_hash.algorithm and h.file_hash.value:
+                            hash = Hash()
+                            hash.algorithm = h.file_hash.algorithm
+                            hash.value = h.file_hash.value
+
+                        file = File()
+                        file.hash = hash
+                        file.filename = h.file_name
+                        files.append(file)
+
 
                 prod.device_type = device_type
                 prod.name = list_to_str(products)  # duplicate value
                 prod.last_seen = starttime
+                prod.files = files
 
                 if helper and helper.serial_numbers is not None and isinstance(
                     helper.serial_numbers, list

@@ -82,10 +82,10 @@ async def get_product_identification_helper(product_identification_helper_value)
         file_hashes_value = hashes_value.get("file_hashes")
 
         if filename != None:
-            hashes.filename = filename
+            hashes.file_name = filename
 
         if file_hashes_value != None:
-            hashes.file_hashes = await get_file_hash(file_hashes_value)
+            hashes.file_hash = await get_file_hash(file_hashes_value)
         
         product_identification_helper.hashes = hashes
 

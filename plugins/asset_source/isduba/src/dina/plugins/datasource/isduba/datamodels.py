@@ -8,7 +8,7 @@ class FileHash:
 
 @dataclass
 class Hash:
-    file_hashes: Optional[FileHash] = None
+    file_hash: Optional[FileHash] = None
     file_name: Optional[str] = None
 
 @dataclass

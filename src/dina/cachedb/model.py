@@ -1,6 +1,6 @@
 import datetime
 import logging
-from sqlalchemy import Float
+from sqlalchemy import Column, Float, Table
 
 # from sqlalchemy import ForeignKey
 from sqlalchemy.ext.asyncio import AsyncAttrs
@@ -144,6 +144,12 @@ class DeviceType(Base):
             logger.info(f"CREATED: {self} {self.model_number}")
         return obj
 
+product_file_association = Table(
+    "product_file_association",
+    Base.metadata,
+    Column("product_id", ForeignKey("product.id"), primary_key=True),
+    Column("file_id", ForeignKey("file.id"), primary_key=True),
+)
 
 class Product(Base):
     __tablename__ = "product"
@@ -163,8 +169,11 @@ class Product(Base):
     manufacturer: Mapped[Optional["Manufacturer"]] = relationship(
         back_populates="products"
     )
-    file_id: Mapped[Optional[int]] = mapped_column(ForeignKey("file.id"), nullable=True)
-    file: Mapped[Optional["File"]] = relationship(back_populates="products")
+    files: Mapped[Optional[List["File"]]] = relationship(
+        "File",
+        secondary=product_file_association,
+        back_populates="products"
+    )
     # asset: Mapped[Optional["Asset"]] = relationship(
     #     back_populates="product", cascade="all, delete-orphan"
     # )
@@ -244,6 +253,12 @@ class Product(Base):
             logger.info(f"CREATED: {the_asset} {the_asset.id}")
         return obj
 
+software_file_association = Table(
+    "software_file_association",
+    Base.metadata,
+    Column("software_id", ForeignKey("software.id"), primary_key=True),
+    Column("file_id", ForeignKey("file.id"), primary_key=True),
+)
 
 class Software(Base):
     __tablename__ = "software"
@@ -260,13 +275,15 @@ class Software(Base):
     manufacturer_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("manufacturer.id"), nullable=True
     )
-    file_id: Mapped[Optional[int]] = mapped_column(ForeignKey("file.id"), nullable=True)
 
     manufacturer: Mapped[Optional["Manufacturer"]] = relationship(
         back_populates="software"
     )
-    file: Mapped[Optional["File"]] = relationship(back_populates="software")
-
+    files: Mapped[Optional[List["File"]]] = relationship(
+            "File",
+            secondary=software_file_association,
+            back_populates="software"
+        )
     asset: Mapped[Optional["Asset"]] = relationship(
         back_populates="software", cascade="all, delete-orphan"
     )
@@ -520,10 +537,18 @@ class File(Base):
 
     hash: Mapped[Optional["Hash"]] = relationship(back_populates="files")
 
-    software: Mapped[List["Software"]] = relationship(back_populates="file")
+    software: Mapped[List["Software"]] = relationship(
+            "Software",
+            secondary=software_file_association,
+            back_populates="files"
+        )
     
-    products: Mapped[List["Product"]] = relationship(back_populates="file")
-
+    products: Mapped[List["Product"]] = relationship(
+            "Product",
+            secondary=product_file_association,
+            back_populates="files"
+        )
+    
     async def create_or_update(self, session) -> None:
         updated = False
 
@@ -634,7 +659,7 @@ class CsafProduct(Base):
     product_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("cacheDB.product.id"), nullable=True
     )
-    
+
     product_name_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     device: Mapped[Optional["Device"]] = relationship(back_populates="csaf_product")
