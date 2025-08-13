@@ -42,7 +42,7 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[Union[
     
     for product_list in product_tree.product_list:
         for product in product_list:
-            product_id, cpe, helper, product_version, products = await get_product_values(product)
+            product_name_id, cpe, helper, product_version, products = await get_product_values(product)
 
             if (cpe == "a" or cpe == "o") or (helper and helper.purl and helper.purl.startswith("pkg:")):
                 logger.info("Software")
@@ -70,7 +70,7 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[Union[
                 software.last_seen = starttime
 
                 csaf_product = CsafProduct()
-                csaf_product.product_id = product_id
+                csaf_product.product_name_id = product_name_id
                 csaf_product.software = software
                 csaf_product_list.append(csaf_product)
 
@@ -120,7 +120,7 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[Union[
                     device.serial_numbers = helper.serial_numbers
 
                 csaf_product = CsafProduct()
-                csaf_product.product_id = product_id
+                csaf_product.product_name_id = product_name_id
                 csaf_product.device = device
                 csaf_product_list.append(csaf_product)
 
@@ -171,7 +171,7 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[Union[
                     prod.serial_numbers = helper.serial_numbers
 
                 csaf_product = CsafProduct()
-                csaf_product.product_id = product_id
+                csaf_product.product_name_id = product_name_id
                 csaf_product.product = prod
                 csaf_product_list.append(csaf_product)
 
@@ -185,10 +185,10 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[Union[
         relates_to_product_reference: Optional[CsafProduct] = None
 
         for csaf_product in csaf_product_list:
-            if csaf_product.product_id == relationship.product_reference:
+            if csaf_product.product_name_id == relationship.product_reference:
                 product_reference = csaf_product
             
-            if csaf_product.product_id == relationship.relates_to_product_reference:
+            if csaf_product.product_name_id == relationship.relates_to_product_reference:
                 relates_to_product_reference = csaf_product
 
             if product_reference != None and relates_to_product_reference != None: 
@@ -204,7 +204,7 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[Union[
 async def get_product_values(product: ProductInfo) -> Tuple[Optional[str], Optional[str], Optional[ProductIdentificationHelper], List, List]:
     cpe = None
     helper = None
-    product_id = None
+    product_name_id = None
     product_version = []
     products = []
        
@@ -213,7 +213,7 @@ async def get_product_values(product: ProductInfo) -> Tuple[Optional[str], Optio
             product_version.append(pv.name)
 
         if p := pv.product:
-            product_id = p.product_id
+            product_name_id = p.product_id
 
             if p.name not in products:
                 products.append(p.name)
@@ -229,7 +229,7 @@ async def get_product_values(product: ProductInfo) -> Tuple[Optional[str], Optio
             product_version.append(pv.name)
 
         if p := pv.product:
-            product_id = p.product_id
+            product_name_id = p.product_id
 
             if p.name not in products:
                 products.append(p.name)
@@ -242,7 +242,7 @@ async def get_product_values(product: ProductInfo) -> Tuple[Optional[str], Optio
 
     if product and (p := product.product):
         products.append(p.name)
-        product_id = p.product_id
+        product_name_id = p.product_id
 
         if h := p.product_identification_helper:
             helper = h
@@ -250,7 +250,7 @@ async def get_product_values(product: ProductInfo) -> Tuple[Optional[str], Optio
             if cpe := h.cpe:
                 cpe = extract_cpe_part(cpe)
 
-    return (product_id, cpe, helper, product_version, products)
+    return (product_name_id, cpe, helper, product_version, products)
 
 def extract_cpe_part(cpe: str) -> str:
     if not cpe or not isinstance(cpe, str):

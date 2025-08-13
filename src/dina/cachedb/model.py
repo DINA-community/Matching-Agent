@@ -168,7 +168,7 @@ class Product(Base):
     # asset: Mapped[Optional["Asset"]] = relationship(
     #     back_populates="product", cascade="all, delete-orphan"
     # )
-    csaf_product_id: Mapped[Optional[int]] = mapped_column(ForeignKey("csaf_product.id"), nullable=True)
+    # csaf_product_id: Mapped[Optional[int]] = mapped_column(ForeignKey("csaf_product.id"), nullable=True)
     csaf_product: Mapped[Optional["CsafProduct"]] = relationship(
         back_populates="product"
     )
@@ -634,7 +634,8 @@ class CsafProduct(Base):
     product_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("cacheDB.product.id"), nullable=True
     )
-    product_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    product_name_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     device: Mapped[Optional["Device"]] = relationship(back_populates="csaf_product")
     software: Mapped[Optional["Software"]] = relationship(back_populates="csaf_product")
