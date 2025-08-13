@@ -2,7 +2,9 @@ from typing import List
 from dina.common import logging
 from dina.synchronizer.base import DataSourcePlugin
 import httpx
-import isduba_api_client
+
+import dina.plugins.datasource.isduba.generated.isduba_api_client as isduba_api_client
+
 # from .connector import get_csaf_product_tree
 # from .converter import convert_into_database_format
 from .datamodels import CsafProductTree
@@ -11,6 +13,7 @@ from .datamodels import CsafProductTree
 # urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.get_logger(__name__)
+
 
 class IsdubaDataSource(DataSourcePlugin):
     def __init__(self, config):
@@ -76,7 +79,7 @@ class IsdubaDataSource(DataSourcePlugin):
 
         #     limit = 2
         #     offset = 0
-            
+
         #     while True:
         #         logger.trace("offset: {}".format(offset))
 
@@ -108,8 +111,8 @@ class IsdubaDataSource(DataSourcePlugin):
         #                 id = doc["id"]
         #                 api_response = api_instance.documents_id_get(id)
         #                 csaf_product_tree = await get_csaf_product_tree(api_response["document"], api_response["product_tree"]["branches"])
-        
-        #                 if csaf_product_tree != None: 
+
+        #                 if csaf_product_tree != None:
         #                     tree = await convert_into_database_format(csaf_product_tree)
 
         #                     for t in tree:
@@ -118,11 +121,11 @@ class IsdubaDataSource(DataSourcePlugin):
         #             offset += limit
 
         #             break # TODO: stop the process for csafsync
-                            
+
         #         except Exception as e:
         #             raise Exception(
         #                 "Exception when calling DefaultApi->documents_get:\n\n%s" % e
         #             )
-                
+
         # Return a list of Asset or CsafDocument objects
         return ret

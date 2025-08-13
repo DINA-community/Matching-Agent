@@ -6,6 +6,8 @@ repos:
     # Run the linter.
     - id: ruff-check
       exclude: plugins/asset_source/netbox/src/dina/plugins/datasource/netbox/api_client
+      respect-gitignore: true
     # Run the formatter.
     - id: ruff-format
       exclude: plugins/asset_source/netbox/src/dina/plugins/datasource/netbox/api_client
+      respect-gitignore: true
