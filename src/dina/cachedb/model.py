@@ -253,13 +253,6 @@ class Product(Base):
             logger.info(f"CREATED: {the_asset} {the_asset.id}")
         return obj
 
-software_file_association = Table(
-    "software_file_association",
-    Base.metadata,
-    Column("software_id", ForeignKey("software.id"), primary_key=True),
-    Column("file_id", ForeignKey("file.id"), primary_key=True),
-)
-
 class Software(Base):
     __tablename__ = "software"
 
@@ -279,11 +272,10 @@ class Software(Base):
     manufacturer: Mapped[Optional["Manufacturer"]] = relationship(
         back_populates="software"
     )
-    files: Mapped[Optional[List["File"]]] = relationship(
-            "File",
-            secondary=software_file_association,
-            back_populates="software"
-        )
+    files: Mapped[List["File"]] = relationship(
+        back_populates="software",
+        cascade="all, delete-orphan"
+    )
     asset: Mapped[Optional["Asset"]] = relationship(
         back_populates="software", cascade="all, delete-orphan"
     )
@@ -537,11 +529,8 @@ class File(Base):
 
     hash: Mapped[Optional["Hash"]] = relationship(back_populates="files")
 
-    software: Mapped[List["Software"]] = relationship(
-            "Software",
-            secondary=software_file_association,
-            back_populates="files"
-        )
+    software_id: Mapped[int] = mapped_column(ForeignKey("software.id"))
+    software: Mapped["Software"] = relationship(back_populates="files")
     
     products: Mapped[List["Product"]] = relationship(
             "Product",
