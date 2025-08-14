@@ -80,11 +80,11 @@ class DeviceType(Base):
     last_seen: Mapped[float] = mapped_column(Float)
     nb_manu_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     model: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    model_number: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    part_number: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    model_number: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    part_number: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
     device_family: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     cpe: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    hardware_version: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    hardware_version: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
     hardware_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     manufacturer_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("manufacturer.id"), nullable=True
@@ -151,23 +151,18 @@ class Software(Base):
     last_seen: Mapped[float] = mapped_column(Float)
     nb_manu_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    version: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    version: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
     cpe: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     purl: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     sbom_urls: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
     manufacturer_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("manufacturer.id"), nullable=True
     )
-    file_id: Mapped[Optional[int]] = mapped_column(ForeignKey("file.id"), nullable=True)
-
     manufacturer: Mapped[Optional["Manufacturer"]] = relationship(
         back_populates="software"
     )
-    file: Mapped[Optional["File"]] = relationship(back_populates="software")
-
-    asset: Mapped[Optional["Asset"]] = relationship(
-        back_populates="software", cascade="all, delete-orphan"
-    )
+    files: Mapped[Optional["File"]] = relationship(back_populates="software")
+    assets: Mapped[List["Asset"]] = relationship(back_populates="software",cascade="all")
     csaf_product: Mapped[Optional["CsafProduct"]] = relationship(
         back_populates="software"
     )
@@ -229,18 +224,15 @@ class Device(Base):
     last_seen: Mapped[float] = mapped_column(Float)
     nb_devicetype_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    serial: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    serial: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
     device_type_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("device_type.id"), nullable=True
     )
 
     device_type: Mapped[Optional["DeviceType"]] = relationship(back_populates="devices")
-
+    assets: Mapped[List["Asset"]] = relationship(back_populates="device", cascade="all")
     csaf_product: Mapped[Optional["CsafProduct"]] = relationship(
         back_populates="device"
-    )
-    asset: Mapped[Optional["Asset"]] = relationship(
-        back_populates="device", cascade="all, delete-orphan"
     )
 
     async def create_or_update(self, session) -> None:
@@ -295,9 +287,8 @@ class Asset(Base):
         ForeignKey("software.id"), nullable=True
     )
 
-    device: Mapped[Optional["Device"]] = relationship(back_populates="asset")
-    software: Mapped[Optional["Software"]] = relationship(back_populates="asset")
-
+    device: Mapped["Device"] = relationship(back_populates="assets")
+    software: Mapped["Software"] = relationship(back_populates="assets")
     matches: Mapped[List["Match"]] = relationship(back_populates="asset")
 
 
@@ -390,13 +381,10 @@ class File(Base):
     last_seen: Mapped[float] = mapped_column(Float)
     nb_software_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     filename: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    hash_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("cacheDB.hash.id"), nullable=True
-    )
+    software_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.software.id"), nullable=True)
 
-    hash: Mapped[Optional["Hash"]] = relationship(back_populates="files")
-
-    software: Mapped[List["Software"]] = relationship(back_populates="file")
+    software: Mapped["Software"] = relationship(back_populates="files")
+    hashes: Mapped[List["Hash"]] = relationship(back_populates="file")
 
     async def create_or_update(self, session) -> None:
         updated = False
@@ -440,8 +428,9 @@ class Hash(Base):
     nb_file_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     algorithm: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    file_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.file.id"), nullable=True)
 
-    files: Mapped[List["File"]] = relationship(back_populates="hash")
+    file: Mapped["File"] = relationship(back_populates="hashes")
 
     async def create_or_update(self, session) -> None:
         updated = False
