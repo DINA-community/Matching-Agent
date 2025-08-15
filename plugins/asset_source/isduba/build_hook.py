@@ -57,8 +57,8 @@ def generate_api_client(
                 "openapi-generator-cli not found. Ensure it is installed and available in PATH."
             ) from e
 
-        package_path = package_path.split(".")
-        package_name = package_path[-1]
+        split_package_path = package_path.split(".")
+        package_name = split_package_path[-1]
         package_path = "/".join(package_path)
         # Locate the generated package directory (may be under src/<pkg> or at root)
         candidates = [
