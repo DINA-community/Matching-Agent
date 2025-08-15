@@ -1,15 +1,18 @@
 from dataclasses import dataclass
 from typing import List, Optional
 
+
 @dataclass
 class FileHash:
     algorithm: Optional[str] = None
     value: Optional[str] = None
 
+
 @dataclass
 class Hash:
     file_hash: Optional[FileHash] = None
     file_name: Optional[str] = None
+
 
 @dataclass
 class ProductIdentificationHelper:
@@ -21,21 +24,25 @@ class ProductIdentificationHelper:
     sbom_urls: Optional[List[str]] = None
     serial_numbers: Optional[List[str]] = None
 
+
 @dataclass
 class Product:
     name: Optional[str] = None
     product_id: Optional[str] = None
     product_identification_helper: Optional[ProductIdentificationHelper] = None
 
+
 @dataclass
 class ProductVersion:
     name: Optional[str] = None
     product: Optional[Product] = None
 
+
 @dataclass
 class ProductVersionRange:
     name: Optional[str] = None
     product: Optional[Product] = None
+
 
 @dataclass
 class ProductInfo:
@@ -49,6 +56,7 @@ class ProductInfo:
     product_version: Optional[ProductVersion] = None
     product: Optional[Product] = None
 
+
 @dataclass
 class CsafDocument:
     url: Optional[str] = None
@@ -56,6 +64,7 @@ class CsafDocument:
     version: Optional[str] = None
     lang: Optional[str] = None
     publisher: Optional[str] = None
+
 
 @dataclass
 class Relationship:

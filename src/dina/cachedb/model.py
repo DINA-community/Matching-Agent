@@ -523,11 +523,8 @@ class File(Base):
     last_seen: Mapped[float] = mapped_column(Float)
     nb_software_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     filename: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    hash_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("cacheDB.hash.id"), nullable=True
-    )
 
-    hash: Mapped[Optional["Hash"]] = relationship(back_populates="files")
+    hashes: Mapped[List["Hash"]] = relationship(back_populates="file")
 
     software_id: Mapped[int] = mapped_column(ForeignKey("software.id"))
     software: Mapped["Software"] = relationship(back_populates="files")
@@ -580,8 +577,9 @@ class Hash(Base):
     nb_file_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     algorithm: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    file_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.file.id"), nullable=True)
 
-    files: Mapped[List["File"]] = relationship(back_populates="hash")
+    file: Mapped["File"] = relationship(back_populates="hashes")
 
     async def create_or_update(self, session) -> None:
         updated = False

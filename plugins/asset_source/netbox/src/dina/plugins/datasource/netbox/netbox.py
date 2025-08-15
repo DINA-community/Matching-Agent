@@ -1,6 +1,7 @@
 import asyncio
 from typing import List, Union
 import time
+import json
 from dina.cachedb.model import (
     Manufacturer,
     DeviceType,
@@ -78,14 +79,12 @@ class NetboxDataSource(DataSourcePlugin):
                 DeviceType(
                     nb_id=x.id,
                     model=x.model,
-                    model_number=x.custom_fields.additional_properties["model_number"],
-                    part_number=x.part_number,
-                    hardware_name=x.custom_fields.additional_properties[
-                        "hardware_name"
-                    ],
-                    hardware_version=x.custom_fields.additional_properties[
+                    model_number=[x.custom_fields.additional_properties["model_number"]],
+                    part_number=[x.part_number],
+                    hardware_name=x.custom_fields.additional_properties["hardware_name"],
+                    hardware_version=[x.custom_fields.additional_properties[
                         "hardware_version"
-                    ],
+                    ]],
                     device_family=x.custom_fields.additional_properties[
                         "device_family"
                     ],
@@ -101,7 +100,7 @@ class NetboxDataSource(DataSourcePlugin):
                 Device(
                     nb_id=x.id,
                     name=x.name,
-                    serial=x.serial,
+                    serial=[x.serial],
                     nb_devicetype_id=x.device_type.id,
                     last_seen=starttime,
                 )
@@ -114,7 +113,7 @@ class NetboxDataSource(DataSourcePlugin):
                     nb_id=x.id,
                     name=x.name,
                     nb_manu_id=x.manufacturer.id,
-                    version=x.version,
+                    version=[x.version],
                     cpe=x.cpe,
                     purl=x.purl,
                     sbom_urls=x.sbom_urls,

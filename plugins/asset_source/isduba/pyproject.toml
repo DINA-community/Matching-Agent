@@ -12,7 +12,8 @@ requires-python = ">=3.13"
 # All data source plugins depend on the base matcher package. Feel free to add any additional dependencies.
 dependencies = [
     "dina.matcher",
-    "openapi-generator-cli>=7.14.0",
+    "urllib3",
+    "aiohttp-retry"
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -25,6 +26,13 @@ isduba_fetcher = "dina.plugins.datasource.isduba.isduba:IsdubaDataSource"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.hooks.custom]
+path = "build_hook.py"
+dependencies = [
+    "openapi-generator-cli>=7.14.0",
+    "dina.matcher",
+]
 
 [tool.uv.sources]
 "dina.matcher" = { workspace = true }

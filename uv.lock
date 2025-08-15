@@ -9,7 +9,6 @@ members = [
     "dina-plugins-datasource-netbox-fetcher",
     "dina-plugins-datasource-sample",
     "dina-plugins-preprocessing-identity",
-    "isduba-api-client",
 ]
 
 [[package]]
@@ -53,6 +52,18 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/05/6a/ea199e61b67f25ba688d3ce93f63b49b0a4e3b3d380f03971b4646412fc6/aiohttp-3.12.15-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:ad702e57dc385cae679c39d318def49aef754455f237499d5b99bea4ef582e51", size = 1710050, upload-time = "2025-07-29T05:51:48.203Z" },
     { url = "https://files.pythonhosted.org/packages/b4/2e/ffeb7f6256b33635c29dbed29a22a723ff2dd7401fff42ea60cf2060abfb/aiohttp-3.12.15-cp313-cp313-win32.whl", hash = "sha256:f813c3e9032331024de2eb2e32a88d86afb69291fbc37a3a3ae81cc9917fb3d0", size = 422647, upload-time = "2025-07-29T05:51:50.718Z" },
     { url = "https://files.pythonhosted.org/packages/1b/8e/78ee35774201f38d5e1ba079c9958f7629b1fd079459aea9467441dbfbf5/aiohttp-3.12.15-cp313-cp313-win_amd64.whl", hash = "sha256:1a649001580bdb37c6fdb1bebbd7e3bc688e8ec2b5c6f52edbb664662b17dc84", size = 449067, upload-time = "2025-07-29T05:51:52.549Z" },
+]
+
+[[package]]
+name = "aiohttp-retry"
+version = "2.9.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiohttp" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9d/61/ebda4d8e3d8cfa1fd3db0fb428db2dd7461d5742cea35178277ad180b033/aiohttp_retry-2.9.1.tar.gz", hash = "sha256:8eb75e904ed4ee5c2ec242fefe85bf04240f685391c4879d8f541d6028ff01f1", size = 13608, upload-time = "2024-11-06T10:44:54.574Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1a/99/84ba7273339d0f3dfa57901b846489d2e5c2cd731470167757f1935fffbd/aiohttp_retry-2.9.1-py3-none-any.whl", hash = "sha256:66d2759d1921838256a05a3f80ad7e724936f083e35be5abb5e16eed6be6dc54", size = 9981, upload-time = "2024-11-06T10:44:52.917Z" },
 ]
 
 [[package]]
@@ -291,16 +302,16 @@ name = "dina-plugins-datasource-isduba-fetcher"
 version = "0.1.0"
 source = { editable = "plugins/asset_source/isduba" }
 dependencies = [
+    { name = "aiohttp-retry" },
     { name = "dina-matcher" },
-    { name = "isduba-api-client" },
-    { name = "openapi-generator-cli" },
+    { name = "urllib3" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "aiohttp-retry" },
     { name = "dina-matcher", editable = "." },
-    { name = "isduba-api-client", editable = "plugins/asset_source/isduba/src/dina/plugins/datasource/isduba/api_client" },
-    { name = "openapi-generator-cli", specifier = ">=7.14.0" },
+    { name = "urllib3" },
 ]
 
 [[package]]
@@ -501,25 +512,6 @@ wheels = [
 ]
 
 [[package]]
-name = "isduba-api-client"
-version = "1.0.0"
-source = { editable = "plugins/asset_source/isduba/src/dina/plugins/datasource/isduba/api_client" }
-dependencies = [
-    { name = "pydantic" },
-    { name = "python-dateutil" },
-    { name = "typing-extensions" },
-    { name = "urllib3" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "pydantic", specifier = ">=2" },
-    { name = "python-dateutil", specifier = ">=2.8.2" },
-    { name = "typing-extensions", specifier = ">=4.7.1" },
-    { name = "urllib3", specifier = ">=2.1.0,<3.0.0" },
-]
-
-[[package]]
 name = "jinja2"
 version = "3.1.6"
 source = { registry = "https://pypi.org/simple" }
@@ -667,15 +659,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/43/16/fc88b08840de0e0a72a2f9d8c6bae36be573e475a6326ae854bcc549fc45/nodeenv-1.9.1.tar.gz", hash = "sha256:6ec12890a2dab7946721edbfbcd91f3319c6ccc9aec47be7c7e6b7011ee6645f", size = 47437, upload-time = "2024-06-04T18:44:11.171Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d2/1d/1b658dbd2b9fa9c4c9f32accbfc0205d532c8c6194dc0f2a4c0428e7128a/nodeenv-1.9.1-py2.py3-none-any.whl", hash = "sha256:ba11c9782d29c27c70ffbdda2d7415098754709be8a7056d79a737cd901155c9", size = 22314, upload-time = "2024-06-04T18:44:08.352Z" },
-]
-
-[[package]]
-name = "openapi-generator-cli"
-version = "7.14.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/57/23/70b408c3565d5cb93ee9f7605654902cdd2a3e3891739859ec304dbd7519/openapi_generator_cli-7.14.0.tar.gz", hash = "sha256:48b5478a83ee09dfd38018da3e1661acafd2ce06627aecce0ec10a66cbd1aa00", size = 27205268, upload-time = "2025-06-26T01:44:11.787Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/9e/5e/0aca9db4760a6b7d66a2b51dfc04073dcede1b1be505f0e6a30cc2f45b1c/openapi_generator_cli-7.14.0-py3-none-any.whl", hash = "sha256:fbf7b606671fd939ab1ee185942396aa4ba88f8ec211a30a47ce02f81855778e", size = 27219227, upload-time = "2025-06-26T01:44:06.756Z" },
 ]
 
 [[package]]

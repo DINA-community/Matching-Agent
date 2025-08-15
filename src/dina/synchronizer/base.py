@@ -214,6 +214,7 @@ class BaseSynchronizer(ABC):
 
             except Exception as e:
                 logger.error(f"Error loading plugin from {config_file}: {e}")
+                raise e
 
         return plugins
 

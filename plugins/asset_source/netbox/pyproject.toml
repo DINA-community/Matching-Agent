@@ -18,6 +18,9 @@ packages = ["src/dina"]
 [project.entry-points."dina.plugins.datasource"]
 netbox_fetcher = "dina.plugins.datasource.netbox.netbox:NetboxDataSource"
 
+[project.scripts]
+dina-netbox-init = "dina.plugins.datasource.netbox.api_generator:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

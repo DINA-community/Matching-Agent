@@ -23,6 +23,7 @@ from .datamodels import (
 logger = logging.get_logger(__name__)
 
 
+
 async def convert_into_database_format(product_tree: ProductTree) -> List[Union[CsafProductTree, CsafProductRelationship]]:
     if product_tree.csaf_document is None:
         return None

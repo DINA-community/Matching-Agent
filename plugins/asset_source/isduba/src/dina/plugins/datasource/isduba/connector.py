@@ -1,8 +1,18 @@
-
 from typing import List
 
-from .datamodels import ProductInfo, FileHash, Hash, ProductIdentificationHelper, ProductVersion, ProductVersionRange, Product, CsafDocument, CsafProductTree, Relationship
+from .datamodels import (
+    ProductInfo,
+    FileHash,
+    Hash,
+    ProductIdentificationHelper,
+    ProductVersion,
+    ProductVersionRange,
+    Product,
+    CsafDocument,
+    CsafProductTree,
+)
 import copy
+
 
 async def get_csaf_product_tree(url, document, product_tree) -> CsafProductTree:
     if document is None or product_tree is None:
@@ -21,11 +31,11 @@ async def get_csaf_product_tree(url, document, product_tree) -> CsafProductTree:
     
     if document and (title:= document["title"]):
         csaf_document.title = title
-    
-    if document and (version:= document["csaf_version"]):
+
+    if document and (version := document["csaf_version"]):
         csaf_document.version = version
 
-    if document and (lang:= document["lang"]):
+    if document and (lang := document["lang"]):
         csaf_document.lang = lang
 
     if document and (publisher:= document["publisher"]) and (p_name:= publisher["name"]):
@@ -50,6 +60,7 @@ async def get_csaf_product_tree(url, document, product_tree) -> CsafProductTree:
         
     return CsafProductTree(csaf_document=csaf_document, product_list=product_list, relationships_list=relationships_list)
 
+
 async def get_file_hash(file_hashes_value) -> FileHash:
     file_hash = FileHash()
     algorithm = file_hashes_value.get("algorithm")
@@ -63,10 +74,13 @@ async def get_file_hash(file_hashes_value) -> FileHash:
 
     return file_hash
 
-async def get_product_identification_helper(product_identification_helper_value) -> ProductIdentificationHelper:
-    if product_identification_helper_value is None: 
+
+async def get_product_identification_helper(
+    product_identification_helper_value,
+) -> ProductIdentificationHelper:
+    if product_identification_helper_value is None:
         return None
-    
+
     product_identification_helper = ProductIdentificationHelper()
     hashes_value = product_identification_helper_value.get("hashes")
     cpe = product_identification_helper_value.get("cpe")
@@ -106,8 +120,9 @@ async def get_product_identification_helper(product_identification_helper_value)
 
     if serial_numbers is not None: 
         product_identification_helper.serial_numbers = serial_numbers
-    
+
     return product_identification_helper
+
 
 async def get_product_version(name: str, sub_branch) -> ProductVersion:
     product_version = ProductVersion()
@@ -116,8 +131,9 @@ async def get_product_version(name: str, sub_branch) -> ProductVersion:
 
     if branch_product is not None:
         product_version.product = await get_product(branch_product)
-    
+
     return product_version
+
 
 async def get_product_version_range(name: str, sub_branch) -> ProductVersionRange:
     product_version_range = ProductVersionRange()
@@ -126,8 +142,9 @@ async def get_product_version_range(name: str, sub_branch) -> ProductVersionRang
 
     if branch_product is not None:
         product_version_range.product = await get_product(branch_product)
-    
+
     return product_version_range
+
 
 async def get_product(branch_product) -> Product:
     product_name = branch_product.get("name")
@@ -140,12 +157,15 @@ async def get_product(branch_product) -> Product:
     
     if product_id is not None:
         product.product_id = product_id
-    
+
     if product_identification_helper is not None:
-        product.product_identification_helper = await get_product_identification_helper(product_identification_helper)
+        product.product_identification_helper = await get_product_identification_helper(
+            product_identification_helper
+        )
 
     return product
-    
+
+
 async def get_product_info(sub_branch) -> List[ProductInfo]:
     result: List[ProductInfo] = []
 
@@ -169,7 +189,9 @@ async def get_product_info(sub_branch) -> List[ProductInfo]:
         elif category == "host_name":
             info.host_name = name
         elif category == "product_version_range":
-            info.product_version_range = await get_product_version_range(name, current_branch)
+            info.product_version_range = await get_product_version_range(
+                name, current_branch
+            )
         elif category == "product_version":
             info.product_version = await get_product_version(name, current_branch)
 
