@@ -1,7 +1,6 @@
 import asyncio
 from typing import List, Union
 import time
-import json
 from dina.cachedb.model import (
     Manufacturer,
     DeviceType,

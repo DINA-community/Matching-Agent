@@ -10,6 +10,7 @@ from .datamodels import (
     Product,
     CsafDocument,
     CsafProductTree,
+    Relationship,
 )
 import copy
 
