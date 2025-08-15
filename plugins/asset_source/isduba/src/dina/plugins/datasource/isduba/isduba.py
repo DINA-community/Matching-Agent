@@ -4,8 +4,8 @@ import httpx
 from dina.cachedb.model import CsafProductRelationship
 from dina.common import logging
 
-# from .connector import get_csaf_product_tree
-# from .converter import convert_into_database_format
+# from dina.plugins.datasource.isduba.connector import get_csaf_product_tree
+# from dina.plugins.datasource.isduba.converter import convert_into_database_format
 from dina.plugins.datasource.isduba.datamodels import CsafProductTree
 from dina.plugins.datasource.isduba.generated import isduba_api_client
 from dina.synchronizer.base import DataSourcePlugin
