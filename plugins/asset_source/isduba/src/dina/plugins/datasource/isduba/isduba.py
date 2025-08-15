@@ -1,13 +1,14 @@
 from typing import List
-from dina.common import logging
-from dina.synchronizer.base import DataSourcePlugin
+
 import httpx
 
-import dina.plugins.datasource.isduba.generated.isduba_api_client as isduba_api_client
+from dina.common import logging
 
 # from .connector import get_csaf_product_tree
 # from .converter import convert_into_database_format
-from .datamodels import CsafProductTree
+from dina.plugins.datasource.isduba.datamodels import CsafProductTree
+from dina.plugins.datasource.isduba.generated import isduba_api_client
+from dina.synchronizer.base import DataSourcePlugin
 
 # import urllib3
 # urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)

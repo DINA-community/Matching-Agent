@@ -12,6 +12,7 @@ requires-python = ">=3.13"
 # All data source plugins depend on the base matcher package. Feel free to add any additional dependencies.
 dependencies = [
     "dina.matcher",
+    "urllib3",
 ]
 
 [tool.hatch.build.targets.wheel]

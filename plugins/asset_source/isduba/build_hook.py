@@ -10,11 +10,11 @@ from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
 logger = logging.getLogger(__name__)
 
-DEF_PACKAGE_NAME = "isduba_api_client"
+DEF_PACKAGE_NAME = "dina.plugins.datasource.isduba.generated.isduba_api_client"
 
 
 def generate_api_client(
-    spec_path: Path, output_parent_dir: Path, package_name: str = DEF_PACKAGE_NAME
+    spec_path: Path, output_parent_dir: Path, package_path: str = DEF_PACKAGE_NAME
 ) -> None:
     """
     Generate the Python API client using openapi-generator-cli into a temporary
@@ -24,7 +24,7 @@ def generate_api_client(
     Args:
         spec_path: Path to the OpenAPI/Swagger spec (json/yaml).
         output_parent_dir: Directory where the package directory should be placed.
-        package_name: The name for the generated python package.
+        package_path: The name for the generated python package.
     """
     if not spec_path.exists():
         raise FileNotFoundError(f"Spec file not found: {spec_path}")
@@ -46,7 +46,7 @@ def generate_api_client(
             "-o",
             str(tmp_out),
             "--package-name",
-            package_name,
+            package_path,
         ]
 
         logger.debug("Running command: %s", " ".join(cmd))
@@ -57,21 +57,24 @@ def generate_api_client(
                 "openapi-generator-cli not found. Ensure it is installed and available in PATH."
             ) from e
 
+        package_path = package_path.split(".")
+        package_name = package_path[-1]
+        package_path = "/".join(package_path)
         # Locate the generated package directory (may be under src/<pkg> or at root)
         candidates = [
-            tmp_out / "src" / package_name,
-            tmp_out / package_name,
+            tmp_out / "src" / package_path,
+            tmp_out / package_path,
         ]
         pkg_src: Path | None = next((c for c in candidates if c.exists()), None)
         if pkg_src is None:
             # Fallback: search for directory named package_name
-            for p in tmp_out.rglob(package_name):
+            for p in tmp_out.rglob(package_path):
                 if p.is_dir():
                     pkg_src = p
                     break
         if pkg_src is None:
             raise RuntimeError(
-                f"Failed to locate generated package directory '{package_name}' in {tmp_out}"
+                f"Failed to locate generated package directory '{package_path}' in {tmp_out}"
             )
 
         target_pkg_dir = output_parent_dir / package_name
