@@ -47,6 +47,8 @@ def generate_api_client(
             str(tmp_out),
             "--package-name",
             package_path,
+            "--library",
+            "asyncio",
         ]
 
         logger.debug("Running command: %s", " ".join(cmd))
@@ -59,7 +61,7 @@ def generate_api_client(
 
         split_package_path = package_path.split(".")
         package_name = split_package_path[-1]
-        package_path = "/".join(package_path)
+        package_path = "/".join(split_package_path)
         # Locate the generated package directory (may be under src/<pkg> or at root)
         candidates = [
             tmp_out / "src" / package_path,

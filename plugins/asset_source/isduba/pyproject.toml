@@ -13,6 +13,7 @@ requires-python = ">=3.13"
 dependencies = [
     "dina.matcher",
     "urllib3",
+    "aiohttp-retry"
 ]
 
 [tool.hatch.build.targets.wheel]
