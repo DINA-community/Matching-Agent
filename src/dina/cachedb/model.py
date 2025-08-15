@@ -81,8 +81,8 @@ class DeviceType(Base):
     last_seen: Mapped[float] = mapped_column(Float)
     nb_manu_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     model: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    model_numbers: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
-    part_numbers: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    model_number: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    part_number: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
     device_family: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     cpe: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     hardware_version: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
@@ -182,7 +182,7 @@ class Product(Base):
         back_populates="product"
     )
     nb_devicetype_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    serial_numbers: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    serial: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
     device_type_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("device_type.id"), nullable=True
     )
@@ -340,7 +340,7 @@ class Device(Base):
     last_seen: Mapped[float] = mapped_column(Float)
     nb_devicetype_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    serial_numbers: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    serial: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
     device_type_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("device_type.id"), nullable=True
     )

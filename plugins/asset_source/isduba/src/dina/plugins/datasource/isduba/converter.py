@@ -110,12 +110,12 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[Union[
                 device_type.last_seen = starttime
 
                 if helper and helper.skus is not None and isinstance(helper.skus, list):
-                    device_type.part_numbers = helper.skus
+                    device_type.part_number = helper.skus
 
                 if helper and helper.model_numbers is not None and isinstance(
                     helper.model_numbers, list
                 ):
-                    device_type.model_numbers = helper.model_numbers
+                    device_type.model_number = helper.model_numbers
 
                 device = Device()
                 device.device_type = device_type
@@ -125,7 +125,7 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[Union[
                 if helper and helper.serial_numbers is not None and isinstance(
                     helper.serial_numbers, list
                 ):
-                    device.serial_numbers = helper.serial_numbers
+                    device.serial = helper.serial_numbers
 
                 csaf_product = CsafProduct()
                 csaf_product.product_name_id = product_name_id
@@ -162,12 +162,12 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[Union[
                 device_type.last_seen = starttime
 
                 if helper and helper.skus is not None and isinstance(helper.skus, list):
-                    device_type.part_numbers = helper.skus
+                    device_type.part_number = helper.skus
 
                 if helper and helper.model_numbers is not None and isinstance(
                     helper.model_numbers, list
                 ):
-                    device_type.model_numbers = helper.model_numbers
+                    device_type.model_number = helper.model_numbers
                 
                 files = []
 
@@ -194,7 +194,7 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[Union[
                 if helper and helper.serial_numbers is not None and isinstance(
                     helper.serial_numbers, list
                 ):
-                    prod.serial_numbers = helper.serial_numbers
+                    prod.serial = helper.serial_numbers
 
                 csaf_product = CsafProduct()
                 csaf_product.product_name_id = product_name_id
