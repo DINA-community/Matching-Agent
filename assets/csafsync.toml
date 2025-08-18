@@ -4,10 +4,24 @@
 # If no preprocessing is needed, use the default identity preprocessor.
 
 [Csafsync]
+# Csaf specific configuration
+
+[Synchronizer]
+# Synchronization inetrval in seconds.
+# The synchronizer will perform a fetching task every X seconds.
+sync_interval = 60
+
 # A list of preprocessor plugins. The order in which they are provided
 # here is the order in which they are executed on the data.
 preprocessor_plugins = ["identity"]
 
+[Synchronizer.Api]
+# The address to serve on
+# 0.0.0.0 means all interfaces
+host = "0.0.0.0"
+
+# The port to serve on.
+port = 8000
 
 [Cachedb]
 host = "localhost"

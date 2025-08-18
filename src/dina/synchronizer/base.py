@@ -9,11 +9,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 import tomllib
 from abc import ABC
 from importlib.metadata import entry_points, EntryPoints
 from pathlib import Path
-from typing import List, Union
+from typing import List, Union, Optional
+
+import uvicorn
+from fastapi import FastAPI
 
 from dina.cachedb.database import CacheDB
 from dina.cachedb.model import Asset, CsafDocument
@@ -22,6 +26,10 @@ from dina.synchronizer.plugin_base.preprocessor import PreprocessorPlugin
 
 # Set up logging
 logger = logging.getLogger(__name__)
+
+type TomlEntry = (
+    dict[str, TomlEntry] | list[TomlEntry] | str | int | float | bool | None
+)
 
 
 class SynchronizerConfig:
@@ -33,43 +41,75 @@ class SynchronizerConfig:
     def preprocessor_plugin_names(self) -> List[str]:
         return self.__preprocessor_plugin_names
 
-    def __init__(self, config: dict):
-        self.__raw_config: dict = config
+    @property
+    def sync_interval(self) -> int:
+        return self.__sync_interval
+
+    @property
+    def api_host(self) -> str:
+        return self.__api_host
+
+    @property
+    def api_port(self) -> int:
+        return self.__api_port
+
+    # noinspection PyUnreachableCode
+    def __init__(self, config: dict[str, TomlEntry]):
+        self.__raw_config = config
         # Parse the configuration file
-
-        # Get the manager section (e.g., Assetman or Csafman)
-        manager_section = None
-        if "Assetsync" in self.__raw_config:
-            manager_section = self.__raw_config["Assetsync"]
-        elif "Csafsync" in self.__raw_config:
-            manager_section = self.__raw_config["Csafsync"]
-
-        if not manager_section:
-            logger.warning(
-                f"No manager section found in configuration file: {self.config_file}"
+        if (
+            manager_section := self.__raw_config.get("Synchronizer", None)
+        ) and isinstance(manager_section, dict):
+            # Get the list of preprocessor plugins
+            self.__preprocessor_plugin_names = manager_section.get(
+                "preprocessor_plugins", None
             )
-            raise KeyError("Missing manager section in configuration file")
+        else:
+            logger.warning(
+                f"No Synchronizer section found in configuration file: {self.__raw_config}"
+            )
+            raise KeyError("Missing Synchronizer section in configuration file")
 
-        # Get the list of preprocessor plugins
-        self.__preprocessor_plugin_names = manager_section.get(
-            "preprocessor_plugins", None
-        )
         if self.__preprocessor_plugin_names is None:
             logger.info("No preprocessor plugins specified in configuration")
             raise KeyError("Missing preprocessor_plugins in configuration")
 
-        cachedb_config = self.__raw_config.get("Cachedb", None)
-        if cachedb_config is None:
+        if (cachedb_config := self.__raw_config.get("Cachedb", None)) and isinstance(
+            cachedb_config, dict
+        ):
+            try:
+                self.__cachedb_config = CacheDB.Config(
+                    host=cachedb_config["host"],  # type: ignore
+                    port=cachedb_config["port"],  # type: ignore
+                    database=cachedb_config["database"],  # type: ignore
+                    user=cachedb_config["username"],  # type: ignore
+                    password=cachedb_config["password"],  # type: ignore
+                )
+            except KeyError as e:
+                logger.error(f"Missing required configuration parameter: {e}")
+                raise
+        else:
             logger.info("No CacheDB section specified in configuration")
             raise KeyError("Missing Cachedb section in configuration")
 
-        self.__cachedb_config = CacheDB.Config(
-            host=cachedb_config["host"],
-            port=cachedb_config["port"],
-            database=cachedb_config["database"],
-            user=cachedb_config["username"],
-            password=cachedb_config["password"],
-        )
+        try:
+            self.__sync_interval = manager_section["sync_interval"]
+        except KeyError:
+            logger.info("No sync_interval specified in configuration")
+            raise
+
+        if (api_section := manager_section.get("Api", None)) and isinstance(
+            api_section, dict
+        ):
+            try:
+                self.__api_host = api_section["host"]
+                self.__api_port = api_section["port"]
+            except KeyError as e:
+                logger.error(f"Missing required configuration parameter: {e}")
+                raise
+        else:
+            logger.info("No API section specified in configuration")
+            raise KeyError("Missing API section in configuration")
 
 
 class PluginLoadError(Exception):
@@ -89,6 +129,7 @@ class BaseSynchronizer(ABC):
             data_source_plugin_configs: Path to a directory containing data source plugin configuration files.
             config_file: Path to the manager configuration file (e.g., assetman.toml).
         """
+        self.__last_synchronization: Optional[float] = None
         self.cache_db: CacheDB = cache_db
         self.pending_data: List[Union[Asset, CsafDocument]] = []
         self.preprocessed_data: List[Union[Asset, CsafDocument]] = []
@@ -257,6 +298,7 @@ class BaseSynchronizer(ABC):
         """Run the manager."""
         try:
             async with asyncio.TaskGroup() as tg:
+                tg.create_task(self.__api_client())
                 logger.info(f"Starting {len(self.data_sources)} data fetching tasks:")
                 for source in self.data_sources:
                     logger.info(f"Creating task for {source.debug_info()}")
@@ -271,7 +313,17 @@ class BaseSynchronizer(ABC):
 
     async def fetch_data_task(self, source: DataSourcePlugin):
         while True:
-            self.pending_data.extend(await source.fetch_data())
+            if (
+                self.__last_synchronization is None
+                or self.__last_synchronization + self.config.sync_interval < time.time()
+            ):
+                try:
+                    self.pending_data.extend(await source.fetch_data())
+                except Exception as e:
+                    logger.error(f"Error fetching data from {source.debug_info()}: {e}")
+                self.__last_synchronization = time.time()
+            else:
+                await asyncio.sleep(1)
 
     async def preprocess_data_task(self):
         """Process data using the loaded preprocessor plugins."""
@@ -309,3 +361,24 @@ class BaseSynchronizer(ABC):
 
     async def cleanup(self):
         await self.cache_db.disconnect()
+
+    async def __api_client(self):
+        api = FastAPI()
+
+        @api.get("/start")
+        async def sync():
+            self.__last_synchronization = None
+            return {}
+
+        @api.get("/status")
+        async def status():
+            return {
+                "last_synchronization": self.__last_synchronization,
+            }
+
+        # TODO: Add security options
+        config = uvicorn.Config(
+            app=api, host=self.config.api_host, port=self.config.api_port
+        )
+        server = uvicorn.Server(config)
+        await server.serve()
