@@ -25,5 +25,12 @@ dina-netbox-init = "dina.plugins.datasource.netbox.api_generator:main"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.build.hooks.custom]
+path = "build_hook.py"
+dependencies = [
+    "openapi-python-client",
+    "dina.matcher",
+]
+
 [tool.uv.sources]
 "dina.matcher" = { workspace = true }

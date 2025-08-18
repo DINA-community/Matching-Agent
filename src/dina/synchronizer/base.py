@@ -11,6 +11,7 @@ import asyncio
 import logging
 import time
 import tomllib
+import traceback
 from abc import ABC
 from importlib.metadata import entry_points, EntryPoints
 from pathlib import Path
@@ -321,6 +322,8 @@ class BaseSynchronizer(ABC):
                     self.pending_data.extend(await source.fetch_data())
                 except Exception as e:
                     logger.error(f"Error fetching data from {source.debug_info()}: {e}")
+                    print(traceback.format_exc())
+
                 self.__last_synchronization = time.time()
             else:
                 await asyncio.sleep(1)

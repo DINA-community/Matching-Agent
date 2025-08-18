@@ -1,9 +1,0 @@
-from enum import Enum
-
-
-class ExtrasConfigTemplatesRenderCreateFormat(str, Enum):
-    JSON = "json"
-    TXT = "txt"
-
-    def __str__(self) -> str:
-        return str(self.value)

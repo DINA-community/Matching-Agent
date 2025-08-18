@@ -1,5 +1,8 @@
 import asyncio
 
+import uvicorn
+from fastapi import FastAPI, APIRouter
+
 from dina.common.logging import configure_logging, get_logger
 
 # Configure logging
@@ -16,6 +19,31 @@ class Matcher:
 
     async def run(self):
         """Run the matcher."""
+        async with asyncio.TaskGroup() as tg:
+            tg.create_task(self.__serve_api())
+
+    async def __serve_api(self):
+        api = FastAPI()
+
+        task_route = APIRouter(prefix="/task")
+
+        @task_route.put("/start")
+        async def start():
+            logger.info("Starting matching task")
+
+        @task_route.get("/status")
+        async def status():
+            return {"status": "running"}
+
+        @task_route.put("/stop")
+        async def stop():
+            logger.info("Stopping matching task")
+
+        api.include_router(task_route)
+
+        config = uvicorn.Config(app=api, host="0.0.0.0", port=8998)
+        server = uvicorn.Server(config)
+        await server.serve()
 
 
 async def run_matcher():

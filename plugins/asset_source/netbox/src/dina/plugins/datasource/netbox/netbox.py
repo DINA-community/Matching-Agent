@@ -1,6 +1,7 @@
 import asyncio
-from typing import List, Union
 import time
+from typing import List, Union
+
 from dina.cachedb.model import (
     Manufacturer,
     DeviceType,
@@ -12,19 +13,19 @@ from dina.cachedb.model import (
     AssetSynchronizer,
 )
 from dina.common import logging
-from dina.synchronizer.plugin_base.data_source import DataSourcePlugin
-from .api_client import Client  # type: ignore
-from .api_client.api.dcim import (
+from dina.plugins.datasource.netbox.generated.api_client import Client
+from dina.plugins.datasource.netbox.generated.api_client.api.dcim import (
     dcim_manufacturers_list,
     dcim_device_types_list,
     dcim_devices_list,
 )
-from .api_client.api.plugins import (
+from dina.plugins.datasource.netbox.generated.api_client.api.plugins import (
     plugins_d3c_software_list_list,
-    plugins_d3c_filehash_list_list,
     plugins_d3c_hash_list_list,
+    plugins_d3c_filehash_list_list,
     plugins_d3c_productrelationship_list_list,
 )
+from dina.synchronizer.plugin_base.data_source import DataSourcePlugin
 
 logger = logging.get_logger(__name__)
 
@@ -78,12 +79,16 @@ class NetboxDataSource(DataSourcePlugin):
                 DeviceType(
                     nb_id=x.id,
                     model=x.model,
-                    model_number=[x.custom_fields.additional_properties["model_number"]],
+                    model_number=[
+                        x.custom_fields.additional_properties["model_number"]
+                    ],
                     part_number=[x.part_number],
-                    hardware_name=x.custom_fields.additional_properties["hardware_name"],
-                    hardware_version=[x.custom_fields.additional_properties[
-                        "hardware_version"
-                    ]],
+                    hardware_name=x.custom_fields.additional_properties[
+                        "hardware_name"
+                    ],
+                    hardware_version=[
+                        x.custom_fields.additional_properties["hardware_version"]
+                    ],
                     device_family=x.custom_fields.additional_properties[
                         "device_family"
                     ],
