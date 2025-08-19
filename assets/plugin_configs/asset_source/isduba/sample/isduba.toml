@@ -3,7 +3,7 @@
 [DataSource]
 plugin_name = "isduba_fetcher"
 
-[DataSource.ISDuBA]
+[DataSource.Plugin]
 url = "http://endpoint.sample.com/"
 username = "username"
 password = "password"

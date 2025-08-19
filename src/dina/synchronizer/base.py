@@ -92,7 +92,7 @@ class BaseSynchronizer(ABC):
 
     @staticmethod
     def _load_plugin_from_entrypoint(
-        plugin_name: str, entry_points_group: str, config_data: dict
+        plugin_name: str, entry_points_group: str, config_data: DataSourcePlugin.Config
     ) -> Union[DataSourcePlugin, PreprocessorPlugin]:
         """
         Load a single plugin from entry points.
@@ -137,7 +137,7 @@ class BaseSynchronizer(ABC):
             raise FileNotFoundError(f"Configuration file not found: {config_file}")
 
         with open(config_file, "rb") as f:
-            return SynchronizerConfig(**tomllib.load(f))
+            return SynchronizerConfig.model_validate(tomllib.load(f))
 
     @staticmethod
     def __load_datasource_plugins(plugin_configs: Path) -> List[DataSourcePlugin]:
@@ -168,10 +168,9 @@ class BaseSynchronizer(ABC):
             try:
                 # Parse the TOML file
                 with open(config_file, "rb") as f:
-                    config_data = tomllib.load(f)
-                data_source = config_data["DataSource"]
+                    config = DataSourcePlugin.Config.model_validate(tomllib.load(f))
                 # Extract plugin information
-                plugin_name = data_source.get("plugin_name")
+                plugin_name = config.DataSource.plugin_name
                 if not plugin_name:
                     logger.error(
                         f"Missing required fields in plugin configuration: {config_file}"
@@ -179,7 +178,7 @@ class BaseSynchronizer(ABC):
                     continue
 
                 plugin_instance = BaseSynchronizer._load_plugin_from_entrypoint(
-                    plugin_name, "dina.plugins.datasource", config_data
+                    plugin_name, "dina.plugins.datasource", config
                 )
                 if isinstance(plugin_instance, PreprocessorPlugin):
                     raise ValueError(

@@ -2,6 +2,8 @@ import asyncio
 import time
 from typing import List, Union, Any
 
+from pydantic import BaseModel
+
 from dina.cachedb.model import (
     Manufacturer,
     DeviceType,
@@ -31,19 +33,26 @@ logger = logging.get_logger(__name__)
 
 
 class NetboxDataSource(DataSourcePlugin):
-    def __init__(self, config=None):
+    class Config(BaseModel):
+        api_url: str
+        api_token: str
+
+    def __init__(self, config: DataSourcePlugin.Config):
+        config.DataSource.Plugin = NetboxDataSource.Config.model_validate(
+            config.DataSource.Plugin
+        )
         super().__init__(config)
         # Extract configuration values
         try:
-            netbox = self.config["DataSource"]["Netbox"]
-            self.api_url = netbox["api_url"]
-            self.api_token = netbox["api_token"]
+            netbox = self.config.DataSource.Plugin
             self.client = AuthenticatedClient(
-                base_url=self.api_url, prefix="Token", token=self.api_token
+                base_url=netbox.api_url, prefix="Token", token=netbox.api_token
             )
         except KeyError:
             raise KeyError("Missing Netbox configuration parameter")
-        logger.debug(f"Initialized NetboxDataSource with API URL: {self.api_url}")
+        logger.debug(
+            f"Initialized NetboxDataSource with API URL: {self.config.DataSource.Plugin.api_url}"
+        )
 
     async def fetch_data(
         self,
@@ -174,4 +183,4 @@ class NetboxDataSource(DataSourcePlugin):
         pass
 
     def endpoint_info(self) -> str:
-        return f"{self.api_url}"
+        return f"{self.config.DataSource.Plugin.api_url}"
