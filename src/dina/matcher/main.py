@@ -1,4 +1,5 @@
 import asyncio
+import tomllib
 
 import uvicorn
 from fastapi import FastAPI, APIRouter
@@ -11,11 +12,34 @@ configure_logging()
 logger = get_logger(__name__)
 
 
+class MatcherConfig:
+    def __init__(self, config):
+        self.__config = config
+        try:
+            self.__config["Matcher"]["Api"]["host"]
+        except KeyError:
+            raise KeyError("Missing required configuration parameter Matcher.Api.host")
+        try:
+            self.__config["Matcher"]["Api"]["port"]
+        except KeyError:
+            raise KeyError("Missing required configuration parameter Matcher.Api.port")
+
+    @property
+    def api_host(self):
+        return self.__config["Matcher"]["Api"]["host"]
+
+    @property
+    def api_port(self):
+        return self.__config["Matcher"]["Api"]["port"]
+
+
 class Matcher:
     def __init__(self):
         """
         Initialize the Matcher.
         """
+        with open("./assets/matcher.toml", "rb") as f:
+            self.__config = MatcherConfig(tomllib.load(f))
 
     async def run(self):
         """Run the matcher."""
@@ -41,7 +65,9 @@ class Matcher:
 
         api.include_router(task_route)
 
-        config = uvicorn.Config(app=api, host="0.0.0.0", port=8998)
+        config = uvicorn.Config(
+            app=api, host=self.__config.api_host, port=self.__config.api_port
+        )
         server = uvicorn.Server(config)
         await server.serve()
 
