@@ -1,6 +1,6 @@
 import asyncio
 import time
-from typing import List, Union
+from typing import List, Union, Any
 
 from dina.cachedb.model import (
     Manufacturer,
@@ -13,7 +13,7 @@ from dina.cachedb.model import (
     AssetSynchronizer,
 )
 from dina.common import logging
-from dina.plugins.datasource.netbox.generated.api_client import Client
+from dina.plugins.datasource.netbox.generated.api_client import AuthenticatedClient
 from dina.plugins.datasource.netbox.generated.api_client.api.dcim import (
     dcim_manufacturers_list,
     dcim_device_types_list,
@@ -38,9 +38,8 @@ class NetboxDataSource(DataSourcePlugin):
             netbox = self.config["DataSource"]["Netbox"]
             self.api_url = netbox["api_url"]
             self.api_token = netbox["api_token"]
-            self.client = Client(
-                base_url=self.api_url,
-                headers={"Authorization": f"Token {self.api_token}"},
+            self.client = AuthenticatedClient(
+                base_url=self.api_url, prefix="Token", token=self.api_token
             )
         except KeyError:
             raise KeyError("Missing Netbox configuration parameter")
@@ -170,6 +169,9 @@ class NetboxDataSource(DataSourcePlugin):
         # logger.info(f"DATA: {results}")
         await asyncio.sleep(10)
         return results
+
+    async def cleanup_data(self, data_to_check: List[Any]):
+        pass
 
     def endpoint_info(self) -> str:
         return f"{self.api_url}"

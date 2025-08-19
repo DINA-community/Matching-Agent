@@ -1,9 +1,11 @@
-from dataclasses import dataclass
-from typing import List, Optional, Union
 import logging
+from typing import List, Optional, Union
+
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncEngine
 from sqlalchemy.sql.ddl import CreateSchema
+
 from dina.cachedb.model import (
     Base,
     CsafProductTree,
@@ -22,13 +24,12 @@ logger = logging.getLogger(__name__)
 
 
 class CacheDB:
-    @dataclass
-    class Config:
-        user: str
-        password: str
+    class Config(BaseModel):
         host: str
         port: int
         database: str
+        username: str
+        password: str
 
     def __init__(self) -> None:
         super().__init__()
@@ -36,7 +37,7 @@ class CacheDB:
 
     async def connect(self, config: Config) -> None:
         self.engine = create_async_engine(
-            f"postgresql+asyncpg://{config.user}:{config.password}@{config.host}:{config.port}/{config.database}"
+            f"postgresql+asyncpg://{config.username}:{config.password}@{config.host}:{config.port}/{config.database}"
         )
         async with self.engine.begin() as conn:
             await conn.execute(CreateSchema("cacheDB", if_not_exists=True))

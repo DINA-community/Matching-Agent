@@ -1,6 +1,7 @@
-from typing import List, Union
+from typing import List, Union, Any
 
 import httpx
+
 from dina.cachedb.model import CsafProductRelationship
 from dina.common import logging
 
@@ -114,7 +115,7 @@ class IsdubaDataSource(DataSourcePlugin):
         #                 api_response = await api_instance.documents_id_get(id)
         #                 csaf_product_tree: CsafProductTree = await get_csaf_product_tree(url, api_response["document"], api_response["product_tree"])
 
-        #                 if csaf_product_tree is not None: 
+        #                 if csaf_product_tree is not None:
         #                     tree = await convert_into_database_format(csaf_product_tree)
 
         #                     for t in tree:
@@ -129,8 +130,11 @@ class IsdubaDataSource(DataSourcePlugin):
         #             raise Exception(
         #                 "Exception when calling DefaultApi->documents_get:\n\n%s" % e
         #             )
-            
+
         #     await api_client.close()
-                
+
         # Return a list of Asset or CsafDocument objects
         return ret
+
+    async def cleanup_data(self, data_to_check: List[Any]):
+        pass

@@ -1,15 +1,19 @@
 from abc import abstractmethod, ABC
 from typing import Any, Dict, List, Union
 
-from dina.cachedb.model import Asset, CsafProductRelationship, CsafProductTree
+from dina.cachedb.model import Asset, CsafDocument
 
 
 class DataSourcePlugin(ABC):
     def __init__(self, config: Dict[str, Any]):
         self.config = config
+        self.origin_module = self.__module__
 
     @abstractmethod
-    async def fetch_data(self) -> List[Union[Asset, CsafProductTree, CsafProductRelationship]]: ...
+    async def fetch_data(self) -> List[Union[Asset, CsafDocument]]: ...
+
+    @abstractmethod
+    async def cleanup_data(self, data_to_check: List[Any]): ...
 
     def debug_info(self) -> str:
         """Return debug information about the plugin."""

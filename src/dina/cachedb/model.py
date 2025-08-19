@@ -1,15 +1,16 @@
 import datetime
 import logging
-from sqlalchemy import Column, Float, Table
-
-# from sqlalchemy import ForeignKey
-from sqlalchemy.ext.asyncio import AsyncAttrs
 from typing import List, Optional
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-from sqlalchemy import select
+
+from sqlalchemy import Column, Float, Table, CheckConstraint
 
 # from sqlalchemy.orm import selectinload
 from sqlalchemy import Text, ForeignKey, MetaData, Integer, JSON
+from sqlalchemy import select
+
+# from sqlalchemy import ForeignKey
+from sqlalchemy.ext.asyncio import AsyncAttrs
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,11 @@ class data_consistency_problem(Exception):
     """consistency with netbox data detected"""
 
     pass
+
+
+class MetaInfo:
+    origin_plugin: Mapped[str] = mapped_column(Text, default="Undefined")
+    origin_info: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
 
 class Base(AsyncAttrs, DeclarativeBase):
@@ -144,12 +150,14 @@ class DeviceType(Base):
             logger.info(f"CREATED: {self} {self.model_number}")
         return obj
 
+
 product_file_association = Table(
     "product_file_association",
     Base.metadata,
     Column("product_id", ForeignKey("product.id"), primary_key=True),
     Column("file_id", ForeignKey("file.id"), primary_key=True),
 )
+
 
 class Product(Base):
     __tablename__ = "product"
@@ -170,9 +178,7 @@ class Product(Base):
         back_populates="products"
     )
     files: Mapped[Optional[List["File"]]] = relationship(
-        "File",
-        secondary=product_file_association,
-        back_populates="products"
+        "File", secondary=product_file_association, back_populates="products"
     )
     # asset: Mapped[Optional["Asset"]] = relationship(
     #     back_populates="product", cascade="all, delete-orphan"
@@ -186,7 +192,9 @@ class Product(Base):
     device_type_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("device_type.id"), nullable=True
     )
-    device_type: Mapped[Optional["DeviceType"]] = relationship(back_populates="products")
+    device_type: Mapped[Optional["DeviceType"]] = relationship(
+        back_populates="products"
+    )
 
     async def create_or_update(self, session) -> None:
         updated = False
@@ -253,6 +261,7 @@ class Product(Base):
             logger.info(f"CREATED: {the_asset} {the_asset.id}")
         return obj
 
+
 class Software(Base):
     __tablename__ = "software"
 
@@ -273,8 +282,7 @@ class Software(Base):
         back_populates="software"
     )
     files: Mapped[List["File"]] = relationship(
-        back_populates="software",
-        cascade="all, delete-orphan"
+        back_populates="software", cascade="all, delete-orphan"
     )
     asset: Mapped[Optional["Asset"]] = relationship(
         back_populates="software", cascade="all, delete-orphan"
@@ -394,8 +402,16 @@ class Device(Base):
         return obj
 
 
-class Asset(Base):
+class Asset(Base, MetaInfo):
     __tablename__ = "asset"
+
+    __table_args__ = (
+        CheckConstraint(
+            "(device_id IS NOT NULL AND software_id IS NULL) OR "
+            "(device_id IS NULL AND software_id IS NOT NULL)",
+            name="device_xor_software",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     last_seen: Mapped[float] = mapped_column(Float)
@@ -528,13 +544,11 @@ class File(Base):
 
     software_id: Mapped[int] = mapped_column(ForeignKey("software.id"))
     software: Mapped["Software"] = relationship(back_populates="files")
-    
+
     products: Mapped[List["Product"]] = relationship(
-            "Product",
-            secondary=product_file_association,
-            back_populates="files"
-        )
-    
+        "Product", secondary=product_file_association, back_populates="files"
+    )
+
     async def create_or_update(self, session) -> None:
         updated = False
 
@@ -577,7 +591,9 @@ class Hash(Base):
     nb_file_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     algorithm: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    file_id: Mapped[int | None] = mapped_column(ForeignKey("cacheDB.file.id"), nullable=True)
+    file_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cacheDB.file.id"), nullable=True
+    )
 
     file: Mapped["File"] = relationship(back_populates="hashes")
 
@@ -618,7 +634,7 @@ class Hash(Base):
         return obj
 
 
-class CsafDocument(Base):
+class CsafDocument(Base, MetaInfo):
     __tablename__ = "csaf_document"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

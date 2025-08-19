@@ -72,6 +72,7 @@ class Relationship:
     product_reference: None | str = None
     relates_to_product_reference: None | str = None
 
+
 @dataclass
 class CsafProductTree:
     csaf_document: Optional[CsafDocument] = None

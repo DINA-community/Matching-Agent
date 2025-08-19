@@ -9,7 +9,7 @@ from dina.cachedb.model import (
     Manufacturer,
     Software,
     Product,
-    CsafProductRelationship
+    CsafProductRelationship,
 )
 from dina.common import logging
 from typing import List, Optional, Tuple, Union
@@ -23,8 +23,9 @@ from .datamodels import (
 logger = logging.get_logger(__name__)
 
 
-
-async def convert_into_database_format(product_tree: ProductTree) -> List[Union[CsafProductTree, CsafProductRelationship]]:
+async def convert_into_database_format(
+    product_tree: ProductTree,
+) -> List[Union[CsafProductTree, CsafProductRelationship]]:
     if product_tree.csaf_document is None:
         return None
 
@@ -40,12 +41,20 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[Union[
     csaf_document.version = document.version
 
     csaf_product_list: List[CsafProduct] = []
-    
+
     for product_list in product_tree.product_list:
         for product in product_list:
-            product_name_id, cpe, helper, product_version, products = await get_product_values(product)
+            (
+                product_name_id,
+                cpe,
+                helper,
+                product_version,
+                products,
+            ) = await get_product_values(product)
 
-            if (cpe == "a" or cpe == "o") or (helper and helper.purl and helper.purl.startswith("pkg:")):
+            if (cpe == "a" or cpe == "o") or (
+                helper and helper.purl and helper.purl.startswith("pkg:")
+            ):
                 logger.info("Software")
                 manufacturer = None
 
@@ -113,8 +122,10 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[Union[
                 if helper and helper.skus is not None and isinstance(helper.skus, list):
                     device_type.part_number = helper.skus
 
-                if helper and helper.model_numbers is not None and isinstance(
-                    helper.model_numbers, list
+                if (
+                    helper
+                    and helper.model_numbers is not None
+                    and isinstance(helper.model_numbers, list)
                 ):
                     device_type.model_number = helper.model_numbers
 
@@ -123,8 +134,10 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[Union[
                 device.name = list_to_str(products)  # duplicate value
                 device.last_seen = starttime
 
-                if helper and helper.serial_numbers is not None and isinstance(
-                    helper.serial_numbers, list
+                if (
+                    helper
+                    and helper.serial_numbers is not None
+                    and isinstance(helper.serial_numbers, list)
                 ):
                     device.serial = helper.serial_numbers
 
@@ -165,11 +178,13 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[Union[
                 if helper and helper.skus is not None and isinstance(helper.skus, list):
                     device_type.part_number = helper.skus
 
-                if helper and helper.model_numbers is not None and isinstance(
-                    helper.model_numbers, list
+                if (
+                    helper
+                    and helper.model_numbers is not None
+                    and isinstance(helper.model_numbers, list)
                 ):
                     device_type.model_number = helper.model_numbers
-                
+
                 files = []
 
                 if helper and helper.hashes:
@@ -186,14 +201,15 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[Union[
                         file.filename = h.file_name
                         files.append(file)
 
-
                 prod.device_type = device_type
                 prod.name = list_to_str(products)  # duplicate value
                 prod.last_seen = starttime
                 prod.files = files
 
-                if helper and helper.serial_numbers is not None and isinstance(
-                    helper.serial_numbers, list
+                if (
+                    helper
+                    and helper.serial_numbers is not None
+                    and isinstance(helper.serial_numbers, list)
                 ):
                     prod.serial = helper.serial_numbers
 
@@ -206,7 +222,7 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[Union[
                 csaf_product_tree.csaf_product = csaf_product
                 csaf_product_tree.csaf_document = csaf_document
                 csaf_full_product_list.append(csaf_product_tree)
-    
+
     for relationship in product_tree.relationships_list:
         product_reference: Optional[CsafProduct] = None
         relates_to_product_reference: Optional[CsafProduct] = None
@@ -214,11 +230,17 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[Union[
         for csaf_product in csaf_product_list:
             if csaf_product.product_name_id == relationship.product_reference:
                 product_reference = csaf_product
-            
-            if csaf_product.product_name_id == relationship.relates_to_product_reference:
+
+            if (
+                csaf_product.product_name_id
+                == relationship.relates_to_product_reference
+            ):
                 relates_to_product_reference = csaf_product
 
-            if product_reference is not None and relates_to_product_reference is not None: 
+            if (
+                product_reference is not None
+                and relates_to_product_reference is not None
+            ):
                 relationship_value = CsafProductRelationship()
                 relationship_value.category = relationship.category
                 relationship_value.csaf_product_source = product_reference
@@ -228,13 +250,18 @@ async def convert_into_database_format(product_tree: ProductTree) -> List[Union[
 
     return csaf_full_product_list
 
-async def get_product_values(product: ProductInfo) -> Tuple[Optional[str], Optional[str], Optional[ProductIdentificationHelper], List, List]:
+
+async def get_product_values(
+    product: ProductInfo,
+) -> Tuple[
+    Optional[str], Optional[str], Optional[ProductIdentificationHelper], List, List
+]:
     cpe = None
     helper = None
     product_name_id = None
     product_version = []
     products = []
-       
+
     if product and (pv := product.product_version):
         if pv.name not in product_version:
             product_version.append(pv.name)
@@ -244,13 +271,13 @@ async def get_product_values(product: ProductInfo) -> Tuple[Optional[str], Optio
 
             if p.name not in products:
                 products.append(p.name)
-            
+
             if h := p.product_identification_helper:
                 helper = h
 
-                if (cpe := h.cpe):
+                if cpe := h.cpe:
                     cpe = extract_cpe_part(cpe)
-    
+
     if product and (pv := product.product_version_range):
         if pv.name and pv.name not in product_version:
             product_version.append(pv.name)
@@ -260,7 +287,7 @@ async def get_product_values(product: ProductInfo) -> Tuple[Optional[str], Optio
 
             if p.name not in products:
                 products.append(p.name)
-            
+
             if h := p.product_identification_helper:
                 helper = h
 
@@ -278,6 +305,7 @@ async def get_product_values(product: ProductInfo) -> Tuple[Optional[str], Optio
                 cpe = extract_cpe_part(cpe)
 
     return (product_name_id, cpe, helper, product_version, products)
+
 
 def extract_cpe_part(cpe: str) -> str:
     if not cpe or not isinstance(cpe, str):
