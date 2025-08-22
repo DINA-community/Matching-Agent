@@ -8,21 +8,22 @@ that fetch data, transform it, and preprocess it using plugins.
 from __future__ import annotations
 
 import asyncio
+import datetime
 import logging
 import time
 import tomllib
 import traceback
 from abc import ABC
-from importlib.metadata import entry_points, EntryPoints
+from importlib.metadata import EntryPoints, entry_points
 from pathlib import Path
-from typing import List, Union, Optional
+from typing import List, Optional, Union
 
 import uvicorn
 from fastapi import FastAPI
 from pydantic import BaseModel
 
 from dina.cachedb.database import CacheDB
-from dina.cachedb.model import Asset, CsafDocument
+from dina.cachedb.model import Asset, CsafProduct
 from dina.synchronizer.plugin_base.data_source import DataSourcePlugin
 from dina.synchronizer.plugin_base.preprocessor import PreprocessorPlugin
 
@@ -46,7 +47,7 @@ class SynchronizerSectionConfig(BaseModel):
 
 
 class SynchronizerConfig(BaseModel):
-    Assetsync: dict
+    Assetsync: Optional[dict] = None
     Synchronizer: SynchronizerSectionConfig
     Cachedb: CacheDB.Config
 
@@ -70,8 +71,8 @@ class BaseSynchronizer(ABC):
         """
         self.__last_synchronization: Optional[float] = None
         self.cache_db: CacheDB = cache_db
-        self.pending_data: List[Union[Asset, CsafDocument]] = []
-        self.preprocessed_data: List[Union[Asset, CsafDocument]] = []
+        self.pending_data: List[Union[Asset, CsafProduct]] = []
+        self.preprocessed_data: List[Union[Asset, CsafProduct]] = []
         self.config_file: Path = config_file
         self.config: SynchronizerConfig = self.load_config(config_file)
 
@@ -92,7 +93,9 @@ class BaseSynchronizer(ABC):
 
     @staticmethod
     def _load_plugin_from_entrypoint(
-        plugin_name: str, entry_points_group: str, config_data: DataSourcePlugin.Config
+        plugin_name: str,
+        entry_points_group: str,
+        config_data: DataSourcePlugin.Config | None,
     ) -> Union[DataSourcePlugin, PreprocessorPlugin]:
         """
         Load a single plugin from entry points.
@@ -195,6 +198,16 @@ class BaseSynchronizer(ABC):
                 logger.error(f"Error loading plugin from {config_file}: {e}")
                 raise e
 
+        # Check if all origins are unique
+        seen_origins = set()
+        for plugin in plugins:
+            if plugin.origin_uri in seen_origins:
+                raise PluginLoadError(
+                    "Found duplicate origins for plugins. It is not allowed to synchronize with the same api endpoint twice"
+                )
+            else:
+                seen_origins.add(plugin.origin_uri)
+
         return plugins
 
     @staticmethod
@@ -214,7 +227,7 @@ class BaseSynchronizer(ABC):
 
             for plugin_name in preprocessor_plugin_names:
                 plugin_instance = BaseSynchronizer._load_plugin_from_entrypoint(
-                    plugin_name, "dina.plugins.preprocessing", {}
+                    plugin_name, "dina.plugins.preprocessing", None
                 )
 
                 if plugin_instance and isinstance(plugin_instance, PreprocessorPlugin):
@@ -241,6 +254,7 @@ class BaseSynchronizer(ABC):
                 for source in self.data_sources:
                     logger.info(f"Creating task for {source.debug_info()}")
                     tg.create_task(self.fetch_data_task(source))
+                    tg.create_task(self.cleanup_task(source))
                 logger.info("Starting preprocessing task")
                 tg.create_task(self.preprocess_data_task())
                 logger.info("Starting storing task")
@@ -257,10 +271,11 @@ class BaseSynchronizer(ABC):
                 < time.time()
             ):
                 try:
-                    for datapoint in await source.fetch_data():
-                        if isinstance(datapoint, Asset):
-                            datapoint.origin_plugin = source.origin_module
+                    fetcher_view = self.cache_db.fetcher_view(source.origin_uri)
+                    for datapoint in await source.fetch_data(fetcher_view):
+                        datapoint.origin_uri = source.origin_uri
                         self.pending_data.append(datapoint)
+                    await fetcher_view.set_last_run(datetime.datetime.now())
                 except Exception as e:
                     logger.error(f"Error fetching data from {source.debug_info()}: {e}")
                     print(traceback.format_exc())
@@ -295,13 +310,17 @@ class BaseSynchronizer(ABC):
         while True:
             if self.preprocessed_data:
                 logger.info(f"Storing {len(self.preprocessed_data)} items in cacheDB")
-                # TODO: Re-enable once the rest is stable enough
                 await self.cache_db.store(self.preprocessed_data)
-                # TODO: for assetsync
-                await self.cache_db.check_delete()
+                # await self.cache_db.check_delete()
                 self.preprocessed_data.clear()
             else:
                 await asyncio.sleep(0.1)
+
+    async def cleanup_task(self, source: DataSourcePlugin):
+        while True:
+            await self.cache_db.run_cleanup_for_plugin(source)
+            # TODO: Refactor to only sleep a second and instead check the cleanup interval
+            await asyncio.sleep(10)
 
     async def cleanup(self):
         await self.cache_db.disconnect()

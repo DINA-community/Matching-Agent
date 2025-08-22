@@ -1,33 +1,28 @@
-import asyncio
 import time
-from typing import List, Union, Any
+from datetime import timezone
+from typing import List, Union
 
 from pydantic import BaseModel
+from sqlalchemy import Integer
 
+from dina.cachedb.fetcher_view import FetcherView
 from dina.cachedb.model import (
-    Manufacturer,
-    DeviceType,
-    Device,
-    Software,
-    File,
-    Hash,
-    ProductRelationship,
-    AssetSynchronizer,
+    Asset,
+    CsafProduct,
+    Product,
+    ProductType,
 )
 from dina.common import logging
 from dina.plugins.datasource.netbox.generated.api_client import AuthenticatedClient
 from dina.plugins.datasource.netbox.generated.api_client.api.dcim import (
-    dcim_manufacturers_list,
     dcim_device_types_list,
     dcim_devices_list,
+    dcim_manufacturers_list,
 )
-from dina.plugins.datasource.netbox.generated.api_client.api.plugins import (
-    plugins_d3c_software_list_list,
-    plugins_d3c_hash_list_list,
-    plugins_d3c_filehash_list_list,
-    plugins_d3c_productrelationship_list_list,
+from dina.plugins.datasource.netbox.generated.api_client.models import (
+    DeviceTypeCustomFields,
 )
-from dina.synchronizer.plugin_base.data_source import DataSourcePlugin
+from dina.synchronizer.plugin_base.data_source import CleanUpDecision, DataSourcePlugin
 
 logger = logging.get_logger(__name__)
 
@@ -38,9 +33,10 @@ class NetboxDataSource(DataSourcePlugin):
         api_token: str
 
     def __init__(self, config: DataSourcePlugin.Config):
-        config.DataSource.Plugin = NetboxDataSource.Config.model_validate(
-            config.DataSource.Plugin
-        )
+        if config.DataSource.Plugin is not None:
+            config.DataSource.Plugin = NetboxDataSource.Config.model_validate(
+                config.DataSource.Plugin
+            )
         super().__init__(config)
         # Extract configuration values
         try:
@@ -56,131 +52,297 @@ class NetboxDataSource(DataSourcePlugin):
 
     async def fetch_data(
         self,
-    ) -> List[
-        Union[
-            Manufacturer, DeviceType, Device, Software, File, Hash, ProductRelationship
-        ]
-    ]:
-        # In a real implementation, this would use the API URL and token to fetch data
+        fetcher_view: FetcherView,
+    ) -> List[Union[Asset, CsafProduct]]:
+        last_run = (await fetcher_view.last_run()).astimezone(tz=timezone.utc)
+        current_time = time.time()
 
-        def find_cachedb_type(nb_type):
-            if nb_type == "dcim.device":
-                return "Device"
-            elif nb_type == "d3c.software":
-                return "Software"
-            else:
-                return None
+        # We want to fetch all devices and device_types and manufacturers.
+        # We then need to check if there were updates to only parts of an asset.
+        if devices_result := await dcim_devices_list.asyncio(
+            client=self.client, last_updated_gt=[last_run]
+        ):
+            devices = {device.id: device for device in devices_result.results}
+        else:
+            raise Exception("what dis")
 
-        results = []
+        if device_types_result := await dcim_device_types_list.asyncio(
+            client=self.client,
+            last_updated_gt=[last_run],
+        ):
+            device_types = {
+                device_type.id: device_type
+                for device_type in device_types_result.results
+            }
+        else:
+            raise Exception("what dis")
 
-        starttime = time.time()
-        logger.info(f"START: {starttime}")
-        results.append(AssetSynchronizer(last_run=starttime))
+        if manufacturers_result := await dcim_manufacturers_list.asyncio(
+            client=self.client,
+            last_updated_gt=[last_run],
+        ):
+            manufacturers = {
+                manufacturer.id: manufacturer
+                for manufacturer in manufacturers_result.results
+            }
+        else:
+            raise Exception("what dis")
 
-        response = await dcim_manufacturers_list.asyncio(client=self.client)
-        for x in response.results:
-            results.append(Manufacturer(nb_id=x.id, name=x.name, last_seen=starttime))
+        # TODO: Use query parameter to reduce request size?
+        # Extend the devices we need to update with devices that received an update to the manufacturer only.
+        if manufacturers:
+            if devices_result := await dcim_devices_list.asyncio(
+                client=self.client,
+                manufacturer_id=list(manufacturers.keys()),
+                id_n=list(devices.keys()),
+            ):
+                for device in devices_result.results:
+                    if device.id not in devices:
+                        devices[device.id] = device
 
-        response = await dcim_device_types_list.asyncio(client=self.client)
-        for x in response.results:
-            results.append(
-                DeviceType(
-                    nb_id=x.id,
-                    model=x.model,
-                    model_number=[
-                        x.custom_fields.additional_properties["model_number"]
-                    ],
-                    part_number=[x.part_number],
-                    hardware_name=x.custom_fields.additional_properties[
-                        "hardware_name"
-                    ],
-                    hardware_version=[
-                        x.custom_fields.additional_properties["hardware_version"]
-                    ],
-                    device_family=x.custom_fields.additional_properties[
-                        "device_family"
-                    ],
-                    cpe=x.custom_fields.additional_properties["cpe"],
-                    nb_manu_id=x.manufacturer.id,
-                    last_seen=starttime,
-                )
-            )
+        # TODO: Use query parameter to reduce request size?
+        # TODO: Maybe we can also combine both these api calls with the query parameter?
+        # Extend the devices we need to update with devices that received an update to the device_type only.
+        if device_types:
+            if devices_result := await dcim_devices_list.asyncio(
+                client=self.client,
+                device_type_id=list(device_types.keys()),
+                id_n=list(devices.keys()),
+            ):
+                for device in devices_result.results:
+                    if device.id not in devices:
+                        devices[device.id] = device
 
-        response = await dcim_devices_list.asyncio(client=self.client)
-        for x in response.results:
-            results.append(
-                Device(
-                    nb_id=x.id,
-                    name=x.name,
-                    serial=[x.serial],
-                    nb_devicetype_id=x.device_type.id,
-                    last_seen=starttime,
-                )
-            )
-
-        response = await plugins_d3c_software_list_list.asyncio(client=self.client)
-        for x in response.results:
-            results.append(
-                Software(
-                    nb_id=x.id,
-                    name=x.name,
-                    nb_manu_id=x.manufacturer.id,
-                    version=[x.version],
-                    cpe=x.cpe,
-                    purl=x.purl,
-                    sbom_urls=x.sbom_urls,
-                    last_seen=starttime,
-                )
-            )
-
-        response = await plugins_d3c_hash_list_list.asyncio(client=self.client)
-        for x in response.results:
-            results.append(
-                File(
-                    nb_id=x.id,
-                    filename=x.filename,
-                    nb_software_id=x.software.id,
-                    last_seen=starttime,
-                )
-            )
-
-        response = await plugins_d3c_filehash_list_list.asyncio(client=self.client)
-        for x in response.results:
-            results.append(
-                Hash(
-                    nb_id=x.id,
-                    nb_file_id=x.hash_.id,
-                    algorithm=x.algorithm,
-                    value=x.value,
-                    last_seen=starttime,
-                )
-            )
-
-        response = await plugins_d3c_productrelationship_list_list.asyncio(
-            client=self.client
-        )
-        for x in response.results:
-            source_type = find_cachedb_type(x.source_type)
-            target_type = find_cachedb_type(x.destination_type)
-            if source_type and target_type:
-                results.append(
-                    ProductRelationship(
-                        nb_id=x.id,
-                        nb_source_id=x.source_id,
-                        source_type=source_type,
-                        nb_target_id=x.destination_id,
-                        target_type=target_type,
-                        category=int(x.category),
-                        last_seen=starttime,
+        # Fetch the missing device types and manufacturers.
+        if devices:
+            missing_device_type_ids = {
+                device.device_type.id
+                for device in devices.values()
+                if device.device_type.id not in device_types
+            }
+            if missing_device_type_ids:
+                if device_types_result := await dcim_device_types_list.asyncio(
+                    client=self.client,
+                    id=list(missing_device_type_ids),
+                ):
+                    device_types.update(
+                        {
+                            device_type.id: device_type
+                            for device_type in device_types_result.results
+                        }
                     )
+
+            missing_manufacturer_ids = {
+                device.device_type.manufacturer.id
+                for device in devices.values()
+                if device.device_type.manufacturer.id not in manufacturers
+            }
+            if missing_manufacturer_ids:
+                if manufacturers_result := await dcim_manufacturers_list.asyncio(
+                    client=self.client,
+                    id=list(missing_manufacturer_ids),
+                ):
+                    manufacturers.update(
+                        {
+                            manufacturer.id: manufacturer
+                            for manufacturer in manufacturers_result.results
+                        }
+                    )
+
+        existing_assets = {
+            asset.origin_info["device_id"]: asset
+            for asset in await fetcher_view.get_existing(
+                Asset,
+                Asset.origin_info["device_id"]
+                .astext.cast(Integer)
+                .in_(list(devices.keys())),
+            )
+        }
+
+        assets: List[Asset | CsafProduct] = []
+        for device in devices.values():
+            logger.debug(f"Adding asset for device: {device.name}")
+            device_type = device_types[device.device_type.id]
+            manufacturer = manufacturers[device_type.manufacturer.id]
+            origin_info = {
+                "device_id": device.id,
+                "device_type_id": device_type.id,
+                "manufacturer_id": manufacturer.id,
+            }
+
+            if asset := existing_assets.get(device.id, None):
+                asset.last_update = current_time
+                asset.origin_info = origin_info
+            else:
+                asset = Asset(
+                    product=Product(),
+                    last_update=current_time,
+                    origin_uri=self.origin_uri,
+                    origin_info=origin_info,
                 )
 
-        # logger.info(f"DATA: {results}")
-        await asyncio.sleep(10)
-        return results
+            asset.product.product_type = ProductType.Device
+            if isinstance(device.name, str):
+                asset.product.name = device.name
+            if isinstance(device.serial, str):
+                asset.product.serial_numbers = [device.serial]
 
-    async def cleanup_data(self, data_to_check: List[Any]):
-        pass
+            asset.product.model = device_type.model
+            if isinstance(device_type.part_number, str):
+                asset.product.part_numbers = [device_type.part_number]
+            if isinstance(device_type.custom_fields, DeviceTypeCustomFields):
+                asset.product.model_numbers = [
+                    device_type.custom_fields.additional_properties["model_number"]
+                ]
+                asset.product.hardware_name = (
+                    device_type.custom_fields.additional_properties["hardware_name"]
+                )
+                asset.product.hardware_version = [
+                    device_type.custom_fields.additional_properties["hardware_version"]
+                ]
+                asset.product.device_family = (
+                    device_type.custom_fields.additional_properties["device_family"]
+                )
+                asset.product.cpe = device_type.custom_fields.additional_properties[
+                    "cpe"
+                ]
+
+            asset.product.manufacturer_name = manufacturer.name
+            asset.children.append(asset)
+            assets.append(asset)
+
+        return assets
+        # # In a real implementation, this would use the API URL and token to fetch data
+        #
+        # def find_cachedb_type(nb_type):
+        #     if nb_type == "dcim.device":
+        #         return "Device"
+        #     elif nb_type == "d3c.software":
+        #         return "Software"
+        #     else:
+        #         return None
+        #
+        # results = []
+        #
+        # starttime = time.time()
+        # logger.info(f"START: {starttime}")
+        # results.append(AssetSynchronizer(last_run=starttime))
+        #
+        # response = await dcim_manufacturers_list.asyncio(client=self.client)
+        # for x in response.results:
+        #     results.append(Manufacturer(nb_id=x.id, name=x.name, last_seen=starttime))
+        #
+        # response = await dcim_device_types_list.asyncio(client=self.client)
+        # for x in response.results:
+        #     results.append(
+        #         DeviceType(
+        #             nb_id=x.id,
+        #             model=x.model,
+        #             model_number=[
+        #                 x.custom_fields.additional_properties["model_number"]
+        #             ],
+        #             part_number=[x.part_number],
+        #             hardware_name=x.custom_fields.additional_properties[
+        #                 "hardware_name"
+        #             ],
+        #             hardware_version=[
+        #                 x.custom_fields.additional_properties["hardware_version"]
+        #             ],
+        #             device_family=x.custom_fields.additional_properties[
+        #                 "device_family"
+        #             ],
+        #             cpe=x.custom_fields.additional_properties["cpe"],
+        #             nb_manu_id=x.manufacturer.id,
+        #             last_seen=starttime,
+        #         )
+        #     )
+        #
+        # response = await dcim_devices_list.asyncio(client=self.client)
+        # for x in response.results:
+        #     results.append(
+        #         Device(
+        #             nb_id=x.id,
+        #             name=x.name,
+        #             serial=[x.serial],
+        #             nb_devicetype_id=x.device_type.id,
+        #             last_seen=starttime,
+        #         )
+        #     )
+        #
+        # response = await plugins_d3c_software_list_list.asyncio(client=self.client)
+        # for x in response.results:
+        #     results.append(
+        #         Software(
+        #             nb_id=x.id,
+        #             name=x.name,
+        #             nb_manu_id=x.manufacturer.id,
+        #             version=[x.version],
+        #             cpe=x.cpe,
+        #             purl=x.purl,
+        #             sbom_urls=x.sbom_urls,
+        #             last_seen=starttime,
+        #         )
+        #     )
+        #
+        # response = await plugins_d3c_hash_list_list.asyncio(client=self.client)
+        # for x in response.results:
+        #     results.append(
+        #         File(
+        #             nb_id=x.id,
+        #             filename=x.filename,
+        #             nb_software_id=x.software.id,
+        #             last_seen=starttime,
+        #         )
+        #     )
+        #
+        # response = await plugins_d3c_filehash_list_list.asyncio(client=self.client)
+        # for x in response.results:
+        #     results.append(
+        #         Hash(
+        #             nb_id=x.id,
+        #             nb_file_id=x.hash_.id,
+        #             algorithm=x.algorithm,
+        #             value=x.value,
+        #             last_seen=starttime,
+        #         )
+        #     )
+        #
+        # response = await plugins_d3c_productrelationship_list_list.asyncio(
+        #     client=self.client
+        # )
+        # for x in response.results:
+        #     source_type = find_cachedb_type(x.source_type)
+        #     target_type = find_cachedb_type(x.destination_type)
+        #     if source_type and target_type:
+        #         results.append(
+        #             ProductRelationship(
+        #                 nb_id=x.id,
+        #                 nb_source_id=x.source_id,
+        #                 source_type=source_type,
+        #                 nb_target_id=x.destination_id,
+        #                 target_type=target_type,
+        #                 category=int(x.category),
+        #                 last_seen=starttime,
+        #             )
+        #         )
+        #
+        # # logger.info(f"DATA: {results}")
+        # await asyncio.sleep(10)
+        # return results
+
+    async def cleanup_data(
+        self, data_to_check: List[Asset | CsafProduct]
+    ) -> List[CleanUpDecision]:
+        logger.debug(f"Cleanup data: {data_to_check}")
+        # TODO: Perform the proper cleanup actions.
+        # We need to query the netbox api for the provided assets and check if they still exist.
+        return [
+            CleanUpDecision(can_delete=False, id=d.id, ty=Asset) for d in data_to_check
+        ]
+
+    @property
+    def origin_uri(self):
+        return self.config.DataSource.Plugin.api_url
 
     def endpoint_info(self) -> str:
         return f"{self.config.DataSource.Plugin.api_url}"

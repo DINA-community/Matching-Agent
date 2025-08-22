@@ -1,12 +1,23 @@
 import datetime
+import enum
 import logging
-from typing import List, Optional
+from dataclasses import asdict, dataclass
+from typing import Any, Dict, List, Optional
 
-from sqlalchemy import Column, Float, Table, CheckConstraint
-
-# from sqlalchemy.orm import selectinload
-from sqlalchemy import Text, ForeignKey, MetaData, Integer, JSON
-from sqlalchemy import select
+from sqlalchemy import (
+    CheckConstraint,
+    Column,
+    Dialect,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    MetaData,
+    Table,
+    Text,
+    TypeDecorator,
+)
+from sqlalchemy.dialects.postgresql import JSONB
 
 # from sqlalchemy import ForeignKey
 from sqlalchemy.ext.asyncio import AsyncAttrs
@@ -15,696 +26,255 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 logger = logging.getLogger(__name__)
 
 
-class data_consistency_problem(Exception):
-    """consistency with netbox data detected"""
-
-    pass
-
-
 class MetaInfo:
-    origin_plugin: Mapped[str] = mapped_column(Text, default="Undefined")
-    origin_info: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    """
+    Represents metadata information related to a resource.
+
+    The MetaInfo class is a representation for defining metadata
+    about a specific resource, such as origin details and the
+    timestamp of the latest update. It provides a structured
+    way to encapsulate this information for consistent access
+    and manipulation.
+
+    :ivar origin_uri: URI base of the originating resource.
+    :type origin_uri: str
+    :ivar origin_info: Additional JSON-formatted information
+        about the origin of the resource, if provided.
+    :type origin_info: Optional[dict]
+    :ivar last_update: The timestamp (Unix epoch) of the last
+        update for the resource.
+    :type last_update: float
+    """
+
+    origin_uri: Mapped[str] = mapped_column(Text)
+    origin_info: Mapped[dict[str, Any]] = mapped_column(JSONB, default={})
+    last_update: Mapped[float] = mapped_column(Float)
 
 
 class Base(AsyncAttrs, DeclarativeBase):
     metadata = MetaData(schema="cacheDB")
-    pass
 
 
-class AssetSynchronizer(Base):
-    __tablename__ = "assetsync"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    last_run: Mapped[float] = mapped_column(Float)
-
-    async def create_or_update(self, session) -> None:
-        stmt = select(AssetSynchronizer)
-        result = await session.execute(stmt)
-        obj = result.scalar_one_or_none()
-        if obj:
-            setattr(obj, "last_run", self.last_run)
-        else:
-            session.add(self)
-        return obj
-
-
-class Manufacturer(Base):
-    __tablename__ = "manufacturer"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    nb_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    last_seen: Mapped[float] = mapped_column(Float)
-    name: Mapped[str] = mapped_column(Text)
-
-    device_types: Mapped[List["DeviceType"]] = relationship(
-        back_populates="manufacturer"
-    )
-    software: Mapped[List["Software"]] = relationship(back_populates="manufacturer")
-    products: Mapped[List["Product"]] = relationship(back_populates="manufacturer")
-
-    async def create_or_update(self, session) -> None:
-        updated = False
-        stmt = select(Manufacturer).where(Manufacturer.nb_id == self.nb_id)
-        result = await session.execute(stmt)
-        obj = result.scalar_one_or_none()
-        if obj:
-            if obj.name != self.name:
-                setattr(obj, "name", self.name)
-                updated = True
-            setattr(obj, "last_seen", self.last_seen)
-            if updated:
-                logger.info(f"UPDATED: {self} {self.name}")
-        else:
-            session.add(self)
-            logger.info(f"CREATED: {self} {self.name}")
-        return obj
-
-
-class DeviceType(Base):
-    __tablename__ = "device_type"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    nb_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    last_seen: Mapped[float] = mapped_column(Float)
-    nb_manu_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    model: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    model_number: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
-    part_number: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
-    device_family: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    cpe: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    hardware_version: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
-    hardware_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    manufacturer_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("manufacturer.id"), nullable=True
+class SynchronizerMetadata(Base):
+    __tablename__ = "synchronizer_metadata"
+    origin_uri: Mapped[str] = mapped_column(Text, primary_key=True)
+    plugin_metadata: Mapped[dict[str, Any]] = mapped_column(JSONB, default={})
+    last_run: Mapped[datetime.datetime] = mapped_column(
+        nullable=False, default=datetime.datetime.fromtimestamp(0.0)
     )
 
-    manufacturer: Mapped[Optional["Manufacturer"]] = relationship(
-        back_populates="device_types"
-    )
 
-    devices: Mapped[List["Device"]] = relationship(back_populates="device_type")
-    products: Mapped[List["Product"]] = relationship(back_populates="device_type")
-
-    async def create_or_update(self, session) -> None:
-        updated = False
-
-        async def find_manufacturer_key(nb_key):
-            stmt = select(Manufacturer).where(Manufacturer.nb_id == nb_key)
-            result = await session.execute(stmt)
-            obj = result.scalar_one_or_none()
-            if obj:
-                return obj.id
-            else:
-                raise data_consistency_problem("Manufacturer not found")
-
-        stmt = select(DeviceType).where(DeviceType.nb_id == self.nb_id)
-        result = await session.execute(stmt)
-        obj = result.scalar_one_or_none()
-        manu_id = await find_manufacturer_key(self.nb_manu_id)
-        if obj:
-            if obj.model_number != self.model_number:
-                setattr(obj, "model_number", self.model_number)
-                updated = True
-            if obj.part_number != self.part_number:
-                setattr(obj, "part_number", self.part_number)
-            if obj.device_family != self.device_family:
-                setattr(obj, "device_family", self.device_family)
-                updated = True
-            if obj.cpe != self.cpe:
-                setattr(obj, "cpe", self.cpe)
-                updated = True
-            if obj.hardware_version != self.hardware_version:
-                setattr(obj, "hardware_version", self.hardware_version)
-                updated = True
-            if obj.hardware_name != self.hardware_name:
-                setattr(obj, "hardware_name", self.hardware_name)
-                updated = True
-            if obj.manufacturer_id != manu_id:
-                setattr(obj, "manufacturer_id", manu_id)
-                updated = True
-            setattr(obj, "last_seen", self.last_seen)
-            if updated:
-                logger.info(f"UPDATED: {self} {self.model_number}")
-        else:
-            self.manufacturer_id = manu_id
-            session.add(self)
-            logger.info(f"CREATED: {self} {self.model_number}")
-        return obj
+class ProductType(enum.Enum):
+    Software = "Software"
+    Device = "Device"
+    Undefined = "Undefined"
 
 
-product_file_association = Table(
-    "product_file_association",
-    Base.metadata,
-    Column("product_id", ForeignKey("product.id"), primary_key=True),
-    Column("file_id", ForeignKey("file.id"), primary_key=True),
-)
+@dataclass
+class File:
+    name: str
+    file_hash: str
+    hash_algorithm: str
+
+
+@dataclass
+class FileList:
+    files: List[File]
+
+
+class FileListType(TypeDecorator):
+    impl = JSONB
+    cache_ok = True
+
+    def process_bind_param(
+        self, value: Optional[FileList], dialect: Dialect
+    ) -> Optional[List[Dict[str, str]]]:
+        if value is None:
+            return []
+        if isinstance(value, FileList):
+            return [asdict(item) for item in value.files]
+        raise TypeError(f"Expected FileList, got {type(value)}")
+
+    def process_result_value(
+        self, value: Optional[Any], dialect: Dialect
+    ) -> Optional[FileList]:
+        if value is None:
+            return FileList(files=[])
+        if isinstance(value, list):
+            return FileList(files=[File(**file) for file in value])
+        raise TypeError(f"Expected list, got {type(value)}")
 
 
 class Product(Base):
     __tablename__ = "product"
+    __table_args__ = (
+        CheckConstraint(
+            "(csaf_product_id IS NULL) != (asset_id IS NULL)",
+            name="check_exclusive_foreign_keys",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    nb_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    last_seen: Mapped[float] = mapped_column(Float)
-    nb_manu_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    product_type: Mapped[ProductType] = mapped_column(
+        Enum(ProductType, name="product_type_enum"), default=ProductType.Undefined
+    )
     name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    version: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    version: Mapped[Optional[List[str]]] = mapped_column(JSONB, nullable=True)
     cpe: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     purl: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    sbom_urls: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
-    manufacturer_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("manufacturer.id"), nullable=True
+    sbom_urls: Mapped[List[str]] = mapped_column(JSONB, default=[])
+    serial_numbers: Mapped[List[str]] = mapped_column(JSONB, default=[])
+    files: Mapped[FileList] = mapped_column(FileListType, default=FileList(files=[]))
+
+    # Device Type information
+    model: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    model_numbers: Mapped[Optional[List[str]]] = mapped_column(JSONB, nullable=True)
+    part_numbers: Mapped[Optional[List[str]]] = mapped_column(JSONB, nullable=True)
+    device_family: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    hardware_version: Mapped[Optional[List[str]]] = mapped_column(JSONB, nullable=True)
+    hardware_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    manufacturer_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    csaf_product_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("cacheDB.csaf_product.id", ondelete="CASCADE"),
+        nullable=True,
     )
-    manufacturer: Mapped[Optional["Manufacturer"]] = relationship(
-        back_populates="products"
+    asset_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("cacheDB.asset.id", ondelete="CASCADE"), nullable=True
     )
-    files: Mapped[Optional[List["File"]]] = relationship(
-        "File", secondary=product_file_association, back_populates="products"
-    )
-    # asset: Mapped[Optional["Asset"]] = relationship(
-    #     back_populates="product", cascade="all, delete-orphan"
-    # )
-    # csaf_product_id: Mapped[Optional[int]] = mapped_column(ForeignKey("csaf_product.id"), nullable=True)
+
     csaf_product: Mapped[Optional["CsafProduct"]] = relationship(
-        back_populates="product"
-    )
-    nb_devicetype_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    serial: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
-    device_type_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("device_type.id"), nullable=True
-    )
-    device_type: Mapped[Optional["DeviceType"]] = relationship(
-        back_populates="products"
-    )
-
-    async def create_or_update(self, session) -> None:
-        updated = False
-
-        async def find_manufacturer_key(nb_key):
-            stmt = select(Manufacturer).where(Manufacturer.nb_id == nb_key)
-            result = await session.execute(stmt)
-            obj = result.scalar_one_or_none()
-            if obj:
-                return obj.id
-            else:
-                raise data_consistency_problem("Manufacturer not found")
-
-        async def find_devicetype_key(nb_key):
-            stmt = select(DeviceType).where(DeviceType.nb_id == nb_key)
-            result = await session.execute(stmt)
-            obj = result.scalar_one_or_none()
-            if obj:
-                return obj.id
-            else:
-                raise data_consistency_problem("DeviceType not found")
-
-        stmt = select(Product).where(Product.nb_id == self.nb_id)
-        result = await session.execute(stmt)
-        obj = result.scalar_one_or_none()
-        manu_id = await find_manufacturer_key(self.nb_manu_id)
-        devicetype_id = await find_devicetype_key(self.nb_devicetype_id)
-        if obj:
-            if obj.name != self.name:
-                setattr(obj, "name", self.name)
-                updated = True
-            if obj.version != self.version:
-                setattr(obj, "version", self.version)
-                updated = True
-            if obj.cpe != self.cpe:
-                setattr(obj, "cpe", self.cpe)
-                updated = True
-            if obj.purl != self.purl:
-                setattr(obj, "purl", self.purl)
-                updated = True
-            if obj.sbom_urls != self.sbom_urls:
-                setattr(obj, "sbom_urls", self.sbom_urls)
-                updated = True
-            if obj.manufacturer_id != manu_id:
-                setattr(obj, "manufacturer_id", manu_id)
-                updated = True
-            if obj.serial != self.serial:
-                setattr(obj, "serial", self.serial)
-                updated = True
-            if obj.device_type_id != devicetype_id:
-                setattr(obj, "device_type_id", devicetype_id)
-                updated = True
-            setattr(obj, "last_seen", self.last_seen)
-            if updated:
-                logger.info(f"UPDATED: {self} {self.name}")
-        else:
-            self.manufacturer_id = manu_id
-            self.device_type_id = devicetype_id
-            session.add(self)
-            await session.flush()
-            the_asset = Asset(software_id=self.id, last_seen=self.last_seen)
-            session.add(the_asset)
-            logger.info(f"CREATED: {self} {self.name}")
-            logger.info(f"CREATED: {the_asset} {the_asset.id}")
-        return obj
-
-
-class Software(Base):
-    __tablename__ = "software"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    nb_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    last_seen: Mapped[float] = mapped_column(Float)
-    nb_manu_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    version: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
-    cpe: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    purl: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    sbom_urls: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
-    manufacturer_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("manufacturer.id"), nullable=True
-    )
-
-    manufacturer: Mapped[Optional["Manufacturer"]] = relationship(
-        back_populates="software"
-    )
-    files: Mapped[List["File"]] = relationship(
-        back_populates="software", cascade="all, delete-orphan"
+        back_populates="product", passive_deletes=True
     )
     asset: Mapped[Optional["Asset"]] = relationship(
-        back_populates="software", cascade="all, delete-orphan"
-    )
-    csaf_product: Mapped[Optional["CsafProduct"]] = relationship(
-        back_populates="software"
+        back_populates="product", passive_deletes=True
     )
 
-    async def create_or_update(self, session) -> None:
-        updated = False
-
-        async def find_manufacturer_key(nb_key):
-            stmt = select(Manufacturer).where(Manufacturer.nb_id == nb_key)
-            result = await session.execute(stmt)
-            obj = result.scalar_one_or_none()
-            if obj:
-                return obj.id
-            else:
-                raise data_consistency_problem("Manufacturer not found")
-
-        stmt = select(Software).where(Software.nb_id == self.nb_id)
-        result = await session.execute(stmt)
-        obj = result.scalar_one_or_none()
-        manu_id = await find_manufacturer_key(self.nb_manu_id)
-        if obj:
-            if obj.name != self.name:
-                setattr(obj, "name", self.name)
-                updated = True
-            if obj.version != self.version:
-                setattr(obj, "version", self.version)
-                updated = True
-            if obj.cpe != self.cpe:
-                setattr(obj, "cpe", self.cpe)
-                updated = True
-            if obj.purl != self.purl:
-                setattr(obj, "purl", self.purl)
-                updated = True
-            if obj.sbom_urls != self.sbom_urls:
-                setattr(obj, "sbom_urls", self.sbom_urls)
-                updated = True
-            if obj.manufacturer_id != manu_id:
-                setattr(obj, "manufacturer_id", manu_id)
-                updated = True
-            setattr(obj, "last_seen", self.last_seen)
-            if updated:
-                logger.info(f"UPDATED: {self} {self.name}")
-        else:
-            self.manufacturer_id = manu_id
-            session.add(self)
-            await session.flush()
-            the_asset = Asset(software_id=self.id, last_seen=self.last_seen)
-            session.add(the_asset)
-            logger.info(f"CREATED: {self} {self.name}")
-            logger.info(f"CREATED: {the_asset} {the_asset.id}")
-        return obj
+    def to_dict(self) -> Dict[str, Any]:
+        result = {
+            "product_type": self.product_type.value,
+            "name": self.name,
+            "version": self.version,
+            "cpe": self.cpe,
+            "purl": self.purl,
+            "sbom_urls": self.sbom_urls,
+            "serial_numbers": self.serial_numbers,
+            "files": self.files,
+            "model": self.model,
+            "model_numbers": self.model_numbers,
+            "part_numbers": self.part_numbers,
+            "device_family": self.device_family,
+            "hardware_version": self.hardware_version,
+            "hardware_name": self.hardware_name,
+            "manufacturer_name": self.manufacturer_name,
+            "csaf_product_id": self.csaf_product_id,
+            "asset_id": self.asset_id,
+        }
+        if self.id is not None:
+            result["id"] = self.id
+        return result
 
 
-class Device(Base):
-    __tablename__ = "device"
+csaf_product_relationship = Table(
+    "csaf_product_relationship",
+    Base.metadata,
+    Column(
+        "parent_id", Integer, ForeignKey("cacheDB.csaf_product.id"), primary_key=True
+    ),
+    Column(
+        "child_id", Integer, ForeignKey("cacheDB.csaf_product.id"), primary_key=True
+    ),
+)
+
+
+class CsafProduct(Base, MetaInfo):
+    __tablename__ = "csaf_product"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    nb_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    last_seen: Mapped[float] = mapped_column(Float)
-    nb_devicetype_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    serial: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
-    device_type_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("device_type.id"), nullable=True
+
+    # A CsafProduct has exactly one Product entry
+    product: Mapped["Product"] = relationship(
+        back_populates="csaf_product", passive_deletes=True
     )
 
-    device_type: Mapped[Optional["DeviceType"]] = relationship(back_populates="devices")
-
-    csaf_product: Mapped[Optional["CsafProduct"]] = relationship(
-        back_populates="device"
-    )
-    asset: Mapped[Optional["Asset"]] = relationship(
-        back_populates="device", cascade="all, delete-orphan"
+    # A CsafProduct can be associated with multiple matches
+    matches: Mapped[List["Match"]] = relationship(
+        back_populates="csaf_product", passive_deletes=True
     )
 
-    async def create_or_update(self, session) -> None:
-        updated = False
+    children: Mapped[List["CsafProduct"]] = relationship(
+        "CsafProduct",
+        secondary=csaf_product_relationship,
+        primaryjoin=id == csaf_product_relationship.c.parent_id,
+        secondaryjoin=id == csaf_product_relationship.c.child_id,
+        back_populates="parents",
+    )
+    parents: Mapped[List["CsafProduct"]] = relationship(
+        "CsafProduct",
+        secondary=csaf_product_relationship,
+        primaryjoin=id == csaf_product_relationship.c.child_id,
+        secondaryjoin=id == csaf_product_relationship.c.parent_id,
+        back_populates="children",
+    )
 
-        async def find_devicetype_key(nb_key):
-            stmt = select(DeviceType).where(DeviceType.nb_id == nb_key)
-            result = await session.execute(stmt)
-            obj = result.scalar_one_or_none()
-            if obj:
-                return obj.id
-            else:
-                raise data_consistency_problem("DeviceType not found")
+    def to_dict(self) -> Dict[str, Any]:
+        result = {
+            "origin_uri": self.origin_uri,
+            "origin_info": self.origin_info,
+            "last_update": self.last_update,
+        }
+        if self.id is not None:
+            result["id"] = self.id
+        return result
 
-        stmt = select(Device).where(Device.nb_id == self.nb_id)
-        result = await session.execute(stmt)
-        obj = result.scalar_one_or_none()
-        devicetype_id = await find_devicetype_key(self.nb_devicetype_id)
-        if obj:
-            if obj.name != self.name:
-                setattr(obj, "name", self.name)
-                updated = True
-            if obj.serial != self.serial:
-                setattr(obj, "serial", self.serial)
-                updated = True
-            if obj.device_type_id != devicetype_id:
-                setattr(obj, "device_type_id", devicetype_id)
-                updated = True
-            setattr(obj, "last_seen", self.last_seen)
-            if updated:
-                logger.info(f"UPDATED: {self} {self.name}")
-        else:
-            self.device_type_id = devicetype_id
-            session.add(self)
-            await session.flush()
-            the_asset = Asset(device_id=self.id, last_seen=self.last_seen)
-            session.add(the_asset)
-            logger.info(f"CREATED: {self} {self.name}")
-            logger.info(f"CREATED: {the_asset} {the_asset.id}")
-        return obj
+
+product_relationship = Table(
+    "product_relationship",
+    Base.metadata,
+    Column("parent_id", Integer, ForeignKey("cacheDB.asset.id"), primary_key=True),
+    Column("child_id", Integer, ForeignKey("cacheDB.asset.id"), primary_key=True),
+)
 
 
 class Asset(Base, MetaInfo):
     __tablename__ = "asset"
 
-    __table_args__ = (
-        CheckConstraint(
-            "(device_id IS NOT NULL AND software_id IS NULL) OR "
-            "(device_id IS NULL AND software_id IS NOT NULL)",
-            name="device_xor_software",
-        ),
-    )
-
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    last_seen: Mapped[float] = mapped_column(Float)
-    device_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("device.id"), nullable=True
-    )
-    software_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("software.id"), nullable=True
+
+    # An Asset has exactly one Product entry
+    product: Mapped["Product"] = relationship(
+        back_populates="asset", passive_deletes=True
     )
 
-    device: Mapped[Optional["Device"]] = relationship(back_populates="asset")
-    software: Mapped[Optional["Software"]] = relationship(back_populates="asset")
-
-    matches: Mapped[List["Match"]] = relationship(back_populates="asset")
-
-
-class ProductRelationship(Base):
-    __tablename__ = "productrelationship"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    nb_id: Mapped[int] = mapped_column(Integer)
-    last_seen: Mapped[float] = mapped_column(Float)
-    nb_source_id: Mapped[int] = mapped_column(Integer)
-    nb_target_id: Mapped[int] = mapped_column(Integer)
-    category: Mapped[int] = mapped_column(Integer)
-    source_id: Mapped[int] = mapped_column(Integer)
-    source_type: Mapped[str] = mapped_column(Text)
-    target_id: Mapped[int] = mapped_column(Integer)
-    target_type: Mapped[str] = mapped_column(Text)
-
-    def get_source(self, session):
-        if self.source_type == "Device":
-            return session.get(Device, self.source_id)
-        elif self.source_type == "Software":
-            return session.get(Software, self.source_id)
-        else:
-            return None
-
-    def get_target(self, session):
-        if self.target_type == "Device":
-            return session.get(Device, self.target_id)
-        elif self.target_type == "Software":
-            return session.get(Software, self.target_id)
-        else:
-            return None
-
-    async def create_or_update(self, session) -> None:
-        updated = False
-
-        async def find_related_key(nb_key, the_type):
-            if the_type == "Device":
-                stmt = select(Device).where(Device.nb_id == nb_key)
-            elif the_type == "Software":
-                stmt = select(Software).where(Software.nb_id == nb_key)
-            else:
-                return None
-            result = await session.execute(stmt)
-            obj = result.scalar_one_or_none()
-            if obj:
-                return obj.id
-            else:
-                raise data_consistency_problem("Device of Software not found")
-
-        stmt = select(ProductRelationship).where(
-            ProductRelationship.nb_id == self.nb_id
-        )
-        result = await session.execute(stmt)
-        obj = result.scalar_one_or_none()
-        source_id = await find_related_key(self.nb_source_id, self.source_type)
-        target_id = await find_related_key(self.nb_target_id, self.target_type)
-        if obj:
-            if obj.source_id != source_id:
-                setattr(obj, "source_id", source_id)
-                updated = True
-            if obj.target_id != target_id:
-                setattr(obj, "target_id", target_id)
-                updated = True
-            if obj.source_type != self.source_type:
-                setattr(obj, "source_type", self.source_type)
-                updated = True
-            if obj.target_type != self.target_type:
-                setattr(obj, "target_type", self.target_type)
-                updated = True
-            if obj.category != self.category:
-                setattr(obj, "category", self.category)
-                updated = True
-            setattr(obj, "last_seen", self.last_seen)
-            if updated:
-                logger.info(f"UPDATED: {self}")
-        else:
-            self.source_id = source_id
-            self.target_id = target_id
-            session.add(self)
-            logger.info(f"CREATED: {self} {self.id}")
-        return obj
-
-
-class CsafProductRelationship(Base):
-    __tablename__ = "csaf_productrelationship"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    category: Mapped[str] = mapped_column(Text)
-    csaf_product_source_id: Mapped[int] = mapped_column(
-        ForeignKey("cacheDB.csaf_product.id")
-    )
-    csaf_product_target_id: Mapped[int] = mapped_column(
-        ForeignKey("cacheDB.csaf_product.id")
+    # An Asset can be associated with multiple matches
+    matches: Mapped[List["Match"]] = relationship(
+        back_populates="asset", passive_deletes=True
     )
 
-    csaf_product_source: Mapped["CsafProduct"] = relationship(
-        back_populates="csaf_productrelationships_source",
-        foreign_keys=[csaf_product_source_id],
+    children: Mapped[List["Asset"]] = relationship(
+        "Asset",
+        secondary=product_relationship,
+        primaryjoin=id == product_relationship.c.parent_id,
+        secondaryjoin=id == product_relationship.c.child_id,
+        back_populates="parents",
     )
-    csaf_product_target: Mapped["CsafProduct"] = relationship(
-        back_populates="csaf_productrelationships_target",
-        foreign_keys=[csaf_product_target_id],
-    )
-
-
-class File(Base):
-    __tablename__ = "file"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    nb_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    last_seen: Mapped[float] = mapped_column(Float)
-    nb_software_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    filename: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-
-    hashes: Mapped[List["Hash"]] = relationship(back_populates="file")
-
-    software_id: Mapped[int] = mapped_column(ForeignKey("software.id"))
-    software: Mapped["Software"] = relationship(back_populates="files")
-
-    products: Mapped[List["Product"]] = relationship(
-        "Product", secondary=product_file_association, back_populates="files"
+    parents: Mapped[List["Asset"]] = relationship(
+        "Asset",
+        secondary=product_relationship,
+        primaryjoin=id == product_relationship.c.child_id,
+        secondaryjoin=id == product_relationship.c.parent_id,
+        back_populates="children",
     )
 
-    async def create_or_update(self, session) -> None:
-        updated = False
-
-        async def find_software_key(nb_key):
-            stmt = select(Software).where(Software.nb_id == nb_key)
-            result = await session.execute(stmt)
-            obj = result.scalar_one_or_none()
-            if obj:
-                return obj.id
-            else:
-                raise data_consistency_problem("Software not found")
-
-        stmt = select(File).where(File.nb_id == self.nb_id)
-        result = await session.execute(stmt)
-        obj = result.scalar_one_or_none()
-        software_id = await find_software_key(self.nb_software_id)
-        if obj:
-            if obj.filename != self.filename:
-                setattr(obj, "filename", self.filename)
-                updated = True
-            if obj.software_id != software_id:
-                setattr(obj, "software_id", software_id)
-                updated = True
-            setattr(obj, "last_seen", self.last_seen)
-            if updated:
-                logger.info(f"UPDATED: {self} {self.filename}")
-        else:
-            self.software_id = software_id
-            session.add(self)
-            logger.info(f"CREATED: {self} {self.filename}")
-        return obj
-
-
-class Hash(Base):
-    __tablename__ = "hash"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    nb_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    last_seen: Mapped[float] = mapped_column(Float)
-    nb_file_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    algorithm: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    file_id: Mapped[int | None] = mapped_column(
-        ForeignKey("cacheDB.file.id"), nullable=True
-    )
-
-    file: Mapped["File"] = relationship(back_populates="hashes")
-
-    async def create_or_update(self, session) -> None:
-        updated = False
-
-        async def find_file_key(nb_key):
-            stmt = select(File).where(File.nb_id == nb_key)
-            result = await session.execute(stmt)
-            obj = result.scalar_one_or_none()
-            if obj:
-                return obj.id
-            else:
-                raise data_consistency_problem("File not found")
-
-        stmt = select(Hash).where(Hash.nb_id == self.nb_id)
-        result = await session.execute(stmt)
-        obj = result.scalar_one_or_none()
-        file_id = await find_file_key(self.nb_file_id)
-        if obj:
-            # logger.info(f"FOUND: {obj.nb_id} {obj.name}")
-            if obj.algorithm != self.algorithm:
-                setattr(obj, "algorithm", self.name)
-                updated = True
-            if obj.value != self.value:
-                setattr(obj, "value", self.serial)
-                updated = True
-            if obj.file_id != file_id:
-                setattr(obj, "file_id", file_id)
-                updated = True
-            setattr(obj, "last_seen", self.last_seen)
-            if updated:
-                logger.info(f"UPDATED: {self} {self.id}")
-        else:
-            self.file_id = file_id
-            session.add(self)
-            logger.info(f"CREATED: {self} {self.id}")
-        return obj
-
-
-class CsafDocument(Base, MetaInfo):
-    __tablename__ = "csaf_document"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    title: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    version: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    lang: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    publisher: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-
-    csaf_product_tree: Mapped["CsafProductTree"] = relationship(
-        back_populates="csaf_document"
-    )
-
-
-class CsafProduct(Base):
-    __tablename__ = "csaf_product"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    device_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("cacheDB.device.id"), nullable=True
-    )
-    software_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("cacheDB.software.id"), nullable=True
-    )
-    product_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("cacheDB.product.id"), nullable=True
-    )
-
-    product_name_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-
-    device: Mapped[Optional["Device"]] = relationship(back_populates="csaf_product")
-    software: Mapped[Optional["Software"]] = relationship(back_populates="csaf_product")
-    product: Mapped[Optional["Product"]] = relationship(back_populates="csaf_product")
-
-    csaf_product_trees: Mapped[List["CsafProductTree"]] = relationship(
-        back_populates="csaf_product"
-    )
-
-    matches: Mapped[List["Match"]] = relationship(back_populates="csaf_product")
-    csaf_productrelationships_source: Mapped[List["CsafProductRelationship"]] = (
-        relationship(
-            back_populates="csaf_product_source",
-            foreign_keys="CsafProductRelationship.csaf_product_source_id",
-        )
-    )
-    csaf_productrelationships_target: Mapped[List["CsafProductRelationship"]] = (
-        relationship(
-            back_populates="csaf_product_target",
-            foreign_keys="CsafProductRelationship.csaf_product_target_id",
-        )
-    )
-
-
-class CsafProductTree(Base):
-    __tablename__ = "csaf_product_tree"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    csaf_document_id: Mapped[int] = mapped_column(
-        ForeignKey("cacheDB.csaf_document.id"), nullable=False
-    )
-    csaf_product_id: Mapped[int] = mapped_column(
-        ForeignKey("cacheDB.csaf_product.id"), nullable=False
-    )
-
-    csaf_document: Mapped["CsafDocument"] = relationship(
-        back_populates="csaf_product_tree"
-    )
-    csaf_product: Mapped[List["CsafProduct"]] = relationship(
-        back_populates="csaf_product_trees"
-    )
+    def to_dict(self) -> Dict[str, Any]:
+        result = {
+            "origin_uri": self.origin_uri,
+            "origin_info": self.origin_info,
+            "last_update": self.last_update,
+        }
+        if self.id is not None:
+            result["id"] = self.id
+        return result
 
 
 class Match(Base):
@@ -712,8 +282,9 @@ class Match(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     score: Mapped[float] = mapped_column(nullable=False)
+    # TODO: Introduce enum for match status?
     status: Mapped[str] = mapped_column(Text, nullable=False)
-    time: Mapped[datetime.datetime] = mapped_column(nullable=False)
+    timestamp: Mapped[datetime.datetime] = mapped_column(nullable=False)
     csaf_product_id: Mapped[int] = mapped_column(
         ForeignKey("cacheDB.csaf_product.id"), nullable=False
     )

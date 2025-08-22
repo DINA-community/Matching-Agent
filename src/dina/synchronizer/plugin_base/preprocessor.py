@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Union, List
+from typing import List, Union
 
-from dina.cachedb.model import CsafDocument, Asset
+from dina.cachedb.model import Asset, CsafProduct
 
 
 class PreprocessorPlugin(ABC):
@@ -10,8 +10,8 @@ class PreprocessorPlugin(ABC):
 
     @abstractmethod
     async def preprocess(
-        self, data: List[Union[Asset, CsafDocument]]
-    ) -> List[Union[Asset, CsafDocument]]:
+        self, data: List[Union[Asset, CsafProduct]]
+    ) -> List[Union[Asset, CsafProduct]]:
         """
         Asynchronously preprocess a given list of `data` items. This function takes each element
         in the provided list, processes it, and then returns a new list of processed items.

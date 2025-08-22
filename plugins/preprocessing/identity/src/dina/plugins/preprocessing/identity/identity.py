@@ -1,6 +1,6 @@
 from typing import List, Union
 
-from dina.cachedb.model import Asset, CsafDocument
+from dina.cachedb.model import Asset, CsafProduct
 from dina.synchronizer.plugin_base.preprocessor import PreprocessorPlugin
 
 
@@ -9,6 +9,6 @@ class IdentityPreprocessor(PreprocessorPlugin):
         super().__init__(**kwargs)
 
     async def preprocess(
-        self, data: List[Union[Asset, CsafDocument]]
-    ) -> List[Union[Asset, CsafDocument]]:
+        self, data: List[Union[Asset, CsafProduct]]
+    ) -> List[Union[Asset, CsafProduct]]:
         return data

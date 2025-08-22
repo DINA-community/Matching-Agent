@@ -1,7 +1,8 @@
 import asyncio
-from typing import List, Union
+from typing import Any, List, Union
 
-from dina.cachedb.model import CsafDocument, Asset
+from dina.cachedb.fetcher_view import FetcherView
+from dina.cachedb.model import Asset, CsafProduct
 from dina.common import logging
 from dina.synchronizer.base import DataSourcePlugin
 
@@ -23,8 +24,10 @@ class SampleDataSource(DataSourcePlugin):
         """Return information about the data source endpoint."""
         return "http://endpoint.sample.com/"
 
-    async def fetch_data(self) -> List[Union[Asset, CsafDocument]]:
-        """Fetch data from the data source and return it as a list of Assets or CsafDocuments."""
+    async def fetch_data(
+        self, fetcher_view: FetcherView
+    ) -> List[Union[Asset, CsafProduct]]:
+        """Fetch data from the data source and return it as a list of Assets or CsafProducts."""
         # Implement your data fetching logic here
         # This is where you would connect to your data source and retrieve data
 
@@ -34,3 +37,10 @@ class SampleDataSource(DataSourcePlugin):
 
         # Return a list of Asset or CsafDocument objects
         return []
+
+    @property
+    def origin_uri(self) -> str:
+        return "http://endpoint.sample.com/"
+
+    async def cleanup_data(self, data_to_check: List[Any]):
+        pass

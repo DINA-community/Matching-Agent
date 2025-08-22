@@ -1,24 +1,24 @@
 import logging
-from typing import List, Optional, Union
+from typing import List, Optional, Type, Union
 
 from pydantic import BaseModel
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncEngine
+from sqlalchemy import delete, select, update
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    create_async_engine,
+)
 from sqlalchemy.sql.ddl import CreateSchema
 
+from dina.cachedb.fetcher_view import FetcherView
 from dina.cachedb.model import (
+    Asset,
     Base,
-    CsafProductTree,
-    Manufacturer,
-    DeviceType,
-    Device,
-    Software,
-    File,
-    Hash,
-    ProductRelationship,
-    AssetSynchronizer,
+    CsafProduct,
+    Product,
 )
-from dina.cachedb.model import data_consistency_problem
+from dina.synchronizer.plugin_base.data_source import DataSourcePlugin
 
 logger = logging.getLogger(__name__)
 
@@ -37,13 +37,19 @@ class CacheDB:
 
     async def connect(self, config: Config) -> None:
         self.engine = create_async_engine(
-            f"postgresql+asyncpg://{config.username}:{config.password}@{config.host}:{config.port}/{config.database}"
+            f"postgresql+asyncpg://{config.username}:{config.password}@{config.host}:{config.port}/{config.database}",
         )
         async with self.engine.begin() as conn:
             await conn.execute(CreateSchema("cacheDB", if_not_exists=True))
             await conn.run_sync(Base.metadata.create_all)
 
-    async def store(self, data: List[Union[Manufacturer, CsafProductTree]]) -> None:
+    def fetcher_view(self, origin: str) -> FetcherView:
+        if self.engine is not None:
+            return FetcherView(origin, self.engine)
+        else:
+            raise Exception("Database not connected")
+
+    async def store(self, data: List[Union[Asset, CsafProduct]]) -> None:
         """
         Stores a list of assets or CSAF documents into the database. This function ensures
         the provided data is added to the database in a single transaction using the
@@ -55,99 +61,110 @@ class CacheDB:
 
         :return: None
         """
+        if not data:
+            return
+
+        # Split data into assets and csaf_docs
+        new_data = [o for o in data if o.id is None]
+        assets_to_update = [
+            o for o in data if isinstance(o, Asset) and o.id is not None
+        ]
+        csaf_products_to_update = [
+            o for o in data if isinstance(o, CsafProduct) and o.id is not None
+        ]
+
         async with AsyncSession(self.engine) as session:
             async with session.begin():
-                # TODO: for csafsync
-                # session.add_all(data)
-                # await session.commit()
+                if new_data:
+                    session.add_all(new_data)
+                if assets_to_update:
+                    await self.__update(session, Asset, assets_to_update)
 
-                # TODO: for assetsync
-                for asset in data:
-                    # logger.info(f"DATA: {asset}")
-                    try:
-                        await asset.create_or_update(session)
-                    except data_consistency_problem as e:
-                        logger.error(
-                            f"Data consistency problem when processing: {asset} {e} "
-                        )
-                await session.commit()
-                await session.close()
+                if csaf_products_to_update:
+                    await self.__update(session, CsafProduct, csaf_products_to_update)
 
-    async def check_delete(self):
+    async def __update(
+        self,
+        session: AsyncSession,
+        ty: Type[Asset | CsafProduct],
+        data: List[Asset] | List[CsafProduct],
+    ):
+        stmt = insert(ty).values([d.to_dict() for d in data])
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["id"], set_=dict(stmt.excluded)
+        )
+        await session.execute(stmt)
+
+        stmt = insert(Product).values([d.product.to_dict() for d in data])
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["id"], set_=dict(stmt.excluded)
+        )
+        await session.execute(stmt)
+
+    async def run_cleanup_for_plugin(self, source: DataSourcePlugin):
         async with AsyncSession(self.engine) as session:
-            stmt = select(AssetSynchronizer)
-            result = await session.execute(stmt)
-            obj = result.scalar_one_or_none()
-            if obj:
-                starttime = obj.last_run
-                logger.info(f"DELETE {starttime}")
+            async with session.begin():
+                fetcher_view = self.fetcher_view(source.origin_uri)
+                last_run = await fetcher_view.last_run()
+                # TODO: Make the time configurable
+                stale_timestamp = last_run.timestamp() - 60
+                # We want to check if anything that was fetched X seconds before the last run is still valid
+                stmt = select(Asset).where(Asset.last_update < stale_timestamp)
+                asset_results = await session.execute(stmt)
+                data: List[Asset | CsafProduct] = list(asset_results.scalars().all())
 
-            result = await session.execute(
-                select(Manufacturer).where(Manufacturer.last_seen < starttime)
-            )
-            all_objects = result.scalars().all()
-            for x in all_objects:
-                # if x.last_seen < starttime:
-                logger.info(f"DELETED: {x} {x.name} {x.last_seen}")
-                await session.delete(x)
-
-            result = await session.execute(
-                select(DeviceType).where(DeviceType.last_seen < starttime)
-            )
-            all_objects = result.scalars().all()
-            for x in all_objects:
-                # if x.last_seen < starttime:
-                logger.info(f"DELETED: {x} {x.model_number} {x.last_seen}")
-                await session.delete(x)
-
-            result = await session.execute(
-                select(Device).where(Device.last_seen < starttime)
-            )
-            all_objects = result.scalars().all()
-            for x in all_objects:
-                # if x.last_seen < starttime:
-                logger.info(f"DELETED: {x} {x.name} {x.last_seen}")
-                await session.delete(x)
-
-            result = await session.execute(
-                select(Software).where(Software.last_seen < starttime)
-            )
-            all_objects = result.scalars().all()
-            for x in all_objects:
-                # if x.last_seen < starttime:
-                logger.info(f"DELETED: {x} {x.name} {x.last_seen}")
-                await session.delete(x)
-
-            result = await session.execute(
-                select(Hash).where(Hash.last_seen < starttime)
-            )
-            all_objects = result.scalars().all()
-            for x in all_objects:
-                # if x.last_seen < starttime:
-                logger.info(f"DELETED: {x} {x.id} {x.last_seen}")
-                await session.delete(x)
-
-            result = await session.execute(
-                select(File).where(File.last_seen < starttime)
-            )
-            all_objects = result.scalars().all()
-            for x in all_objects:
-                # if x.last_seen < starttime:
-                logger.info(f"DELETED: {x} {x.filename} {x.last_seen}")
-                await session.delete(x)
-
-            result = await session.execute(
-                select(ProductRelationship).where(
-                    ProductRelationship.last_seen < starttime
+                csaf_stmt = select(CsafProduct).where(
+                    CsafProduct.last_update < stale_timestamp
                 )
-            )
-            all_objects = result.scalars().all()
-            for x in all_objects:
-                # if x.last_seen < starttime:
-                logger.info(f"DELETED: {x} {x.id} {x.last_seen}")
-                await session.delete(x)
+                csaf_results = await session.execute(csaf_stmt)
+                data.extend(list(csaf_results.scalars().all()))
 
-            await session.commit()
+                cleanup_results = await source.cleanup_data(data)
+                assets_to_delete = [
+                    result.id
+                    for result in cleanup_results
+                    if result.ty == Asset and result.can_delete
+                ]
+                assets_to_refresh = [
+                    result.id
+                    for result in cleanup_results
+                    if result.ty == Asset and not result.can_delete
+                ]
+
+                csaf_to_delete = [
+                    result.id
+                    for result in cleanup_results
+                    if result.ty == CsafProduct and result.can_delete
+                ]
+                csaf_to_refresh = [
+                    result.id
+                    for result in cleanup_results
+                    if result.ty == CsafProduct and not result.can_delete
+                ]
+
+                if assets_to_delete:
+                    del_stmt = delete(Asset).where(Asset.id.in_(assets_to_delete))
+                    await session.execute(del_stmt)
+                if csaf_to_delete:
+                    del_stmt = delete(CsafProduct).where(
+                        CsafProduct.id.in_(csaf_to_delete)
+                    )
+                    await session.execute(del_stmt)
+
+                if assets_to_refresh:
+                    update_stmt = (
+                        update(Asset)
+                        .where(Asset.id.in_(assets_to_refresh))
+                        .values(last_update=last_run.timestamp())
+                    )
+                    await session.execute(update_stmt)
+                if csaf_to_refresh:
+                    update_stmt = (
+                        update(CsafProduct)
+                        .where(CsafProduct.id.in_(csaf_to_refresh))
+                        .values(last_update=last_run.timestamp())
+                    )
+                    await session.execute(update_stmt)
 
     async def disconnect(self) -> None:
         if self.engine is not None:

@@ -2,6 +2,8 @@
 
 [DataSource]
 plugin_name = "isduba_fetcher"
+timeout_seconds = 30
+update_interval = 60
 
 [DataSource.Plugin]
 url = "http://endpoint.sample.com/"

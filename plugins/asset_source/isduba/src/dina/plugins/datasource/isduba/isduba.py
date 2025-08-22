@@ -1,13 +1,14 @@
-from typing import List, Union, Any
+from typing import Any, List
 
 import httpx
+from pydantic import BaseModel
 
-from dina.cachedb.model import CsafProductRelationship
+from dina.cachedb.fetcher_view import FetcherView
+from dina.cachedb.model import Asset, CsafProduct
 from dina.common import logging
 
 # from dina.plugins.datasource.isduba.connector import get_csaf_product_tree
 # from dina.plugins.datasource.isduba.converter import convert_into_database_format
-from dina.plugins.datasource.isduba.datamodels import CsafProductTree
 from dina.plugins.datasource.isduba.generated import isduba_api_client
 from dina.synchronizer.base import DataSourcePlugin
 
@@ -18,24 +19,23 @@ logger = logging.get_logger(__name__)
 
 
 class IsdubaDataSource(DataSourcePlugin):
+    class Config(BaseModel):
+        username: str
+        password: str
+        verify_ssl: bool
+        url: str
+
     def __init__(self, config):
+        config.DataSource.Plugin = IsdubaDataSource.Config.model_validate(
+            config.DataSource.Plugin
+        )
         super().__init__(config)
-        # Extract configuration values
-        try:
-            plugin_config = self.config["DataSource"]["ISDuBA"]
-            self.username = plugin_config["username"]
-            self.password = plugin_config["password"]
-            self.verify_ssl = plugin_config["verify_ssl"]
-            self.url = plugin_config["url"]
-            # Add other configuration parameters as needed
-        except KeyError:
-            raise KeyError("Missing required configuration parameter")
 
     def endpoint_info(self) -> str:
         """Return information about the data source endpoint."""
-        return self.url
+        return self.config.DataSource.Plugin.url
 
-    async def fetch_data(self) -> List[Union[CsafProductTree, CsafProductRelationship]]:
+    async def fetch_data(self, fetcher_view: FetcherView) -> List[Asset | CsafProduct]:
         """Fetch data from the data source and return it as a list of Assets or CsafDocuments."""
         # Implement your data fetching logic here
         # This is where you would connect to your data source and retrieve data
@@ -44,7 +44,7 @@ class IsdubaDataSource(DataSourcePlugin):
         logger.trace("IsdubaDataSource: Fetching data from ISDuBA")
 
         token_url = "{}:8081/realms/isduba/protocol/openid-connect/token".format(
-            self.url
+            self.config.DataSource.Plugin.url
         )
         logger.trace("Fetching bearer token from {}".format(token_url))
         token = (
@@ -53,16 +53,16 @@ class IsdubaDataSource(DataSourcePlugin):
                 data={
                     "grant_type": "password",
                     "client_id": "auth",
-                    "username": self.username,
-                    "password": self.password,
+                    "username": self.config.DataSource.Plugin.username,
+                    "password": self.config.DataSource.Plugin.password,
                 },
-                verify=self.verify_ssl,
+                verify=self.config.DataSource.Plugin.verify_ssl,
             )
             .json()
             .get("access_token")
         )
 
-        api_url = "{}/api".format(self.url)
+        api_url = "{}/api".format(self.config.DataSource.Plugin.url)
         logger.trace("Creating client for API at {}".format(api_url))
         # Defining the host is optional and defaults to /api
         # See configuration.py for a list of all supported configuration parameters.
@@ -71,7 +71,7 @@ class IsdubaDataSource(DataSourcePlugin):
             api_key={"bearerAuth": token},
             api_key_prefix={"bearerAuth": "Bearer"},
         )
-        configuration.verify_ssl = self.verify_ssl
+        configuration.verify_ssl = self.config.DataSource.Plugin.verify_ssl
         ret = []
 
         # Enter a context with an instance of the API client
@@ -138,3 +138,7 @@ class IsdubaDataSource(DataSourcePlugin):
 
     async def cleanup_data(self, data_to_check: List[Any]):
         pass
+
+    @property
+    def origin_uri(self):
+        return self.config.DataSource.Plugin.url
