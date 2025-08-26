@@ -1,3 +1,4 @@
+import datetime
 import logging
 from typing import List, Optional, Type, Union
 
@@ -106,6 +107,12 @@ class CacheDB:
             async with session.begin():
                 fetcher_view = self.fetcher_view(source.origin_uri)
                 last_run = await fetcher_view.last_run()
+                
+                if last_run.tzinfo is None:
+                    last_run = last_run.replace(tzinfo=datetime.timezone.utc)
+
+                last_run = last_run.astimezone(tz=datetime.timezone.utc)
+
                 # TODO: Make the time configurable
                 stale_timestamp = last_run.timestamp() - 60
                 # We want to check if anything that was fetched X seconds before the last run is still valid
