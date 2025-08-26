@@ -36,7 +36,7 @@ class IsdubaDataSource(DataSourcePlugin):
     async def fetch_data(self, fetcher_view: FetcherView) -> List[Asset | CsafProduct]:
         """Fetch data from the data source and return it as a list of Assets or CsafDocuments."""
         plugin = IsdubaDataSource(self.config)
-        
+       
         token_url = "{}:8081/realms/isduba/protocol/openid-connect/token".format(
              plugin.origin_uri
          )
@@ -72,7 +72,7 @@ class IsdubaDataSource(DataSourcePlugin):
             api_instance = isduba_api_client.DefaultApi(api_client)
 
             try:
-                api_response = await api_instance.documents_get(limit=2)
+                api_response = await api_instance.documents_get(limit=5, offset=0)
 
                 if not api_response.documents:
                     return ret
@@ -84,7 +84,7 @@ class IsdubaDataSource(DataSourcePlugin):
                     csaf_product_tree: CsafProductTree = await get_csaf_product_tree(plugin.origin_uri, path, api_response["document"], api_response["product_tree"])
 
                     if csaf_product_tree is not None:
-                        tree = await convert_into_database_format(csaf_product_tree)
+                        tree = await convert_into_database_format(fetcher_view, csaf_product_tree)
 
                         for t in tree:
                             ret.append(t)

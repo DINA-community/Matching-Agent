@@ -1,4 +1,5 @@
 import time
+from dina.cachedb.fetcher_view import FetcherView
 from dina.cachedb.model import (
     CsafProduct,
     ProductType,
@@ -16,6 +17,7 @@ from .datamodels import (
 logger = logging.get_logger(__name__)
 
 async def convert_into_database_format(
+    fetcher_view: FetcherView,
     product_tree: ProductTree,
 ) -> List[Union[CsafProduct]]:
     if product_tree.csaf_document is None:
@@ -27,11 +29,13 @@ async def convert_into_database_format(
 
     document: Document = product_tree.csaf_document
 
+    product_name_id_list = []
+
     for product_list in product_tree.product_list:
         for product in product_list:
             (
                 product_name_id,
-                cpe,
+                cpe_identifier,
                 helper,
                 product_version,
                 products,
@@ -39,12 +43,12 @@ async def convert_into_database_format(
 
             product_type = ProductType.Undefined
 
-            if (cpe == "a" or cpe == "o" 
+            if (cpe_identifier == "a" or cpe_identifier == "o" 
                 or (helper and helper.purl and helper.purl.startswith("pkg:"))
                 ):
                 product_type = ProductType.Software
             elif (
-                cpe == "h"
+                cpe_identifier == "h"
                 or (helper and helper.serial_numbers)
                 or (helper and helper.model_numbers)
                 or (helper and helper.skus)
@@ -55,7 +59,9 @@ async def convert_into_database_format(
             model_product.product_type = product_type
             model_product.name = list_to_str(products)
             model_product.version = product_version
-            model_product.cpe = cpe
+
+            if helper and helper.cpe:
+                model_product.cpe = helper.cpe
 
             if helper and helper.purl:
                 model_product.purl = helper.purl
@@ -92,6 +98,9 @@ async def convert_into_database_format(
 
             csaf_product.origin_info = {}
 
+            csaf_product.origin_info["product_name_id"] = product_name_id
+            product_name_id_list.append(product_name_id)
+
             if document and document.path:
                 csaf_product.origin_info["path"] = document.path
             
@@ -110,12 +119,12 @@ async def convert_into_database_format(
     #     product_reference: Optional[CsafProduct] = None
     #     relates_to_product_reference: Optional[CsafProduct] = None
 
-    #     for csaf_product in csaf_product_list:
-    #         if csaf_product.product_name == relationship.product_reference:
+    #     for csaf_product in csaf_full_product_list:
+    #         if csaf_product.origin_uri["product_name_id"] == relationship.product_reference:
     #             product_reference = csaf_product
 
     #         if (
-    #             csaf_product.product_name
+    #             csaf_product.origin_uri["product_name_id"]
     #             == relationship.relates_to_product_reference
     #         ):
     #             relates_to_product_reference = csaf_product
@@ -130,6 +139,23 @@ async def convert_into_database_format(
     #             relationship_value.csaf_product_target = relates_to_product_reference
     #             csaf_full_product_list.append(relationship_value)
     #             break
+
+    existing_products = {
+            prod.origin_info["product_name_id"]: prod
+            for prod in await fetcher_view.get_existing(
+                CsafProduct,
+                CsafProduct.origin_info["product_name_id"]
+                .astext
+                .in_(list(product_name_id_list)),
+            )
+        }
+    
+    existing_ids = set(existing_products.keys())
+
+    csaf_full_product_list = [
+        prod for prod in csaf_full_product_list
+        if prod.origin_info.get("product_name_id") not in existing_ids
+    ]
 
     return csaf_full_product_list
 
