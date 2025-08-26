@@ -1,15 +1,8 @@
 import time
-from dina.cachedb.database import Device, DeviceType
 from dina.cachedb.model import (
-    CsafDocument,
     CsafProduct,
-    CsafProductTree,
-    File,
-    Hash,
-    Manufacturer,
-    Software,
-    Product,
-    CsafProductRelationship,
+    ProductType,
+    Product
 )
 from dina.common import logging
 from typing import List, Optional, Tuple, Union
@@ -22,25 +15,17 @@ from .datamodels import (
 
 logger = logging.get_logger(__name__)
 
-
 async def convert_into_database_format(
     product_tree: ProductTree,
-) -> List[Union[CsafProductTree, CsafProductRelationship]]:
+) -> List[Union[CsafProduct]]:
     if product_tree.csaf_document is None:
         return None
 
-    starttime = time.time()
+    last_update = time.time()
 
-    csaf_full_product_list: List[Union[CsafProductTree, CsafProductRelationship]] = []
+    csaf_full_product_list: List[Union[CsafProduct]] = []
 
     document: Document = product_tree.csaf_document
-    csaf_document = CsafDocument()
-    csaf_document.url = document.url
-    csaf_document.lang = document.lang
-    csaf_document.publisher = document.publisher
-    csaf_document.version = document.version
-
-    csaf_product_list: List[CsafProduct] = []
 
     for product_list in product_tree.product_list:
         for product in product_list:
@@ -52,201 +37,99 @@ async def convert_into_database_format(
                 products,
             ) = await get_product_values(product)
 
-            if (cpe == "a" or cpe == "o") or (
-                helper and helper.purl and helper.purl.startswith("pkg:")
-            ):
-                logger.info("Software")
-                manufacturer = None
+            product_type = ProductType.Undefined
 
-                if m_name := product.manufacturer:
-                    manufacturer = Manufacturer()
-                    manufacturer.name = m_name
-                    manufacturer.last_seen = starttime
-
-                files = []
-
-                if helper and helper.hashes:
-                    for h in helper.hashes:
-                        hash = None
-
-                        if h.file_hash and h.file_hash.algorithm and h.file_hash.value:
-                            hash = Hash()
-                            hash.algorithm = h.file_hash.algorithm
-                            hash.value = h.file_hash.value
-
-                        file = File()
-                        file.hash = hash
-                        file.filename = h.file_name
-                        files.append(file)
-
-                software = Software()
-                software.name = list_to_str(products)
-                software.cpe = cpe
-                software.version = product_version
-                software.manufacturer = manufacturer
-                software.last_seen = starttime
-                software.files = files
-
-                csaf_product = CsafProduct()
-                csaf_product.product_name_id = product_name_id
-                csaf_product.software = software
-                csaf_product_list.append(csaf_product)
-
-                csaf_product_tree = CsafProductTree()
-                csaf_product_tree.csaf_product = csaf_product
-                csaf_product_tree.csaf_document = csaf_document
-                csaf_full_product_list.append(csaf_product_tree)
-
+            if (cpe == "a" or cpe == "o" 
+                or (helper and helper.purl and helper.purl.startswith("pkg:"))
+                ):
+                product_type = ProductType.Software
             elif (
                 cpe == "h"
                 or (helper and helper.serial_numbers)
                 or (helper and helper.model_numbers)
                 or (helper and helper.skus)
-            ):
-                logger.info("Device")
-                manufacturer = None
-
-                if m_name := product.manufacturer:
-                    manufacturer = Manufacturer()
-                    manufacturer.name = m_name
-                    manufacturer.last_seen = starttime
-
-                device_type = DeviceType()
-                device_type.manufacturer = manufacturer
-                device_type.cpe = cpe
-                device_type.hardware_name = list_to_str(products)  # duplicate value
-                device_type.hardware_version = product_version
-                device_type.device_family = product.product_family
-                device_type.last_seen = starttime
-
-                if helper and helper.skus is not None and isinstance(helper.skus, list):
-                    device_type.part_number = helper.skus
-
-                if (
-                    helper
-                    and helper.model_numbers is not None
-                    and isinstance(helper.model_numbers, list)
                 ):
-                    device_type.model_number = helper.model_numbers
+                product_type = ProductType.Device
 
-                device = Device()
-                device.device_type = device_type
-                device.name = list_to_str(products)  # duplicate value
-                device.last_seen = starttime
+            model_product = Product()
+            model_product.product_type = product_type
+            model_product.name = list_to_str(products)
+            model_product.version = product_version
+            model_product.cpe = cpe
 
-                if (
-                    helper
-                    and helper.serial_numbers is not None
-                    and isinstance(helper.serial_numbers, list)
-                ):
-                    device.serial = helper.serial_numbers
+            if helper and helper.purl:
+                model_product.purl = helper.purl
 
-                csaf_product = CsafProduct()
-                csaf_product.product_name_id = product_name_id
-                csaf_product.device = device
-                csaf_product_list.append(csaf_product)
+            if helper and helper.sbom_urls:
+                model_product.sbom_urls = helper.sbom_urls
 
-                csaf_product_tree = CsafProductTree()
-                csaf_product_tree.csaf_product = csaf_product
-                csaf_product_tree.csaf_document = csaf_document
-                csaf_full_product_list.append(csaf_product_tree)
-            elif cpe is None:
-                logger.info("Undefined Type")
+            if helper and helper.serial_numbers:
+                model_product.serial_numbers = helper.serial_numbers
 
-                manufacturer = None
+            if helper and helper.files:
+                model_product.files = helper.files 
 
-                if m_name := product.manufacturer:
-                    manufacturer = Manufacturer()
-                    manufacturer.name = m_name
-                    manufacturer.last_seen = starttime
+            # model_product.model = 
 
-                prod = Product()
-                prod.name = list_to_str(products)
-                prod.cpe = cpe
-                prod.version = product_version
-                prod.manufacturer = manufacturer
-                prod.last_seen = starttime
+            if helper and helper.model_numbers:
+                model_product.model_numbers = helper.model_numbers
 
-                device_type = DeviceType()
-                device_type.manufacturer = manufacturer
-                device_type.cpe = cpe
-                device_type.hardware_name = list_to_str(products)  # duplicate value
-                device_type.hardware_version = product_version
-                device_type.device_family = product.product_family
-                device_type.last_seen = starttime
+            if helper and helper.skus:
+                model_product.part_numbers = helper.skus
+            
+            if product_family := product.product_family:
+                model_product.device_family = product_family
 
-                if helper and helper.skus is not None and isinstance(helper.skus, list):
-                    device_type.part_number = helper.skus
+            if m_name := product.manufacturer:
+                model_product.manufacturer_name = m_name
 
-                if (
-                    helper
-                    and helper.model_numbers is not None
-                    and isinstance(helper.model_numbers, list)
-                ):
-                    device_type.model_number = helper.model_numbers
+            csaf_product = CsafProduct()
+            csaf_product.product = model_product
+            csaf_product.last_update = last_update
 
-                files = []
+            if document and document.host:
+                csaf_product.origin_uri = document.host
 
-                if helper and helper.hashes:
-                    for h in helper.hashes:
-                        hash = None
+            csaf_product.origin_info = {}
 
-                        if h.file_hash and h.file_hash.algorithm and h.file_hash.value:
-                            hash = Hash()
-                            hash.algorithm = h.file_hash.algorithm
-                            hash.value = h.file_hash.value
+            if document and document.path:
+                csaf_product.origin_info["path"] = document.path
+            
+            if document and document.version:
+                csaf_product.origin_info["version"] = document.version
 
-                        file = File()
-                        file.hash = hash
-                        file.filename = h.file_name
-                        files.append(file)
+            if document and document.publisher:
+                csaf_product.origin_info["publisher"] = document.publisher
+            
+            if document and document.lang:
+                csaf_product.origin_info["lang"] = document.lang
 
-                prod.device_type = device_type
-                prod.name = list_to_str(products)  # duplicate value
-                prod.last_seen = starttime
-                prod.files = files
+            csaf_full_product_list.append(csaf_product)
 
-                if (
-                    helper
-                    and helper.serial_numbers is not None
-                    and isinstance(helper.serial_numbers, list)
-                ):
-                    prod.serial = helper.serial_numbers
+    # for relationship in product_tree.relationships_list:
+    #     product_reference: Optional[CsafProduct] = None
+    #     relates_to_product_reference: Optional[CsafProduct] = None
 
-                csaf_product = CsafProduct()
-                csaf_product.product_name_id = product_name_id
-                csaf_product.product = prod
-                csaf_product_list.append(csaf_product)
+    #     for csaf_product in csaf_product_list:
+    #         if csaf_product.product_name == relationship.product_reference:
+    #             product_reference = csaf_product
 
-                csaf_product_tree = CsafProductTree()
-                csaf_product_tree.csaf_product = csaf_product
-                csaf_product_tree.csaf_document = csaf_document
-                csaf_full_product_list.append(csaf_product_tree)
+    #         if (
+    #             csaf_product.product_name
+    #             == relationship.relates_to_product_reference
+    #         ):
+    #             relates_to_product_reference = csaf_product
 
-    for relationship in product_tree.relationships_list:
-        product_reference: Optional[CsafProduct] = None
-        relates_to_product_reference: Optional[CsafProduct] = None
-
-        for csaf_product in csaf_product_list:
-            if csaf_product.product_name_id == relationship.product_reference:
-                product_reference = csaf_product
-
-            if (
-                csaf_product.product_name_id
-                == relationship.relates_to_product_reference
-            ):
-                relates_to_product_reference = csaf_product
-
-            if (
-                product_reference is not None
-                and relates_to_product_reference is not None
-            ):
-                relationship_value = CsafProductRelationship()
-                relationship_value.category = relationship.category
-                relationship_value.csaf_product_source = product_reference
-                relationship_value.csaf_product_target = relates_to_product_reference
-                csaf_full_product_list.append(relationship_value)
-                break
+    #         if (
+    #             product_reference is not None
+    #             and relates_to_product_reference is not None
+    #         ):
+    #             relationship_value = CsafProductRelationship()
+    #             relationship_value.category = relationship.category
+    #             relationship_value.csaf_product_source = product_reference
+    #             relationship_value.csaf_product_target = relates_to_product_reference
+    #             csaf_full_product_list.append(relationship_value)
+    #             break
 
     return csaf_full_product_list
 

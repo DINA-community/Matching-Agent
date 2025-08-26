@@ -1,9 +1,9 @@
 from typing import List
 
+from dina.cachedb.model import File, FileList
+
 from .datamodels import (
     ProductInfo,
-    FileHash,
-    Hash,
     ProductIdentificationHelper,
     ProductVersion,
     ProductVersionRange,
@@ -15,7 +15,7 @@ from .datamodels import (
 import copy
 
 
-async def get_csaf_product_tree(url, document, product_tree) -> CsafProductTree:
+async def get_csaf_product_tree(host, path, document, product_tree) -> CsafProductTree:
     if document is None or product_tree is None:
         return None
 
@@ -27,8 +27,11 @@ async def get_csaf_product_tree(url, document, product_tree) -> CsafProductTree:
     csaf_document = CsafDocument()
     product_list: List[List[ProductInfo]] = []
 
-    if url:
-        csaf_document.url = url
+    if host:
+        csaf_document.host = host
+
+    if path:
+        csaf_document.path = path
 
     if document and (title := document["title"]):
         csaf_document.title = title
@@ -72,20 +75,6 @@ async def get_csaf_product_tree(url, document, product_tree) -> CsafProductTree:
     )
 
 
-async def get_file_hash(file_hashes_value) -> FileHash:
-    file_hash = FileHash()
-    algorithm = file_hashes_value.get("algorithm")
-    value = file_hashes_value.get("value")
-
-    if algorithm is not None:
-        file_hash.algorithm = algorithm
-
-    if value is not None:
-        file_hash.value = value
-
-    return file_hash
-
-
 async def get_product_identification_helper(
     product_identification_helper_value,
 ) -> ProductIdentificationHelper:
@@ -102,17 +91,20 @@ async def get_product_identification_helper(
     serial_numbers = product_identification_helper_value.get("serial_numbers")
 
     if hashes_value is not None:
-        hashes = Hash()
-        filename = hashes_value.get("filename")
-        file_hashes_value = hashes_value.get("file_hashes")
+        files = FileList()
 
-        if filename is not None:
-            hashes.file_name = filename
+        for hash_value in hashes_value:
+            file = File()
+            file.name = hash_value.get("filename")
+            file_hashes_value = hash_value.get("file_hashes")
 
-        if file_hashes_value is not None:
-            hashes.file_hash = await get_file_hash(file_hashes_value)
+            if file_hashes_value is not None:
+                file.hash_algorithm = hash_value.get("algorithm")
+                file.file_hash = hash_value.get("value")
+            
+            files.files.append(file)
 
-        product_identification_helper.hashes = hashes
+        product_identification_helper.files = files
 
     if cpe is not None:
         product_identification_helper.cpe = cpe

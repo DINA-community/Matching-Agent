@@ -1,22 +1,12 @@
 from dataclasses import dataclass
 from typing import List, Optional
 
-
-@dataclass
-class FileHash:
-    algorithm: Optional[str] = None
-    value: Optional[str] = None
-
-
-@dataclass
-class Hash:
-    file_hash: Optional[FileHash] = None
-    file_name: Optional[str] = None
+from dina.cachedb.model import FileList
 
 
 @dataclass
 class ProductIdentificationHelper:
-    hashes: Optional[Hash] = None
+    files: Optional[FileList] = None
     cpe: Optional[str] = None
     purl: Optional[str] = None
     model_numbers: Optional[List[str]] = None
@@ -59,7 +49,8 @@ class ProductInfo:
 
 @dataclass
 class CsafDocument:
-    url: Optional[str] = None
+    host: Optional[str] = None
+    path: Optional[str] = None
     title: Optional[str] = None
     version: Optional[str] = None
     lang: Optional[str] = None
