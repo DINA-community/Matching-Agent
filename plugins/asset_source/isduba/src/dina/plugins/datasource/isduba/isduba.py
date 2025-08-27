@@ -80,6 +80,7 @@ class IsdubaDataSource(DataSourcePlugin):
                             all_new_data.extend(converted)
 
                     if all_new_data:
+                        # TODO: to be discussed
                         await self._add_data(all_new_data)
 
                     offset += limit
@@ -116,7 +117,8 @@ class IsdubaDataSource(DataSourcePlugin):
         configuration.verify_ssl = self.config.DataSource.Plugin.verify_ssl
 
         return configuration
-
+    
+    # TODO: to be discussed
     async def _add_data(self, data: list[Asset | CsafProduct]):
         """Insert fetched data into the cache database."""
         config = CacheDB.Config(
