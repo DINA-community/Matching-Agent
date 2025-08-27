@@ -119,7 +119,7 @@ class Product(Base):
         Enum(ProductType, name="product_type_enum"), default=ProductType.Undefined
     )
     name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    version: Mapped[Optional[List[str]]] = mapped_column(JSONB, nullable=True)
+    version: Mapped[List[str]] = mapped_column(JSONB, nullable=True)
     cpe: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     purl: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     sbom_urls: Mapped[List[str]] = mapped_column(JSONB, default=[])
@@ -131,7 +131,6 @@ class Product(Base):
     model_numbers: Mapped[Optional[List[str]]] = mapped_column(JSONB, nullable=True)
     part_numbers: Mapped[Optional[List[str]]] = mapped_column(JSONB, nullable=True)
     device_family: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    hardware_version: Mapped[Optional[List[str]]] = mapped_column(JSONB, nullable=True)
     hardware_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     manufacturer_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
@@ -164,7 +163,6 @@ class Product(Base):
             "model_numbers": self.model_numbers,
             "part_numbers": self.part_numbers,
             "device_family": self.device_family,
-            "hardware_version": self.hardware_version,
             "hardware_name": self.hardware_name,
             "manufacturer_name": self.manufacturer_name,
             "csaf_product_id": self.csaf_product_id,
