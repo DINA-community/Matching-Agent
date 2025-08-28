@@ -31,7 +31,7 @@ async def convert_into_database_format(
     for product_list in product_tree.product_list:
         for product in product_list:
             product_name_id, cpe_identifier, helper, product_version, products = (
-                await get_product_values(product)
+                await _get_product_values(product)
             )
 
             if product_name_id and "-fixed" in product_name_id:
@@ -50,8 +50,8 @@ async def convert_into_database_format(
             )
 
             csaf_product.product = Product(
-                product_type=determine_product_type(cpe_identifier, helper),
-                name=list_to_str(products),
+                product_type=_determine_product_type(cpe_identifier, helper),
+                name=_list_to_str(products),
                 version=product_version,
                 cpe=helper.cpe if helper and helper.cpe else None,
                 purl=helper.purl if helper and helper.purl else None,
@@ -148,7 +148,7 @@ def _update_product_fields(target: Product, source: Product) -> None:
     target.device_family = source.device_family
     target.manufacturer_name = source.manufacturer_name
 
-def determine_product_type(
+def _determine_product_type(
     cpe_identifier: Optional[str], helper: Optional[ProductIdentificationHelper]
 ) -> ProductType:
     """Determine product type based on CPE or helper info."""
@@ -170,7 +170,7 @@ def determine_product_type(
     return ProductType.Undefined
 
 
-async def get_product_values(
+async def _get_product_values(
     product: ProductInfo,
 ) -> Tuple[Optional[str], Optional[str], Optional[ProductIdentificationHelper], list[str], list[str]]:
     """Extract values like product_id, cpe, helper, versions and names from ProductInfo."""
@@ -190,7 +190,7 @@ async def get_product_values(
         product_name_id = product.product.product_id
         helper = product.product.product_identification_helper or helper
         if helper and helper.cpe:
-            cpe = extract_cpe_part(helper.cpe)
+            cpe = _extract_cpe_part(helper.cpe)
 
     return product_name_id, cpe, helper, product_version, products
 
@@ -211,12 +211,12 @@ def _extract_product_info(pv, helper, cpe):
     if pv.product and pv.product.product_identification_helper:
         helper = pv.product.product_identification_helper
         if helper.cpe:
-            cpe = extract_cpe_part(helper.cpe)
+            cpe = _extract_cpe_part(helper.cpe)
 
     return product_name_id, helper, cpe
 
 
-def extract_cpe_part(cpe: str) -> Optional[str]:
+def _extract_cpe_part(cpe: str) -> Optional[str]:
     """Extract the relevant part from a CPE string."""
     if not cpe or not isinstance(cpe, str):
         return None
@@ -234,6 +234,6 @@ def extract_cpe_part(cpe: str) -> Optional[str]:
     return None
 
 
-def list_to_str(values: list) -> Optional[str]:
+def _list_to_str(values: list) -> Optional[str]:
     """Join a list into a comma-separated string."""
     return ", ".join(values) if values else None
