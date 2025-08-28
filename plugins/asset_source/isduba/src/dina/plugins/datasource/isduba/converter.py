@@ -34,6 +34,9 @@ async def convert_into_database_format(
                 await get_product_values(product)
             )
 
+            if product_name_id and "-fixed" in product_name_id:
+                continue
+
             product_type = determine_product_type(cpe_identifier, helper)
 
             model_product = Product(
