@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
-    <data-source source="LOCAL" name="CacheDB" uuid="20f85dbc-9b44-4c18-a562-3484299f4489">
+    <data-source source="LOCAL" name="CacheDB" uuid="0375b8b7-b6fa-4eaf-8626-1231dbcb8d69">
       <driver-ref>postgresql</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>org.postgresql.Driver</jdbc-driver>

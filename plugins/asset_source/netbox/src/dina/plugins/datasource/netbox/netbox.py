@@ -1,3 +1,4 @@
+import asyncio
 import time
 from datetime import timezone
 from typing import List, Union
@@ -18,6 +19,9 @@ from dina.plugins.datasource.netbox.generated.api_client.api.dcim import (
     dcim_device_types_list,
     dcim_devices_list,
     dcim_manufacturers_list,
+)
+from dina.plugins.datasource.netbox.generated.api_client.api.plugins import (
+    plugins_d3c_software_list_list,
 )
 from dina.plugins.datasource.netbox.generated.api_client.models import (
     DeviceTypeCustomFields,
@@ -59,17 +63,35 @@ class NetboxDataSource(DataSourcePlugin):
 
         # We want to fetch all devices and device_types and manufacturers.
         # We then need to check if there were updates to only parts of an asset.
-        if devices_result := await dcim_devices_list.asyncio(
-            client=self.client, last_updated_gt=[last_run]
-        ):
+        (
+            devices_result,
+            software_results,
+            device_types_result,
+            manufacturers_result,
+        ) = await asyncio.gather(
+            dcim_devices_list.asyncio(client=self.client, last_updated_gt=[last_run]),
+            plugins_d3c_software_list_list.asyncio(
+                client=self.client, last_updated_gt=[last_run]
+            ),
+            dcim_device_types_list.asyncio(
+                client=self.client, last_updated_gt=[last_run]
+            ),
+            dcim_manufacturers_list.asyncio(
+                client=self.client, last_updated_gt=[last_run]
+            ),
+        )
+
+        if devices_result:
             devices = {device.id: device for device in devices_result.results}
         else:
             raise Exception("what dis")
 
-        if device_types_result := await dcim_device_types_list.asyncio(
-            client=self.client,
-            last_updated_gt=[last_run],
-        ):
+        if software_results:
+            software = {sw.id: sw for sw in software_results.results}
+        else:
+            raise Exception("what dis")
+
+        if device_types_result:
             device_types = {
                 device_type.id: device_type
                 for device_type in device_types_result.results
@@ -77,10 +99,7 @@ class NetboxDataSource(DataSourcePlugin):
         else:
             raise Exception("what dis")
 
-        if manufacturers_result := await dcim_manufacturers_list.asyncio(
-            client=self.client,
-            last_updated_gt=[last_run],
-        ):
+        if manufacturers_result:
             manufacturers = {
                 manufacturer.id: manufacturer
                 for manufacturer in manufacturers_result.results
@@ -88,9 +107,9 @@ class NetboxDataSource(DataSourcePlugin):
         else:
             raise Exception("what dis")
 
-        # TODO: Use query parameter to reduce request size?
-        # Extend the devices we need to update with devices that received an update to the manufacturer only.
+        # TODO: Maybe we can use graphql instead to reduce the amount of communication needed?
         if manufacturers:
+            # Extend the devices we need to update with devices that received an update to the manufacturer only.
             if devices_result := await dcim_devices_list.asyncio(
                 client=self.client,
                 manufacturer_id=list(manufacturers.keys()),
@@ -100,8 +119,14 @@ class NetboxDataSource(DataSourcePlugin):
                     if device.id not in devices:
                         devices[device.id] = device
 
-        # TODO: Use query parameter to reduce request size?
-        # TODO: Maybe we can also combine both these api calls with the query parameter?
+            if software_results := await plugins_d3c_software_list_list.asyncio(
+                client=self.client, id_n=list(software.keys())
+            ):
+                for sw in software_results.results:
+                    # TODO: The netbox api needs to support filtering on manufacturer_id
+                    if sw.id not in software and sw.manufacturer.id in manufacturers:
+                        software[sw.id] = sw
+
         # Extend the devices we need to update with devices that received an update to the device_type only.
         if device_types:
             if devices_result := await dcim_devices_list.asyncio(
@@ -149,13 +174,23 @@ class NetboxDataSource(DataSourcePlugin):
                         }
                     )
 
-        existing_assets = {
+        existing_device_assets = {
             asset.origin_info["device_id"]: asset
             for asset in await fetcher_view.get_existing(
                 Asset,
                 Asset.origin_info["device_id"]
                 .astext.cast(Integer)
                 .in_(list(devices.keys())),
+            )
+        }
+
+        existing_software_assets = {
+            sw.origin_info["software_id"]: sw
+            for sw in await fetcher_view.get_existing(
+                Asset,
+                Asset.origin_info["software_id"]
+                .astext.cast(Integer)
+                .in_(list(software.keys())),
             )
         }
 
@@ -170,7 +205,7 @@ class NetboxDataSource(DataSourcePlugin):
                 "manufacturer_id": manufacturer.id,
             }
 
-            if asset := existing_assets.get(device.id, None):
+            if asset := existing_device_assets.get(device.id, None):
                 asset.last_update = current_time
                 asset.origin_info = origin_info
             else:
@@ -197,7 +232,7 @@ class NetboxDataSource(DataSourcePlugin):
                 asset.product.hardware_name = (
                     device_type.custom_fields.additional_properties["hardware_name"]
                 )
-                asset.product.hardware_version = [
+                asset.product.version = [
                     device_type.custom_fields.additional_properties["hardware_version"]
                 ]
                 asset.product.device_family = (
@@ -206,6 +241,41 @@ class NetboxDataSource(DataSourcePlugin):
                 asset.product.cpe = device_type.custom_fields.additional_properties[
                     "cpe"
                 ]
+
+            asset.product.manufacturer_name = manufacturer.name
+            asset.children.append(asset)
+            assets.append(asset)
+
+        for sw in software.values():
+            logger.debug(f"Adding asset for device: {sw.name}")
+            manufacturer = manufacturers[sw.manufacturer.id]
+            origin_info = {
+                "software_id": sw.id,
+                "manufacturer_id": manufacturer.id,
+            }
+
+            if asset := existing_software_assets.get(sw.id, None):
+                asset.last_update = current_time
+                asset.origin_info = origin_info
+            else:
+                asset = Asset(
+                    product=Product(),
+                    last_update=current_time,
+                    origin_uri=self.origin_uri,
+                    origin_info=origin_info,
+                )
+
+            asset.product.product_type = ProductType.Software
+            if isinstance(sw.name, str):
+                asset.product.name = sw.name
+            if isinstance(sw.version, str):
+                asset.product.version = [sw.version]
+            if isinstance(sw.cpe, str):
+                asset.product.cpe = sw.cpe
+            if isinstance(sw.purl, str):
+                asset.product.purl = sw.purl
+            if isinstance(sw.sbom_urls, list):
+                asset.product.sbom_urls = sw.sbom_urls  # type: ignore
 
             asset.product.manufacturer_name = manufacturer.name
             asset.children.append(asset)
@@ -221,53 +291,6 @@ class NetboxDataSource(DataSourcePlugin):
         #         return "Software"
         #     else:
         #         return None
-        #
-        # results = []
-        #
-        # starttime = time.time()
-        # logger.info(f"START: {starttime}")
-        # results.append(AssetSynchronizer(last_run=starttime))
-        #
-        # response = await dcim_manufacturers_list.asyncio(client=self.client)
-        # for x in response.results:
-        #     results.append(Manufacturer(nb_id=x.id, name=x.name, last_seen=starttime))
-        #
-        # response = await dcim_device_types_list.asyncio(client=self.client)
-        # for x in response.results:
-        #     results.append(
-        #         DeviceType(
-        #             nb_id=x.id,
-        #             model=x.model,
-        #             model_number=[
-        #                 x.custom_fields.additional_properties["model_number"]
-        #             ],
-        #             part_number=[x.part_number],
-        #             hardware_name=x.custom_fields.additional_properties[
-        #                 "hardware_name"
-        #             ],
-        #             hardware_version=[
-        #                 x.custom_fields.additional_properties["hardware_version"]
-        #             ],
-        #             device_family=x.custom_fields.additional_properties[
-        #                 "device_family"
-        #             ],
-        #             cpe=x.custom_fields.additional_properties["cpe"],
-        #             nb_manu_id=x.manufacturer.id,
-        #             last_seen=starttime,
-        #         )
-        #     )
-        #
-        # response = await dcim_devices_list.asyncio(client=self.client)
-        # for x in response.results:
-        #     results.append(
-        #         Device(
-        #             nb_id=x.id,
-        #             name=x.name,
-        #             serial=[x.serial],
-        #             nb_devicetype_id=x.device_type.id,
-        #             last_seen=starttime,
-        #         )
-        #     )
         #
         # response = await plugins_d3c_software_list_list.asyncio(client=self.client)
         # for x in response.results:
