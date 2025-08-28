@@ -43,9 +43,6 @@ class IsdubaDataSource(DataSourcePlugin):
         """Fetch data from the data source and return it as a list of Assets or CsafDocuments."""
         config = IsdubaDataSource(self.config)
 
-        token = await self._get_token(config.origin_uri)
-        configuration = self._create_api_config(config.origin_uri, token)
-
         offset, limit = 0, 100
 
         while True:
