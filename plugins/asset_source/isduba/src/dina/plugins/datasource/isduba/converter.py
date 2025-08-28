@@ -25,8 +25,8 @@ async def convert_into_database_format(
 
     last_update = time.time()
     document: Document = product_tree.csaf_document
-    csaf_full_product_list: list[CsafProduct] = []
-    product_name_id_list: list[str] = []
+    csaf_products: list[CsafProduct] = []
+    product_name_ids: list[str] = []
 
     for product_list in product_tree.product_list:
         for product in product_list:
@@ -37,10 +37,20 @@ async def convert_into_database_format(
             if product_name_id and "-fixed" in product_name_id:
                 continue
 
-            product_type = determine_product_type(cpe_identifier, helper)
+            csaf_product = CsafProduct(
+                last_update=last_update,
+                origin_uri=document.host or None,
+                origin_info={
+                    "product_name_id": product_name_id,
+                    "path": getattr(document, "path", None),
+                    "version": getattr(document, "version", None),
+                    "publisher": getattr(document, "publisher", None),
+                    "lang": getattr(document, "lang", None),
+                },
+            )
 
-            model_product = Product(
-                product_type=product_type,
+            csaf_product.product = Product(
+                product_type=determine_product_type(cpe_identifier, helper),
                 name=list_to_str(products),
                 version=product_version,
                 cpe=helper.cpe if helper and helper.cpe else None,
@@ -54,65 +64,89 @@ async def convert_into_database_format(
                 manufacturer_name=product.manufacturer or None,
             )
 
-            csaf_product = CsafProduct(
-                product=model_product,
-                last_update=last_update,
-                origin_uri=document.host if document.host else None,
-                origin_info={
-                    "product_name_id": product_name_id,
-                    "path": getattr(document, "path", None),
-                    "version": getattr(document, "version", None),
-                    "publisher": getattr(document, "publisher", None),
-                    "lang": getattr(document, "lang", None),
-                },
-            )
-
-            product_name_id_list.append(product_name_id)
-            csaf_full_product_list.append(csaf_product)
+            product_name_ids.append(product_name_id)
+            csaf_products.append(csaf_product)
 
     existing_products = {
-        prod.origin_info["product_name_id"]: prod
+        (prod.origin_info.get("product_name_id"), prod.origin_info.get("path")): prod
         for prod in await fetcher_view.get_existing(
             CsafProduct,
-            CsafProduct.origin_info["product_name_id"].astext.in_(
-                product_name_id_list
-            ),
+            CsafProduct.origin_info["product_name_id"].astext.in_(product_name_ids),
         )
     }
-    existing_ids = set(existing_products.keys())
 
-    # TODO: relationship between the products
-    # for relationship in product_tree.relationships_list:
-    #     product_reference: Optional[CsafProduct] = None
-    #     relates_to_product_reference: Optional[CsafProduct] = None
+    deduped: dict[tuple[Optional[str], Optional[str]], CsafProduct] = {}
 
-    #     for csaf_product in csaf_full_product_list:
-    #         if csaf_product.origin_uri["product_name_id"] == relationship.product_reference:
-    #             product_reference = csaf_product
+    for prod in csaf_products:
+        key = (prod.origin_info.get("product_name_id"), prod.origin_info.get("path"))
+        if key in deduped:
+            _update_product_fields(deduped[key].product, prod.product)
+            deduped[key].origin_info.update(prod.origin_info)
+            deduped[key].last_update = prod.last_update
+        else:
+            deduped[key] = prod
 
-    #         if (
-    #             csaf_product.origin_uri["product_name_id"]
-    #             == relationship.relates_to_product_reference
-    #         ):
-    #             relates_to_product_reference = csaf_product
+    result: list[CsafProduct] = []
 
-    #         if (
-    #             product_reference is not None
-    #             and relates_to_product_reference is not None
-    #         ):
-    #             relationship_value = CsafProductRelationship()
-    #             relationship_value.category = relationship.category
-    #             relationship_value.csaf_product_source = product_reference
-    #             relationship_value.csaf_product_target = relates_to_product_reference
-    #             csaf_full_product_list.append(relationship_value)
-    #             break
+    for key, prod in deduped.items():
+        if key in existing_products:
+            existing = existing_products[key]
+            existing.last_update = prod.last_update
+            existing.origin_info.update(prod.origin_info)
 
-    return [
-        prod
-        for prod in csaf_full_product_list
-        if prod.origin_info.get("product_name_id") not in existing_ids
-    ]
+            if existing.product:
+                _update_product_fields(existing.product, prod.product)
+            else:
+                existing.product = prod.product
 
+            result.append(existing)
+        else:
+            result.append(prod)
+
+    return result
+
+#TODO: relationship between the products
+"""
+for relationship in product_tree.relationships_list:
+    product_reference: Optional[CsafProduct] = None
+    relates_to_product_reference: Optional[CsafProduct] = None
+
+    for csaf_product in csaf_full_product_list:
+        if csaf_product.origin_uri["product_name_id"] == relationship.product_reference:
+            product_reference = csaf_product
+
+        if (
+            csaf_product.origin_uri["product_name_id"]
+            == relationship.relates_to_product_reference
+        ):
+            relates_to_product_reference = csaf_product
+
+        if (
+            product_reference is not None
+            and relates_to_product_reference is not None
+        ):
+            relationship_value = CsafProductRelationship()
+            relationship_value.category = relationship.category
+            relationship_value.csaf_product_source = product_reference
+            relationship_value.csaf_product_target = relates_to_product_reference
+            csaf_full_product_list.append(relationship_value)
+            break
+"""
+
+def _update_product_fields(target: Product, source: Product) -> None:
+    """Update all relevant fields of a Product without overwriting the object itself."""
+    target.product_type = source.product_type
+    target.name = source.name
+    target.version = source.version
+    target.cpe = source.cpe
+    target.purl = source.purl
+    target.sbom_urls = source.sbom_urls
+    target.serial_numbers = source.serial_numbers
+    target.files = source.files
+    target.model_numbers = source.model_numbers
+    target.part_numbers = source.part_numbers
+    target.device_family = source.device_family
+    target.manufacturer_name = source.manufacturer_name
 
 def determine_product_type(
     cpe_identifier: Optional[str], helper: Optional[ProductIdentificationHelper]
