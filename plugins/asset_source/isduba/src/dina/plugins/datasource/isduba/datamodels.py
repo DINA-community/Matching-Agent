@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional
 
 from dina.cachedb.model import FileList
@@ -67,5 +67,5 @@ class Relationship:
 @dataclass
 class CsafProductTree:
     csaf_document: Optional[CsafDocument] = None
-    product_list: Optional[List[List[ProductInfo]]] = None
-    relationships_list: Optional[List[Relationship]] = None
+    product_list: List[List[ProductInfo]] = field(default_factory=list)
+    relationships_list: List[Relationship] = field(default_factory=list)

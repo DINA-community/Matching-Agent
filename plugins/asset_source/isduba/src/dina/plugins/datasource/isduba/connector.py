@@ -1,20 +1,23 @@
-from typing import List, Optional
 import copy
+from typing import List, Optional
 
 from dina.cachedb.model import File, FileList
+
 from .datamodels import (
-    ProductInfo,
-    ProductIdentificationHelper,
-    ProductVersion,
-    ProductVersionRange,
-    Product,
     CsafDocument,
     CsafProductTree,
+    Product,
+    ProductIdentificationHelper,
+    ProductInfo,
+    ProductVersion,
+    ProductVersionRange,
     Relationship,
 )
 
 
-async def get_csaf_product_tree(host: str, path: str, document: dict, product_tree: dict) -> Optional[CsafProductTree]:
+def get_csaf_product_tree(
+    host: str, path: str, document: dict, product_tree: dict
+) -> Optional[CsafProductTree]:
     """Convert raw CSAF document + product_tree into CsafProductTree."""
     if not document or not product_tree:
         return None
@@ -32,7 +35,7 @@ async def get_csaf_product_tree(host: str, path: str, document: dict, product_tr
         publisher=document.get("publisher", {}).get("name"),
     )
 
-    product_list = [await get_product_info(branch) for branch in branches]
+    product_list = [get_product_info(branch) for branch in branches]
 
     relationships_list: List[Relationship] = [
         Relationship(
@@ -50,7 +53,9 @@ async def get_csaf_product_tree(host: str, path: str, document: dict, product_tr
     )
 
 
-async def get_product_identification_helper(data: dict) -> Optional[ProductIdentificationHelper]:
+def get_product_identification_helper(
+    data: dict,
+) -> Optional[ProductIdentificationHelper]:
     """Build ProductIdentificationHelper from raw dict."""
     if not data:
         return None
@@ -65,7 +70,7 @@ async def get_product_identification_helper(data: dict) -> Optional[ProductIdent
     )
 
     hashes = data.get("hashes")
-    
+
     if hashes:
         files = FileList()
 
@@ -81,20 +86,22 @@ async def get_product_identification_helper(data: dict) -> Optional[ProductIdent
     return helper
 
 
-async def get_product_version(name: str, sub_branch: dict, as_range: bool = False) -> ProductVersion | ProductVersionRange:
+def get_product_version(
+    name: str, sub_branch: dict, as_range: bool = False
+) -> ProductVersion | ProductVersionRange:
     """Create a ProductVersion or ProductVersionRange object."""
     cls = ProductVersionRange if as_range else ProductVersion
     version_obj = cls(name=name)
 
     branch_product = sub_branch.get("product")
-    
+
     if branch_product:
-        version_obj.product = await get_product(branch_product)
+        version_obj.product = get_product(branch_product)
 
     return version_obj
 
 
-async def get_product(branch_product: dict) -> Product:
+def get_product(branch_product: dict) -> Product:
     """Convert product dict into Product model."""
     product = Product(
         name=branch_product.get("name"),
@@ -102,15 +109,17 @@ async def get_product(branch_product: dict) -> Product:
     )
 
     if helper := branch_product.get("product_identification_helper"):
-        product.product_identification_helper = await get_product_identification_helper(helper)
+        product.product_identification_helper = get_product_identification_helper(
+            helper
+        )
 
     return product
 
 
-async def get_product_info(sub_branch) -> List[ProductInfo]:
+def get_product_info(sub_branch) -> List[ProductInfo]:
     result: List[ProductInfo] = []
 
-    async def process_branch(current_branch, base_info: ProductInfo):
+    def process_branch(current_branch, base_info: ProductInfo):
         info = copy.deepcopy(base_info)
         category = current_branch.get("category")
         name = current_branch.get("name")
@@ -131,19 +140,21 @@ async def get_product_info(sub_branch) -> List[ProductInfo]:
             case "host_name":
                 info.host_name = name
             case "product_version_range":
-                info.product_version_range = await get_product_version(name, current_branch, as_range=True)
+                info.product_version_range = get_product_version(
+                    name, current_branch, as_range=True
+                )
             case "product_version":
-                info.product_version = await get_product_version(name, current_branch)
+                info.product_version = get_product_version(name, current_branch)
 
         if branch_product:
-            info.product = await get_product(branch_product)
+            info.product = get_product(branch_product)
 
         if sub_branches:
             for child in sub_branches:
-                await process_branch(child, info)
+                process_branch(child, info)
         else:
             result.append(info)
 
-    await process_branch(sub_branch, ProductInfo())
+    process_branch(sub_branch, ProductInfo())
 
     return result

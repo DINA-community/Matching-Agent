@@ -1,7 +1,7 @@
 import datetime
 import enum
 import logging
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import (
@@ -79,7 +79,7 @@ class File:
 
 @dataclass
 class FileList:
-    files: List[File]
+    files: List[File] = field(default_factory=list)
 
 
 class FileListType(TypeDecorator):

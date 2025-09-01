@@ -272,9 +272,14 @@ class BaseSynchronizer(ABC):
             ):
                 try:
                     fetcher_view = self.cache_db.fetcher_view(source.origin_uri)
-                    for datapoint in await source.fetch_data(fetcher_view):
-                        datapoint.origin_uri = source.origin_uri
-                        self.pending_data.append(datapoint)
+                    again = True
+                    while again:
+                        logger.debug(f"Fetching data from {source.debug_info()}")
+                        result = await source.fetch_data(fetcher_view)
+                        for datapoint in result.data:
+                            datapoint.origin_uri = source.origin_uri
+                            self.pending_data.append(datapoint)
+                        again = result.again
                     await fetcher_view.set_last_run(datetime.datetime.now())
                 except Exception as e:
                     logger.error(f"Error fetching data from {source.debug_info()}: {e}")

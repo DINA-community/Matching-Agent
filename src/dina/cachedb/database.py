@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import logging
 from typing import List, Optional, Type, Union
@@ -66,6 +67,7 @@ class CacheDB:
             return
 
         # Split data into assets and csaf_docs
+        logger.debug("Sorting items into new and to_update")
         new_data = [o for o in data if o.id is None]
         assets_to_update = [
             o for o in data if isinstance(o, Asset) and o.id is not None
@@ -73,6 +75,7 @@ class CacheDB:
         csaf_products_to_update = [
             o for o in data if isinstance(o, CsafProduct) and o.id is not None
         ]
+        logger.debug("Done sorting")
 
         async with AsyncSession(self.engine) as session:
             async with session.begin():
@@ -83,6 +86,7 @@ class CacheDB:
 
                 if csaf_products_to_update:
                     await self.__update(session, CsafProduct, csaf_products_to_update)
+        logger.info("Done storing")
 
     async def __update(
         self,
@@ -90,6 +94,22 @@ class CacheDB:
         ty: Type[Asset | CsafProduct],
         data: List[Asset] | List[CsafProduct],
     ):
+        chunk_size = 200
+        chunks = [data[i : i + chunk_size] for i in range(0, len(data), chunk_size)]
+
+        await asyncio.gather(
+            *[self.__update_chunk(session, ty, chunk) for chunk in chunks]
+        )
+
+    async def __update_chunk(
+        self,
+        session: AsyncSession,
+        ty: Type[Asset | CsafProduct],
+        data: List[Asset] | List[CsafProduct],
+    ):
+        if not data:
+            return
+
         stmt = insert(ty).values([d.to_dict() for d in data])
         stmt = stmt.on_conflict_do_update(
             index_elements=["id"], set_=dict(stmt.excluded)
@@ -107,7 +127,7 @@ class CacheDB:
             async with session.begin():
                 fetcher_view = self.fetcher_view(source.origin_uri)
                 last_run = await fetcher_view.last_run()
-                
+
                 if last_run.tzinfo is None:
                     last_run = last_run.replace(tzinfo=datetime.timezone.utc)
 

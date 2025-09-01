@@ -1,7 +1,7 @@
 import asyncio
 import time
 from datetime import timezone
-from typing import List, Union
+from typing import List
 
 from pydantic import BaseModel
 from sqlalchemy import Integer
@@ -26,7 +26,11 @@ from dina.plugins.datasource.netbox.generated.api_client.api.plugins import (
 from dina.plugins.datasource.netbox.generated.api_client.models import (
     DeviceTypeCustomFields,
 )
-from dina.synchronizer.plugin_base.data_source import CleanUpDecision, DataSourcePlugin
+from dina.synchronizer.plugin_base.data_source import (
+    CleanUpDecision,
+    DataSourcePlugin,
+    FetchDataResult,
+)
 
 logger = logging.get_logger(__name__)
 
@@ -57,7 +61,7 @@ class NetboxDataSource(DataSourcePlugin):
     async def fetch_data(
         self,
         fetcher_view: FetcherView,
-    ) -> List[Union[Asset, CsafProduct]]:
+    ) -> FetchDataResult:
         last_run = (await fetcher_view.last_run()).astimezone(tz=timezone.utc)
         current_time = time.time()
 
@@ -281,7 +285,7 @@ class NetboxDataSource(DataSourcePlugin):
             asset.children.append(asset)
             assets.append(asset)
 
-        return assets
+        return FetchDataResult(again=False, data=assets)
         # # In a real implementation, this would use the API URL and token to fetch data
         #
         # def find_cachedb_type(nb_type):

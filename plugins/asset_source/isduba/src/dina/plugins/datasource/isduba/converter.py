@@ -1,13 +1,11 @@
 import time
 from typing import Optional, Tuple
 
-from dina.cachedb.fetcher_view import FetcherView
-from dina.cachedb.model import CsafProduct, ProductType, Product
+from dina.cachedb.model import CsafProduct, Product, ProductType
 from dina.common import logging
-
-from .datamodels import (
-    CsafDocument as Document,
-    CsafProductTree as ProductTree,
+from dina.plugins.datasource.isduba.datamodels import (  # type: ignore
+    CsafDocument,
+    CsafProductTree,
     ProductIdentificationHelper,
     ProductInfo,
 )
@@ -15,24 +13,27 @@ from .datamodels import (
 logger = logging.get_logger(__name__)
 
 
-async def convert_into_database_format(
-    fetcher_view: FetcherView,
-    product_tree: ProductTree,
+def convert_into_database_format(
+    product_tree: CsafProductTree,
 ) -> list[CsafProduct]:
+    logger.debug("Converting CSAF product tree into database model objects.")
     """Convert CSAF product tree into database model objects."""
     if not product_tree.csaf_document:
         return []
 
     last_update = time.time()
-    document: Document = product_tree.csaf_document
+    document: CsafDocument = product_tree.csaf_document
     csaf_products: list[CsafProduct] = []
-    product_name_ids: list[str] = []
 
     for product_list in product_tree.product_list:
         for product in product_list:
-            product_name_id, cpe_identifier, helper, product_version, products = (
-                await _get_product_values(product)
-            )
+            (
+                product_name_id,
+                cpe_identifier,
+                helper,
+                product_version,
+                products,
+            ) = _get_product_values(product)
 
             if product_name_id and "-fixed" in product_name_id:
                 continue
@@ -64,16 +65,7 @@ async def convert_into_database_format(
                 manufacturer_name=product.manufacturer or None,
             )
 
-            product_name_ids.append(product_name_id)
             csaf_products.append(csaf_product)
-
-    existing_products = {
-        (prod.origin_info.get("product_name_id"), prod.origin_info.get("path")): prod
-        for prod in await fetcher_view.get_existing(
-            CsafProduct,
-            CsafProduct.origin_info["product_name_id"].astext.in_(product_name_ids),
-        )
-    }
 
     deduped: dict[tuple[Optional[str], Optional[str]], CsafProduct] = {}
 
@@ -86,26 +78,10 @@ async def convert_into_database_format(
         else:
             deduped[key] = prod
 
-    result: list[CsafProduct] = []
+    return [item for item in deduped.values()]
 
-    for key, prod in deduped.items():
-        if key in existing_products:
-            existing = existing_products[key]
-            existing.last_update = prod.last_update
-            existing.origin_info.update(prod.origin_info)
 
-            if existing.product:
-                _update_product_fields(existing.product, prod.product)
-            else:
-                existing.product = prod.product
-
-            result.append(existing)
-        else:
-            result.append(prod)
-
-    return result
-
-#TODO: relationship between the products
+# TODO: relationship between the products
 """
 for relationship in product_tree.relationships_list:
     product_reference: Optional[CsafProduct] = None
@@ -133,6 +109,7 @@ for relationship in product_tree.relationships_list:
             break
 """
 
+
 def _update_product_fields(target: Product, source: Product) -> None:
     """Update all relevant fields of a Product without overwriting the object itself."""
     target.product_type = source.product_type
@@ -148,42 +125,49 @@ def _update_product_fields(target: Product, source: Product) -> None:
     target.device_family = source.device_family
     target.manufacturer_name = source.manufacturer_name
 
+
 def _determine_product_type(
     cpe_identifier: Optional[str], helper: Optional[ProductIdentificationHelper]
 ) -> ProductType:
     """Determine product type based on CPE or helper info."""
-    if (
-        cpe_identifier in {"a", "o"}
-        or (helper and helper.purl and helper.purl.startswith("pkg:"))
+    if cpe_identifier in {"a", "o"} or (
+        helper and helper.purl and helper.purl.startswith("pkg:")
     ):
         return ProductType.Software
-    
-    if (
-        cpe_identifier == "h"
-        or any(
-            getattr(helper, field, None)
-            for field in ("serial_numbers", "model_numbers", "skus")
-        )
+
+    if cpe_identifier == "h" or any(
+        getattr(helper, field, None)
+        for field in ("serial_numbers", "model_numbers", "skus")
     ):
         return ProductType.Device
-    
+
     return ProductType.Undefined
 
 
-async def _get_product_values(
+def _get_product_values(
     product: ProductInfo,
-) -> Tuple[Optional[str], Optional[str], Optional[ProductIdentificationHelper], list[str], list[str]]:
+) -> Tuple[
+    Optional[str],
+    Optional[str],
+    Optional[ProductIdentificationHelper],
+    list[str],
+    list[str],
+]:
     """Extract values like product_id, cpe, helper, versions and names from ProductInfo."""
     product_name_id, cpe, helper = None, None, None
     product_version, products = [], []
 
     if product and product.product_version:
         _extract_from_version(product.product_version, product_version, products)
-        product_name_id, helper, cpe = _extract_product_info(product.product_version, helper, cpe)
+        product_name_id, helper, cpe = _extract_product_info(
+            product.product_version, helper, cpe
+        )
 
     if product and product.product_version_range:
         _extract_from_version(product.product_version_range, product_version, products)
-        product_name_id, helper, cpe = _extract_product_info(product.product_version_range, helper, cpe)
+        product_name_id, helper, cpe = _extract_product_info(
+            product.product_version_range, helper, cpe
+        )
 
     if product and product.product:
         products.append(product.product.name)
@@ -224,13 +208,13 @@ def _extract_cpe_part(cpe: str) -> Optional[str]:
 
     if len(parts) < 3:
         return None
-    
+
     if parts[1].startswith("/"):
         return parts[1].lstrip("/")
-    
+
     if parts[0] == "cpe":
         return parts[2]
-    
+
     return None
 
 
