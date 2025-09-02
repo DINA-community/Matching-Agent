@@ -16,7 +16,6 @@ logger = logging.get_logger(__name__)
 def convert_into_database_format(
     product_tree: CsafProductTree,
 ) -> list[CsafProduct]:
-    logger.debug("Converting CSAF product tree into database model objects.")
     """Convert CSAF product tree into database model objects."""
     if not product_tree.csaf_document:
         return []
