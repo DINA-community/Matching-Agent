@@ -13,6 +13,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./init-scripts:/docker-entrypoint-initdb.d
     restart: unless-stopped
+    shm_size: 1G
 
 
 volumes:

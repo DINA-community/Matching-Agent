@@ -4,6 +4,7 @@ from typing import Any, List
 
 import httpx
 from pydantic import BaseModel
+from sqlalchemy import and_
 
 from dina.cachedb.fetcher_view import FetcherView
 from dina.cachedb.model import Asset, CsafProduct
@@ -31,7 +32,7 @@ class IsdubaDataSource(DataSourcePlugin):
         config.DataSource.Plugin = IsdubaDataSource.Config.model_validate(
             config.DataSource.Plugin
         )
-        self.__limit = 1000
+        self.__limit = 500
         self.__offset = 0
         super().__init__(config)
         logging.get_logger("httpx").setLevel(logging.WARNING)
@@ -88,20 +89,47 @@ class IsdubaDataSource(DataSourcePlugin):
                         products.extend(product_list)
 
                 logger.info("Searching for duplicates")
-                existing_products = {
-                    (
-                        prod.origin_info.get("product_name_id"),
-                        prod.origin_info.get("path"),
-                    ): prod
-                    # Todo: Make this faster and use chunking for large amounts of products
-                    for prod in await fetcher_view.get_existing(
-                        CsafProduct,
-                        CsafProduct.origin_info["product_name_id"].astext.in_(
-                            [p.origin_info["product_name_id"] for p in products]
-                        ),
+                # Get all product name IDs from the new products
+                product_name_ids = [p.origin_info["product_name_id"] for p in products]
+                paths = [p.origin_info["path"] for p in products]
+
+                # Initialize dictionary to store existing products
+                existing_products = {}
+
+                # Process in batches
+                batch_size = 1000
+                batches = []
+                for i in range(0, len(product_name_ids), batch_size):
+                    logger.debug(
+                        f"Searching duplicates for batch {i} to {i + batch_size}"
                     )
-                }
-                logger.debug(f"Found {len(existing_products)} duplicates")
+                    product_id_batch = product_name_ids[i : i + batch_size]
+                    path_batch = paths[i : i + batch_size]
+                    batches.append(
+                        await fetcher_view.get_existing(
+                            CsafProduct,
+                            and_(
+                                CsafProduct.origin_info["product_name_id"].astext.in_(
+                                    product_id_batch
+                                ),
+                                CsafProduct.origin_info["path"].astext.in_(path_batch),
+                            ),
+                        )
+                    )
+
+                for batch in batches:
+                    # Add batch results to the existing_products dictionary
+                    existing_products.update(
+                        {
+                            (
+                                prod.origin_info.get("product_name_id"),
+                                prod.origin_info.get("path"),
+                            ): prod
+                            for prod in batch
+                        }
+                    )
+
+                logger.info(f"Found {len(existing_products)} duplicates")
 
                 for i, prod in enumerate(products):
                     if existing := existing_products.get(
@@ -206,7 +234,6 @@ def process_document(
     path = f"/api/documents/{doc_id}"
 
     assert isinstance(response, dict)
-    logger.debug(f"Processing document: {path}")
     product_tree = get_csaf_product_tree(
         origin_uri,
         path,
