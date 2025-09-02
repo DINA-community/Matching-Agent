@@ -15,7 +15,7 @@ from dina.plugins.datasource.isduba.converter import (
 )
 from dina.plugins.datasource.isduba.generated import isduba_api_client
 from dina.synchronizer.base import DataSourcePlugin
-from dina.synchronizer.plugin_base.data_source import FetchDataResult
+from dina.synchronizer.plugin_base.data_source import CleanUpDecision, FetchDataResult
 
 logger = logging.get_logger(__name__)
 
@@ -157,7 +157,9 @@ class IsdubaDataSource(DataSourcePlugin):
 
         return configuration
 
-    async def cleanup_data(self, data_to_check: List[Any]):
+    async def cleanup_data(
+        self, data_to_check: List[Asset | CsafProduct]
+    ) -> List[CleanUpDecision]:
         return []
 
     @property
