@@ -1,7 +1,16 @@
-import logging
+import logging as lg
 import os
 
 import colorlog
+
+CRITICAL = lg.CRITICAL  # type: ignore
+FATAL = lg.FATAL  # type: ignore
+ERROR = lg.ERROR  # type: ignore
+WARNING = lg.WARNING  # type: ignore
+WARN = lg.WARN  # type: ignore
+INFO = lg.INFO  # type: ignore
+DEBUG = lg.DEBUG  # type: ignore
+NOTSET = lg.NOTSET  # type: ignore
 
 
 def configure_logging():
@@ -13,15 +22,15 @@ def configure_logging():
     """
     # Get log level from environment variable, default to INFO
     TRACE_LEVEL = 5
-    logging.addLevelName(TRACE_LEVEL, "TRACE")
-    logging.TRACE = TRACE_LEVEL
+    lg.addLevelName(TRACE_LEVEL, "TRACE")
+    lg.TRACE = TRACE_LEVEL
 
     # Add trace method to all loggers
     def trace(self, message, *args, **kwargs):
         if self.isEnabledFor(TRACE_LEVEL):
             self._log(TRACE_LEVEL, message, args, **kwargs)
 
-    logging.Logger.trace = trace
+    lg.Logger.trace = trace
 
     log_level = os.getenv("LOG_LEVEL", "INFO").upper()
 
@@ -39,9 +48,9 @@ def configure_logging():
             },
         )
     )
-    logging.root.handlers.clear()
-    logging.root.addHandler(handler)
-    logging.root.setLevel(getattr(logging, log_level))
+    lg.root.handlers.clear()
+    lg.root.addHandler(handler)
+    lg.root.setLevel(getattr(lg, log_level))
 
 
 def get_logger(name):
@@ -54,4 +63,4 @@ def get_logger(name):
     Returns:
         logging.Logger: A configured logger instance
     """
-    return logging.getLogger(name)
+    return lg.getLogger(name)

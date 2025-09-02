@@ -34,6 +34,8 @@ class IsdubaDataSource(DataSourcePlugin):
         self.__limit = 1000
         self.__offset = 0
         super().__init__(config)
+        logging.get_logger("httpx").setLevel(logging.WARNING)
+        logging.get_logger("httpcore").setLevel(logging.WARNING)
 
     def endpoint_info(self) -> str:
         """Return information about the data source endpoint."""
@@ -86,7 +88,6 @@ class IsdubaDataSource(DataSourcePlugin):
                         products.extend(product_list)
 
                 logger.info("Searching for duplicates")
-                # Todo duplicates
                 existing_products = {
                     (
                         prod.origin_info.get("product_name_id"),
