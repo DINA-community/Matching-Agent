@@ -161,7 +161,38 @@ class IsdubaDataSource(DataSourcePlugin):
     async def cleanup_data(
         self, data_to_check: List[Asset | CsafProduct]
     ) -> List[CleanUpDecision]:
-        return []
+        logger.debug(f"Cleanup data: {data_to_check}")
+
+        csaf_items = [d for d in data_to_check if isinstance(d, CsafProduct)]
+
+        if not csaf_items:
+            return []
+
+        token = await self._get_token(self.origin_uri)
+        configuration = self._create_api_config(self.origin_uri, token)
+
+        async with isduba_api_client.ApiClient(configuration) as api_client:
+            api_instance = isduba_api_client.DefaultApi(api_client)
+
+            results = []
+
+            for d in csaf_items:
+                try:
+                    doc_id = int(d.origin_info["path"].removeprefix("/api/documents/"))
+                    document_result = await api_instance.documents_id_get(doc_id)
+
+                    results.append(
+                        CleanUpDecision(
+                            can_delete=document_result is None,
+                            id=d.id,
+                            ty=CsafProduct,
+                        )
+                    )
+                except Exception as e:
+                    logger.error(f"Error checking CSAF product {d.id}: {e}")
+                    raise
+
+        return results
 
     @property
     def origin_uri(self):
