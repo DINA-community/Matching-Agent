@@ -2,6 +2,7 @@ import datetime
 from typing import Any, Dict, List, Type
 
 from sqlalchemy import ColumnExpressionArgument, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from sqlalchemy.orm import joinedload, noload
 
@@ -75,6 +76,15 @@ class FetcherView:
                 origin_uri=self.__origin, plugin_metadata={}
             )
             session.add(db_metadata)
-        await session.commit()
-        await session.flush()
+            try:
+                await session.commit()
+                await session.flush()
+            except IntegrityError:
+                # Another process/thread created the record between our query and insert
+                # Roll back and query again
+                await session.rollback()
+                stmt = select(SynchronizerMetadata).where(
+                    SynchronizerMetadata.origin_uri == self.__origin
+                )
+                db_metadata = (await session.execute(stmt)).scalar_one()
         return db_metadata
