@@ -57,12 +57,14 @@ class FetcherView:
 
     async def last_run(self) -> datetime.datetime:
         async with AsyncSession(self.__engine) as session:
-            return await (await self.__get_meta(session)).awaitable_attrs.last_run
+            return (
+                await (await self.__get_meta(session)).awaitable_attrs.last_run
+            ).replace(tzinfo=datetime.timezone.utc)
 
     async def set_last_run(self, last_run: datetime.datetime):
         async with AsyncSession(self.__engine) as session:
             metadata = await self.__get_meta(session)
-            metadata.last_run = last_run
+            metadata.last_run = last_run.astimezone(tz=datetime.timezone.utc)
             await session.merge(metadata)
             await session.commit()
 
