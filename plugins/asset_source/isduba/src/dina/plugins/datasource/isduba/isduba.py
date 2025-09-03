@@ -1,5 +1,6 @@
 import asyncio
 import concurrent.futures
+from datetime import datetime, timezone
 from typing import Any, List
 
 import httpx
@@ -49,8 +50,20 @@ class IsdubaDataSource(DataSourcePlugin):
         async with isduba_api_client.ApiClient(configuration) as api_client:
             api_instance = isduba_api_client.DefaultApi(api_client)
             try:
+                last_run = await fetcher_view.last_run()
+
+                if last_run.tzinfo is None:
+                    last_run = last_run.replace(tzinfo=timezone.utc)
+
+                last_run = last_run.astimezone(tz=timezone.utc)
+
+                query = f"$current_release_date {last_run.isoformat()} timestamp >= $current_release_date {datetime.now(timezone.utc).isoformat()} timestamp <="
+
                 api_response = await api_instance.documents_get(
-                    limit=self.__limit, offset=self.__offset
+                    limit=self.__limit, 
+                    offset=self.__offset,
+                    query=query,
+                    orders="-critical"
                 )
 
                 if not api_response.documents:
