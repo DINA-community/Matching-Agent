@@ -144,7 +144,7 @@ class CacheDB:
                     data.extend(list(asset_results.scalars().all()))
 
                 csaf_stmt = select(CsafProduct).where(
-                    CsafProduct.last_update < stale_timestamp
+                    CsafProduct.last_update > stale_timestamp
                 )
                 csaf_results = await session.execute(csaf_stmt)
 
