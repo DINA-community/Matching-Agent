@@ -182,6 +182,9 @@ csaf_product_relationship = Table(
     Column(
         "child_id", Integer, ForeignKey("cacheDB.csaf_product.id"), primary_key=True
     ),
+    Column("origin_uri", Text, nullable=False),
+    Column("origin_info", JSONB, default={}),
+    Column("last_update", Float, nullable=False, default=0.0),
 )
 
 
@@ -231,6 +234,9 @@ product_relationship = Table(
     Base.metadata,
     Column("parent_id", Integer, ForeignKey("cacheDB.asset.id"), primary_key=True),
     Column("child_id", Integer, ForeignKey("cacheDB.asset.id"), primary_key=True),
+    Column("origin_uri", Text, nullable=False),
+    Column("origin_info", JSONB, default={}),
+    Column("last_update", Float, nullable=False, default=0.0),
 )
 
 

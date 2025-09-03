@@ -24,7 +24,7 @@ class SampleDataSource(DataSourcePlugin):
         """Return information about the data source endpoint."""
         return "http://endpoint.sample.com/"
 
-    async def fetch_data(
+    async def fetch_products(
         self, fetcher_view: FetcherView
     ) -> List[Union[Asset, CsafProduct]]:
         """Fetch data from the data source and return it as a list of Assets or CsafProducts."""
@@ -42,5 +42,5 @@ class SampleDataSource(DataSourcePlugin):
     def origin_uri(self) -> str:
         return "http://endpoint.sample.com/"
 
-    async def cleanup_data(self, data_to_check: List[Any]):
+    async def cleanup_products(self, data_to_check: List[Any]):
         pass

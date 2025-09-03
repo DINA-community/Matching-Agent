@@ -21,6 +21,7 @@ from dina.plugins.datasource.netbox.generated.api_client.api.dcim import (
     dcim_manufacturers_list,
 )
 from dina.plugins.datasource.netbox.generated.api_client.api.plugins import (
+    plugins_d3c_productrelationship_list_list,
     plugins_d3c_software_list_list,
 )
 from dina.plugins.datasource.netbox.generated.api_client.models import (
@@ -29,7 +30,11 @@ from dina.plugins.datasource.netbox.generated.api_client.models import (
 from dina.synchronizer.plugin_base.data_source import (
     CleanUpDecision,
     DataSourcePlugin,
-    FetchDataResult,
+    FetchProductsResult,
+    FetchRelationshipsResult,
+    MappedRelationship,
+    ProductId,
+    Relationship,
 )
 
 logger = logging.get_logger(__name__)
@@ -58,17 +63,11 @@ class NetboxDataSource(DataSourcePlugin):
             f"Initialized NetboxDataSource with API URL: {self.config.DataSource.Plugin.api_url}"
         )
 
-    async def fetch_data(
+    async def fetch_products(
         self,
         fetcher_view: FetcherView,
-    ) -> FetchDataResult:
-        last_run = await fetcher_view.last_run()
-
-        if last_run.tzinfo is None:
-            last_run = last_run.replace(tzinfo=timezone.utc)
-
-        last_run = last_run.astimezone(tz=timezone.utc)
-        
+    ) -> FetchProductsResult:
+        last_run = (await fetcher_view.last_run()).astimezone(tz=timezone.utc)
         current_time = time.time()
 
         # We want to fetch all devices and device_types and manufacturers.
@@ -253,7 +252,6 @@ class NetboxDataSource(DataSourcePlugin):
                 ]
 
             asset.product.manufacturer_name = manufacturer.name
-            asset.children.append(asset)
             assets.append(asset)
 
         for sw in software.values():
@@ -288,10 +286,9 @@ class NetboxDataSource(DataSourcePlugin):
                 asset.product.sbom_urls = sw.sbom_urls  # type: ignore
 
             asset.product.manufacturer_name = manufacturer.name
-            asset.children.append(asset)
             assets.append(asset)
 
-        return FetchDataResult(again=False, data=assets)
+        return FetchProductsResult(again=False, data=assets)
         # # In a real implementation, this would use the API URL and token to fetch data
         #
         # def find_cachedb_type(nb_type):
@@ -302,20 +299,6 @@ class NetboxDataSource(DataSourcePlugin):
         #     else:
         #         return None
         #
-        # response = await plugins_d3c_software_list_list.asyncio(client=self.client)
-        # for x in response.results:
-        #     results.append(
-        #         Software(
-        #             nb_id=x.id,
-        #             name=x.name,
-        #             nb_manu_id=x.manufacturer.id,
-        #             version=[x.version],
-        #             cpe=x.cpe,
-        #             purl=x.purl,
-        #             sbom_urls=x.sbom_urls,
-        #             last_seen=starttime,
-        #         )
-        #     )
         #
         # response = await plugins_d3c_hash_list_list.asyncio(client=self.client)
         # for x in response.results:
@@ -363,7 +346,104 @@ class NetboxDataSource(DataSourcePlugin):
         # await asyncio.sleep(10)
         # return results
 
-    async def cleanup_data(
+    async def fetch_relationships(
+        self, fetcher_view: FetcherView
+    ) -> FetchRelationshipsResult:
+        last_run = (await fetcher_view.last_run()).astimezone(tz=timezone.utc)
+
+        if response := await plugins_d3c_productrelationship_list_list.asyncio(
+            client=self.client,
+            last_updated_gt=[last_run],
+        ):
+            return FetchRelationshipsResult(
+                again=False,
+                data=[
+                    Relationship(
+                        parent=ProductId(
+                            relation.source_id, find_cachedb_type(relation.source_type)
+                        ),
+                        child=ProductId(
+                            relation.destination_id,
+                            find_cachedb_type(relation.destination_type),
+                        ),
+                        ty=Asset,
+                    )
+                    for relation in response.results
+                ],
+            )
+
+        return FetchRelationshipsResult(again=False)
+
+    async def map_relationships(
+        self, fetcher_view: FetcherView, relations: List[Relationship]
+    ) -> List[MappedRelationship]:
+        device_ids = set()
+        software_ids = set()
+        for relation in relations:
+            match relation.parent.product_type:
+                case ProductType.Device:
+                    device_ids.add(relation.parent.id)
+                case ProductType.Software:
+                    software_ids.add(relation.parent.id)
+                case _:
+                    raise RuntimeError("Invalid device type")
+            match relation.child.product_type:
+                case ProductType.Device:
+                    device_ids.add(relation.child.id)
+                case ProductType.Software:
+                    software_ids.add(relation.child.id)
+                case _:
+                    raise RuntimeError("Invalid device type")
+
+        devices = {
+            device.origin_info["device_id"]: device.id
+            for device in await fetcher_view.get_existing(
+                Asset,
+                Asset.origin_info["device_id"]
+                .astext.cast(Integer)
+                .in_(list(device_ids)),
+            )
+        }
+        software = {
+            software.origin_info["software_id"]: software.id
+            for software in await fetcher_view.get_existing(
+                Asset,
+                Asset.origin_info["software_id"]
+                .astext.cast(Integer)
+                .in_(list(software_ids)),
+            )
+        }
+
+        mapped = []
+
+        for relation in relations:
+            match relation.parent.product_type:
+                case ProductType.Device:
+                    parent_id = devices[relation.parent.id]
+                case ProductType.Software:
+                    parent_id = software[relation.parent.id]
+                case _:
+                    raise RuntimeError(
+                        f"Relation parent {relation.parent.id} has unknown type"
+                    )
+            match relation.child.product_type:
+                case ProductType.Device:
+                    child_id = devices[relation.child.id]
+                case ProductType.Software:
+                    child_id = software[relation.child.id]
+                case _:
+                    raise RuntimeError(
+                        f"Relation child {relation.child.id} has unknown type"
+                    )
+
+            mapped.append(
+                MappedRelationship(parent=parent_id, child=child_id, ty=Asset)
+            )
+
+        unique_mapped = {(m.parent, m.child): m for m in mapped}
+        return list(unique_mapped.values())
+
+    async def cleanup_products(
         self, data_to_check: List[Asset | CsafProduct]
     ) -> List[CleanUpDecision]:
         logger.debug(f"Cleanup data: {data_to_check}")
@@ -373,9 +453,26 @@ class NetboxDataSource(DataSourcePlugin):
             CleanUpDecision(can_delete=False, id=d.id, ty=Asset) for d in data_to_check
         ]
 
+    async def cleanup_relationships(
+        self, relationships_to_check: List[Relationship]
+    ) -> List[Relationship]:
+        return relationships_to_check
+
     @property
     def origin_uri(self):
         return self.config.DataSource.Plugin.api_url
 
     def endpoint_info(self) -> str:
         return f"{self.config.DataSource.Plugin.api_url}"
+
+
+def find_cachedb_type(netbox_type) -> ProductType:
+    """
+    Determines the ProductType corresponding to the given NetBox type.
+    """
+    if netbox_type == "dcim.device":
+        return ProductType.Device
+    elif netbox_type == "d3c.software":
+        return ProductType.Software
+    else:
+        return ProductType.Undefined

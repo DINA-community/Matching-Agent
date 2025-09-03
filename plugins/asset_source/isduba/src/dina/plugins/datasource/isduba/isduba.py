@@ -17,7 +17,10 @@ from dina.plugins.datasource.isduba.converter import (
 )
 from dina.plugins.datasource.isduba.generated import isduba_api_client
 from dina.synchronizer.base import DataSourcePlugin
-from dina.synchronizer.plugin_base.data_source import CleanUpDecision, FetchDataResult
+from dina.synchronizer.plugin_base.data_source import (
+    CleanUpDecision,
+    FetchProductsResult,
+)
 
 logger = logging.get_logger(__name__)
 
@@ -43,7 +46,7 @@ class IsdubaDataSource(DataSourcePlugin):
         """Return information about the data source endpoint."""
         return self.config.DataSource.Plugin.url
 
-    async def fetch_data(self, fetcher_view: FetcherView) -> FetchDataResult:
+    async def fetch_products(self, fetcher_view: FetcherView) -> FetchProductsResult:
         """Fetch data from the data source and return it as a list of Assets or CsafDocuments."""
         token = await self._get_token(self.origin_uri)
         configuration = self._create_api_config(self.origin_uri, token)
@@ -70,7 +73,7 @@ class IsdubaDataSource(DataSourcePlugin):
                     # If there are no more results, we reset the offset to zero and return an empty list
                     # The fetcher will be called for the next syncing interval and can start from offset 0
                     self.__offset = 0
-                    return FetchDataResult(again=False)
+                    return FetchProductsResult(again=False)
 
                 products: list[Asset | CsafProduct] = []
 
@@ -159,14 +162,14 @@ class IsdubaDataSource(DataSourcePlugin):
                 self.__offset += self.__limit
                 if products:
                     logger.info(f"Fetched {len(products)} products")
-                    return FetchDataResult(again=True, data=products)
+                    return FetchProductsResult(again=True, data=products)
 
             except Exception as e:
                 raise Exception(
                     f"Exception when calling DefaultApi->documents_get:\n\n{e}"
                 )
 
-        return FetchDataResult(again=False)
+        return FetchProductsResult(again=False)
 
     async def _get_token(self, origin_uri: str) -> str:
         """Retrieve an access token via Keycloak."""
@@ -199,7 +202,7 @@ class IsdubaDataSource(DataSourcePlugin):
 
         return configuration
 
-    async def cleanup_data(
+    async def cleanup_products(
         self, data_to_check: List[Asset | CsafProduct]
     ) -> List[CleanUpDecision]:
         logger.debug(f"Cleanup data: {data_to_check}")

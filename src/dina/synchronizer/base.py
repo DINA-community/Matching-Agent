@@ -14,17 +14,19 @@ import time
 import tomllib
 import traceback
 from abc import ABC
+from collections import defaultdict
 from importlib.metadata import EntryPoints, entry_points
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import uvicorn
 from fastapi import FastAPI
 from pydantic import BaseModel
 
 from dina.cachedb.database import CacheDB
+from dina.cachedb.fetcher_view import FetcherView
 from dina.cachedb.model import Asset, CsafProduct
-from dina.synchronizer.plugin_base.data_source import DataSourcePlugin
+from dina.synchronizer.plugin_base.data_source import DataSourcePlugin, Relationship
 from dina.synchronizer.plugin_base.preprocessor import PreprocessorPlugin
 
 # Set up logging
@@ -71,12 +73,13 @@ class BaseSynchronizer(ABC):
         """
         self.__last_synchronization: Optional[float] = None
         self.cache_db: CacheDB = cache_db
-        self.pending_data: List[Union[Asset, CsafProduct]] = []
-        self.preprocessed_data: List[Union[Asset, CsafProduct]] = []
+        self.pending_products: List[Asset | CsafProduct] = []
+        self.pending_relationships: Dict[str, List[Relationship]] = defaultdict(list)
+        self.preprocessed_data: List[Asset | CsafProduct] = []
         self.config_file: Path = config_file
         self.config: SynchronizerConfig = self.load_config(config_file)
 
-        self.data_sources: List[DataSourcePlugin] = self.__load_datasource_plugins(
+        self.data_sources: Dict[str, DataSourcePlugin] = self.__load_datasource_plugins(
             data_source_plugin_configs
         )
         self.preprocessor_plugins = self.__load_preprocessor_plugins(
@@ -143,7 +146,7 @@ class BaseSynchronizer(ABC):
             return SynchronizerConfig.model_validate(tomllib.load(f))
 
     @staticmethod
-    def __load_datasource_plugins(plugin_configs: Path) -> List[DataSourcePlugin]:
+    def __load_datasource_plugins(plugin_configs: Path) -> Dict[str, DataSourcePlugin]:
         """
         Load plugins from configuration files in the specified directory.
 
@@ -164,7 +167,7 @@ class BaseSynchronizer(ABC):
                 f"Plugin configuration directory not found: {plugin_configs}"
             )
 
-        plugins: List[DataSourcePlugin] = []
+        plugins: Dict[str, DataSourcePlugin] = {}
 
         # Scan the directory for TOML files
         for config_file in plugin_configs.glob("*.toml"):
@@ -188,7 +191,11 @@ class BaseSynchronizer(ABC):
                         f"Plugin {plugin_name} is a preprocessor plugin, not a data source plugin"
                     )
                 else:
-                    plugins.append(plugin_instance)
+                    if plugin_instance.origin_uri in plugins:
+                        raise PluginLoadError(
+                            "Found duplicate origins for plugins. It is not allowed to synchronize with the same api endpoint twice"
+                        )
+                    plugins[plugin_instance.origin_uri] = plugin_instance
 
                 logger.info(
                     f"Successfully loaded plugin: {plugin_name} with config: {config_file}"
@@ -197,16 +204,6 @@ class BaseSynchronizer(ABC):
             except Exception as e:
                 logger.error(f"Error loading plugin from {config_file}: {e}")
                 raise e
-
-        # Check if all origins are unique
-        seen_origins = set()
-        for plugin in plugins:
-            if plugin.origin_uri in seen_origins:
-                raise PluginLoadError(
-                    "Found duplicate origins for plugins. It is not allowed to synchronize with the same api endpoint twice"
-                )
-            else:
-                seen_origins.add(plugin.origin_uri)
 
         return plugins
 
@@ -251,7 +248,7 @@ class BaseSynchronizer(ABC):
             async with asyncio.TaskGroup() as tg:
                 tg.create_task(self.__api_client())
                 logger.info(f"Starting {len(self.data_sources)} data fetching tasks:")
-                for source in self.data_sources:
+                for source in self.data_sources.values():
                     logger.info(f"Creating task for {source.debug_info()}")
                     tg.create_task(self.fetch_data_task(source))
                     tg.create_task(self.cleanup_task(source))
@@ -272,14 +269,8 @@ class BaseSynchronizer(ABC):
             ):
                 try:
                     fetcher_view = self.cache_db.fetcher_view(source.origin_uri)
-                    again = True
-                    while again:
-                        logger.debug(f"Fetching data from {source.debug_info()}")
-                        result = await source.fetch_data(fetcher_view)
-                        for datapoint in result.data:
-                            datapoint.origin_uri = source.origin_uri
-                            self.pending_data.append(datapoint)
-                        again = result.again
+                    await self.fetch_products(fetcher_view, source)
+                    await self.fetch_relationships(fetcher_view, source)
                     await fetcher_view.set_last_run(datetime.datetime.now())
                 except Exception as e:
                     logger.error(f"Error fetching data from {source.debug_info()}: {e}")
@@ -289,15 +280,35 @@ class BaseSynchronizer(ABC):
             else:
                 await asyncio.sleep(1)
 
+    async def fetch_products(self, fetcher_view: FetcherView, source: DataSourcePlugin):
+        again = True
+        while again:
+            logger.debug(f"Fetching data from {source.debug_info()}")
+            result = await source.fetch_products(fetcher_view)
+            for datapoint in result.data:
+                datapoint.origin_uri = source.origin_uri
+                self.pending_products.append(datapoint)
+            again = result.again
+
+    async def fetch_relationships(
+        self, fetcher_view: FetcherView, source: DataSourcePlugin
+    ):
+        again = True
+        while again:
+            logger.debug(f"Fetching relationships from {source.debug_info()}")
+            result = await source.fetch_relationships(fetcher_view)
+            self.pending_relationships[source.origin_uri].extend(result.data)
+            again = result.again
+
     async def preprocess_data_task(self):
         """Process data using the loaded preprocessor plugins."""
         assert self.preprocessor_plugins, "No preprocessor plugins loaded"
         while True:
-            if self.pending_data:
-                logger.info(f"Preprocessing {len(self.pending_data)} items")
+            if self.pending_products:
+                logger.info(f"Preprocessing {len(self.pending_products)} items")
 
                 # Process data through each preprocessor plugin in sequence
-                processed_data = self.pending_data
+                processed_data = self.pending_products
                 for plugin in self.preprocessor_plugins:
                     logger.info(
                         f"Applying preprocessor plugin: {plugin.__class__.__name__}"
@@ -306,18 +317,36 @@ class BaseSynchronizer(ABC):
 
                 self.preprocessed_data.extend(processed_data)
 
-                self.pending_data.clear()
+                self.pending_products.clear()
             else:
                 await asyncio.sleep(0.1)
 
     async def store_data_task(self):
         """Store the preprocessed data."""
         while True:
-            if self.preprocessed_data:
+            if self.preprocessed_data or any(self.pending_relationships.values()):
                 logger.info(f"Storing {len(self.preprocessed_data)} items in cacheDB")
-                await self.cache_db.store(self.preprocessed_data)
-                # await self.cache_db.check_delete()
-                self.preprocessed_data.clear()
+                data = self.preprocessed_data
+                self.preprocessed_data = []
+                mapped_relations = []
+                for origin_uri in self.pending_relationships.keys():
+                    fetcher_view = self.cache_db.fetcher_view(origin_uri)
+                    relations = self.pending_relationships[origin_uri]
+                    self.pending_relationships[origin_uri] = []
+
+                    def extend_origin(relation):
+                        relation.origin_uri = origin_uri
+                        return relation
+
+                    mapped_relations.extend(
+                        map(
+                            extend_origin,
+                            await self.data_sources[origin_uri].map_relationships(
+                                fetcher_view, relations
+                            ),
+                        )
+                    )
+                await self.cache_db.store(data, mapped_relations)
             else:
                 await asyncio.sleep(0.1)
 

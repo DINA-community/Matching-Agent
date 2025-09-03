@@ -5,7 +5,7 @@ from typing import Any, List, Type
 from pydantic import BaseModel
 
 from dina.cachedb.fetcher_view import FetcherView
-from dina.cachedb.model import Asset, CsafProduct
+from dina.cachedb.model import Asset, CsafProduct, ProductType
 
 
 class DataSourceConfig(BaseModel):
@@ -23,7 +23,47 @@ class CleanUpDecision:
 
 
 @dataclass
-class FetchDataResult:
+class ProductId:
+    id: Any
+    product_type: ProductType
+
+
+@dataclass
+class Relationship:
+    """
+    Represents a relationship between a parent and a child entity along with metadata.
+
+    This class is used for managing relationships between entities such as assets or
+    csaf products. It encapsulates the IDs of the parent and child entities, the type of
+    the relationship, and whether the relationship can be deleted.
+
+    :ivar parent: The ID of the parent entity.
+    :ivar child: The ID of the child entity.
+    :ivar ty: The type of relationship, which may involve an Asset or CsafProduct.
+    """
+
+    parent: ProductId
+    child: ProductId
+    ty: Type[Asset | CsafProduct]
+
+
+@dataclass
+class MappedRelationship:
+    parent: int
+    child: int
+    ty: Type[Asset | CsafProduct]
+    origin_uri: str = ""
+    can_delete: bool = False
+
+
+@dataclass
+class FetchRelationshipsResult:
+    again: bool
+    data: List[Relationship] = field(default_factory=list)
+
+
+@dataclass
+class FetchProductsResult:
     """Result object containing fetched data and fetch continuation flag.
 
     Attributes:
@@ -51,8 +91,8 @@ class DataSourcePlugin(ABC):
         self.config = config
 
     @abstractmethod
-    async def fetch_data(self, fetcher_view: FetcherView) -> FetchDataResult:
-        """Fetch data from the external data source.
+    async def fetch_products(self, fetcher_view: FetcherView) -> FetchProductsResult:
+        """Fetch products associated with assets or csaf documents from the external data source.
 
         This method is responsible for retrieving data from the external source
         and converting it into the internal data model format.
@@ -66,10 +106,26 @@ class DataSourcePlugin(ABC):
         ...
 
     @abstractmethod
-    async def cleanup_data(
+    async def fetch_relationships(
+        self, fetcher_view: FetcherView
+    ) -> FetchRelationshipsResult:
+        """
+        Fetch relationships associated with assets or csaf documents from the external data source.
+        """
+        ...
+
+    @abstractmethod
+    async def map_relationships(
+        self, fetcher_view: FetcherView, relations: List[Relationship]
+    ) -> List[MappedRelationship]:
+        """Maps the plugin-internal ids of the relationships to the core asset or csaf-product ids."""
+        ...
+
+    @abstractmethod
+    async def cleanup_products(
         self, data_to_check: List[Asset | CsafProduct]
     ) -> List[CleanUpDecision]:
-        """Determine which stale data items should be deleted.
+        """Determine which stale products should be deleted.
 
         Args:
             data_to_check: List of stale data items to evaluate for cleanup.
@@ -81,6 +137,13 @@ class DataSourcePlugin(ABC):
                 - id: The ID of the data item
                 - ty: The type of the data item (Asset or CsafProduct)
         """
+        ...
+
+    @abstractmethod
+    async def cleanup_relationships(
+        self, relationships_to_check: List[Relationship]
+    ) -> List[Relationship]:
+        """Determine which stale relationships should be deleted."""
         ...
 
     def debug_info(self) -> str:

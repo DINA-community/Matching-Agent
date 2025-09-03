@@ -19,8 +19,13 @@ from dina.cachedb.model import (
     Base,
     CsafProduct,
     Product,
+    csaf_product_relationship,
+    product_relationship,
 )
-from dina.synchronizer.plugin_base.data_source import DataSourcePlugin
+from dina.synchronizer.plugin_base.data_source import (
+    DataSourcePlugin,
+    MappedRelationship,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +56,11 @@ class CacheDB:
         else:
             raise Exception("Database not connected")
 
-    async def store(self, data: List[Union[Asset, CsafProduct]]) -> None:
+    async def store(
+        self,
+        data: List[Union[Asset, CsafProduct]],
+        relationships: List[MappedRelationship],
+    ) -> None:
         """
         Stores a list of assets or CSAF documents into the database. This function ensures
         the provided data is added to the database in a single transaction using the
@@ -63,7 +72,7 @@ class CacheDB:
 
         :return: None
         """
-        if not data:
+        if not data and not relationships:
             return
 
         # Split data into assets and csaf_docs
@@ -74,6 +83,10 @@ class CacheDB:
         ]
         csaf_products_to_update = [
             o for o in data if isinstance(o, CsafProduct) and o.id is not None
+        ]
+        product_relations_to_update = [o for o in relationships if o.ty == Asset]
+        csaf_product_relations_to_update = [
+            o for o in relationships if o.ty == CsafProduct
         ]
         logger.debug("Done sorting")
 
@@ -86,7 +99,56 @@ class CacheDB:
 
                 if csaf_products_to_update:
                     await self.__update(session, CsafProduct, csaf_products_to_update)
+
+                await self.__upsert_relations(
+                    session, Asset, product_relations_to_update
+                )
+                await self.__upsert_relations(
+                    session, CsafProduct, csaf_product_relations_to_update
+                )
         logger.info("Done storing")
+
+    async def __upsert_relations(
+        self,
+        session: AsyncSession,
+        ty: Type[Asset | CsafProduct],
+        data: List[MappedRelationship],
+    ):
+        chunk_size = 200
+        chunks = [data[i : i + chunk_size] for i in range(0, len(data), chunk_size)]
+
+        await asyncio.gather(
+            *[self.__upsert_relations_chunk(session, ty, chunk) for chunk in chunks]
+        )
+
+    async def __upsert_relations_chunk(
+        self,
+        session: AsyncSession,
+        ty: Type[Asset | CsafProduct],
+        data: List[MappedRelationship],
+    ):
+        current_time = datetime.datetime.now().timestamp()
+        relation_ty = product_relationship if ty == Asset else csaf_product_relationship
+
+        if not data:
+            return
+
+        stmt = insert(relation_ty).values(
+            [
+                {
+                    "parent_id": d.parent,
+                    "child_id": d.child,
+                    "origin_uri": d.origin_uri,
+                    "origin_info": {},
+                    "last_update": current_time,
+                }
+                for d in data
+            ]
+        )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["parent_id", "child_id"], set_=dict(stmt.excluded)
+        )
+        await session.execute(stmt)
 
     async def __update(
         self,
@@ -150,8 +212,8 @@ class CacheDB:
 
                 if source.config and source.config.DataSource and source.config.DataSource.plugin_name == "isduba_fetcher":
                     data.extend(list(csaf_results.scalars().all()))
-                
-                cleanup_results = await source.cleanup_data(data)
+
+                cleanup_results = await source.cleanup_products(data)
                 assets_to_delete = [
                     result.id
                     for result in cleanup_results
