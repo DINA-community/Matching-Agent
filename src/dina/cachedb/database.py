@@ -138,14 +138,19 @@ class CacheDB:
                 # We want to check if anything that was fetched X seconds before the last run is still valid
                 stmt = select(Asset).where(Asset.last_update < stale_timestamp)
                 asset_results = await session.execute(stmt)
-                data: List[Asset | CsafProduct] = list(asset_results.scalars().all())
+                data: List[Asset | CsafProduct] = []
+
+                if source.config and source.config.DataSource and source.config.DataSource.plugin_name == "netbox_fetcher":
+                    data.extend(list(asset_results.scalars().all()))
 
                 csaf_stmt = select(CsafProduct).where(
                     CsafProduct.last_update < stale_timestamp
                 )
                 csaf_results = await session.execute(csaf_stmt)
-                data.extend(list(csaf_results.scalars().all()))
 
+                if source.config and source.config.DataSource and source.config.DataSource.plugin_name == "isduba_fetcher":
+                    data.extend(list(csaf_results.scalars().all()))
+                
                 cleanup_results = await source.cleanup_data(data)
                 assets_to_delete = [
                     result.id

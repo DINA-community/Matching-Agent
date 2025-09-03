@@ -191,9 +191,7 @@ class IsdubaDataSource(DataSourcePlugin):
     ) -> List[CleanUpDecision]:
         logger.debug(f"Cleanup data: {data_to_check}")
 
-        csaf_items = [d for d in data_to_check if isinstance(d, CsafProduct)]
-
-        if not csaf_items:
+        if not data_to_check:
             return []
 
         token = await self._get_token(self.origin_uri)
@@ -204,7 +202,7 @@ class IsdubaDataSource(DataSourcePlugin):
 
             results = []
 
-            for d in csaf_items:
+            for d in data_to_check:
                 try:
                     doc_id = int(d.origin_info["path"].removeprefix("/api/documents/"))
                     document_result = await api_instance.documents_id_get(doc_id)
