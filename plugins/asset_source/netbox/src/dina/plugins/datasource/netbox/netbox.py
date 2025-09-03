@@ -62,7 +62,13 @@ class NetboxDataSource(DataSourcePlugin):
         self,
         fetcher_view: FetcherView,
     ) -> FetchDataResult:
-        last_run = (await fetcher_view.last_run()).astimezone(tz=timezone.utc)
+        last_run = await fetcher_view.last_run()
+
+        if last_run.tzinfo is None:
+            last_run = last_run.replace(tzinfo=timezone.utc)
+
+        last_run = last_run.astimezone(tz=timezone.utc)
+        
         current_time = time.time()
 
         # We want to fetch all devices and device_types and manufacturers.
