@@ -5,12 +5,16 @@ from typing import Any, List
 
 import httpx
 from pydantic import BaseModel
-from sqlalchemy import and_
+from sqlalchemy import String, and_, cast
 
+from dina.cachedb.database import MappedRelationship
 from dina.cachedb.fetcher_view import FetcherView
 from dina.cachedb.model import Asset, CsafProduct
 from dina.common import logging
-from dina.plugins.datasource.isduba.connector import get_csaf_product_tree
+from dina.plugins.datasource.isduba.connector import (
+    get_csaf_product_tree,
+    get_relationships
+)
 from dina.plugins.datasource.isduba.converter import (
     _update_product_fields,
     convert_into_database_format,
@@ -20,6 +24,8 @@ from dina.synchronizer.base import DataSourcePlugin
 from dina.synchronizer.plugin_base.data_source import (
     CleanUpDecision,
     FetchProductsResult,
+    FetchRelationshipsResult,
+    Relationship
 )
 
 logger = logging.get_logger(__name__)
@@ -53,12 +59,7 @@ class IsdubaDataSource(DataSourcePlugin):
         async with isduba_api_client.ApiClient(configuration) as api_client:
             api_instance = isduba_api_client.DefaultApi(api_client)
             try:
-                last_run = await fetcher_view.last_run()
-
-                if last_run.tzinfo is None:
-                    last_run = last_run.replace(tzinfo=timezone.utc)
-
-                last_run = last_run.astimezone(tz=timezone.utc)
+                last_run = (await fetcher_view.last_run()).astimezone(tz=timezone.utc)
 
                 query = f"$current_release_date {last_run.isoformat()} timestamp >= $current_release_date {datetime.now(timezone.utc).isoformat()} timestamp <="
 
@@ -201,6 +202,84 @@ class IsdubaDataSource(DataSourcePlugin):
         configuration.verify_ssl = self.config.DataSource.Plugin.verify_ssl
 
         return configuration
+    
+    async def fetch_relationships(
+        self, fetcher_view: FetcherView
+    ) -> FetchRelationshipsResult:
+        last_run = (await fetcher_view.last_run()).astimezone(tz=timezone.utc)
+
+        existing_products = await fetcher_view.get_existing(
+            CsafProduct, CsafProduct.last_update > last_run.timestamp()
+        )
+
+        if not existing_products:
+            return FetchRelationshipsResult(again=False)
+
+        token = await self._get_token(self.origin_uri)
+        config = self._create_api_config(self.origin_uri, token)
+
+        async with isduba_api_client.ApiClient(config) as api_client:
+            api = isduba_api_client.DefaultApi(api_client)
+
+            for prod in existing_products:
+                try:
+                    doc_id_str = prod.origin_info["path"]
+                    doc_id = int(doc_id_str.removeprefix("/api/documents/"))
+
+                    response = await api.documents_id_get(doc_id)
+
+                    product_tree = response.get("product_tree")
+
+                    if not product_tree:
+                        continue
+
+                    relationships: list[Relationship] = []
+                        
+                    existing_relationships : List[Relationship] = get_relationships(product_tree)
+
+                    for rel in existing_relationships:
+                        product_ref = await fetcher_view.get_existing(
+                            CsafProduct,
+                            and_(
+                                cast(CsafProduct.origin_info["product_name_id"].astext, String) == str(rel.product_reference),
+                                cast(CsafProduct.origin_info["path"].astext, String) == doc_id_str,
+                            ),
+                        )
+                        relates_to_ref = await fetcher_view.get_existing(
+                            CsafProduct,
+                            and_(
+                                cast(CsafProduct.origin_info["product_name_id"].astext, String) == str(rel.relates_to_product_reference),
+                                cast(CsafProduct.origin_info["path"].astext, String) == doc_id_str,
+                            ),
+                        )
+
+                        if product_ref and relates_to_ref:
+                            relationships.append(
+                                Relationship(
+                                    parent=product_ref[0],
+                                    child=relates_to_ref[0],
+                                    ty=CsafProduct,
+                                )
+                            )
+
+                    return FetchRelationshipsResult(
+                        again=False,
+                        data=relationships
+                        )
+
+                except Exception as e:
+                    logger.error(f"Error fetching relationships for {prod.id}: {e}")
+
+        return FetchRelationshipsResult(again=False)
+    
+    async def map_relationships(
+        self, fetcher_view: FetcherView, relations: List[Relationship]
+    ) -> List[MappedRelationship]:
+        logger.info(f"Storing {len(relations)} relationships between CSAF products")
+        return [
+            MappedRelationship(parent=rel.parent.id, child=rel.child.id, ty=CsafProduct)
+            for rel in relations
+        ]
 
     async def cleanup_products(
         self, data_to_check: List[Asset | CsafProduct]
@@ -221,7 +300,7 @@ class IsdubaDataSource(DataSourcePlugin):
             for d in data_to_check:
                 try:
                     doc_id = int(d.origin_info["path"].removeprefix("/api/documents/"))
-                    document_result = await api_instance.documents_id_get(doc_id)
+                    document_result = await self._safe_documents_id_get(api_instance, doc_id)
 
                     results.append(
                         CleanUpDecision(
@@ -235,6 +314,21 @@ class IsdubaDataSource(DataSourcePlugin):
                     raise
 
         return results
+
+    async def _safe_documents_id_get(self, api_instance, doc_id: int):
+        try:
+            return await api_instance.documents_id_get(doc_id)
+        except isduba_api_client.exceptions.UnauthorizedException:
+            token = await self._get_token(self.origin_uri)
+            configuration = self._create_api_config(self.origin_uri, token)
+            async with isduba_api_client.ApiClient(configuration) as new_client:
+                new_instance = isduba_api_client.DefaultApi(new_client)
+                return await new_instance.documents_id_get(doc_id)
+    
+    async def cleanup_relationships(
+        self, relationships_to_check: List[Relationship]
+    ) -> List[Relationship]:
+        return relationships_to_check
 
     @property
     def origin_uri(self):
