@@ -52,6 +52,7 @@ def convert_into_database_format(
             csaf_product.product = Product(
                 product_type=_determine_product_type(cpe_identifier, helper),
                 name=_list_to_str(products),
+                hardware_name=_list_to_str(products) if _determine_product_type(cpe_identifier, helper) == ProductType.Device else None,
                 version=product_version,
                 cpe=helper.cpe if helper and helper.cpe else None,
                 purl=helper.purl if helper and helper.purl else None,
@@ -175,7 +176,12 @@ def _get_product_values(
         if helper and helper.cpe:
             cpe = _extract_cpe_part(helper.cpe)
 
-    return product_name_id, cpe, helper, product_version, products
+    product_list = []
+
+    if products:
+        product_list = list(dict.fromkeys(products))
+
+    return product_name_id, cpe, helper, product_version, product_list
 
 
 def _extract_from_version(pv, product_version: list[str], products: list[str]):
