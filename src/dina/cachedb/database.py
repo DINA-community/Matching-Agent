@@ -117,9 +117,8 @@ class CacheDB:
         chunk_size = 200
         chunks = [data[i : i + chunk_size] for i in range(0, len(data), chunk_size)]
 
-        await asyncio.gather(
-            *[self.__upsert_relations_chunk(session, ty, chunk) for chunk in chunks]
-        )
+        for chunk in chunks:
+            await self.__upsert_relations_chunk(session, ty, chunk)
 
     async def __upsert_relations_chunk(
         self,
@@ -159,9 +158,8 @@ class CacheDB:
         chunk_size = 200
         chunks = [data[i : i + chunk_size] for i in range(0, len(data), chunk_size)]
 
-        await asyncio.gather(
-            *[self.__update_chunk(session, ty, chunk) for chunk in chunks]
-        )
+        for chunk in chunks:
+            await self.__update_chunk(session, ty, chunk)
 
     async def __update_chunk(
         self,
