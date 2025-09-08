@@ -447,11 +447,58 @@ class NetboxDataSource(DataSourcePlugin):
         self, data_to_check: List[Asset | CsafProduct]
     ) -> List[CleanUpDecision]:
         logger.debug(f"Cleanup data: {data_to_check}")
-        # TODO: Perform the proper cleanup actions.
-        # We need to query the netbox api for the provided assets and check if they still exist.
-        return [
-            CleanUpDecision(can_delete=False, id=d.id, ty=Asset) for d in data_to_check
-        ]
+        if not data_to_check:
+            return []
+        devices = {
+            int(d.origin_info["device_id"]): d
+            for d in data_to_check
+            if d.product.product_type == ProductType.Device
+        }
+        software_set = {
+            int(d.origin_info["software_id"]): d
+            for d in data_to_check
+            if d.product.product_type == ProductType.Software
+        }
+
+        devices_result, software_result = await asyncio.gather(
+            dcim_devices_list.asyncio(client=self.client, id=list(devices.keys())),
+            plugins_d3c_software_list_list.asyncio(
+                client=self.client, id=list(software_set.keys())
+            ),
+        )
+
+        decisions: List[CleanUpDecision] = []
+
+        if devices_result:
+            for device in devices_result.results:
+                # The device still exists. Remove it from the set and mark it as kept
+                kept_device = devices.pop(device.id)
+                decisions.append(
+                    CleanUpDecision(can_delete=False, id=kept_device.id, ty=Asset)
+                )
+
+        if software_result:
+            for software in software_result.results:
+                kept_software = software_set.pop(software.id)
+                decisions.append(
+                    CleanUpDecision(can_delete=False, id=kept_software.id, ty=Asset)
+                )
+
+        # Add the remaining devices and software to the decisions as to be deleted.
+        decisions.extend(
+            map(
+                lambda x: CleanUpDecision(can_delete=True, id=x.id, ty=Asset),
+                devices.values(),
+            )
+        )
+        decisions.extend(
+            map(
+                lambda x: CleanUpDecision(can_delete=True, id=x.id, ty=Asset),
+                software_set.values(),
+            )
+        )
+
+        return decisions
 
     async def cleanup_relationships(
         self, relationships_to_check: List[Relationship]

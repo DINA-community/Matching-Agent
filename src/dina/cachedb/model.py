@@ -177,10 +177,16 @@ csaf_product_relationship = Table(
     "csaf_product_relationship",
     Base.metadata,
     Column(
-        "parent_id", Integer, ForeignKey("cacheDB.csaf_product.id"), primary_key=True
+        "parent_id",
+        Integer,
+        ForeignKey("cacheDB.csaf_product.id", ondelete="CASCADE"),
+        primary_key=True,
     ),
     Column(
-        "child_id", Integer, ForeignKey("cacheDB.csaf_product.id"), primary_key=True
+        "child_id",
+        Integer,
+        ForeignKey("cacheDB.csaf_product.id", ondelete="CASCADE"),
+        primary_key=True,
     ),
     Column("origin_uri", Text, nullable=False),
     Column("origin_info", JSONB, default={}),
@@ -232,8 +238,18 @@ class CsafProduct(Base, MetaInfo):
 product_relationship = Table(
     "product_relationship",
     Base.metadata,
-    Column("parent_id", Integer, ForeignKey("cacheDB.asset.id"), primary_key=True),
-    Column("child_id", Integer, ForeignKey("cacheDB.asset.id"), primary_key=True),
+    Column(
+        "parent_id",
+        Integer,
+        ForeignKey("cacheDB.asset.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "child_id",
+        Integer,
+        ForeignKey("cacheDB.asset.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
     Column("origin_uri", Text, nullable=False),
     Column("origin_info", JSONB, default={}),
     Column("last_update", Float, nullable=False, default=0.0),

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import (
     AsyncSession,
     create_async_engine,
 )
+from sqlalchemy.orm import joinedload
 from sqlalchemy.sql.ddl import CreateSchema
 
 from dina.cachedb.fetcher_view import FetcherView
@@ -199,6 +200,7 @@ class CacheDB:
                 stmt = (
                     select(Asset)
                     .where(Asset.last_update < stale_timestamp)
+                    .options(joinedload(Asset.product))
                     .filter(Asset.origin_uri == source.origin_uri)
                 )
                 data.extend((await session.execute(stmt)).scalars().all())
@@ -206,6 +208,7 @@ class CacheDB:
                 csaf_stmt = (
                     select(CsafProduct)
                     .where(CsafProduct.last_update > stale_timestamp)
+                    .options(joinedload(CsafProduct.product))
                     .filter(CsafProduct.origin_uri == source.origin_uri)
                 )
                 data.extend((await session.execute(csaf_stmt)).scalars().all())
