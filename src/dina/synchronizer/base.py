@@ -17,7 +17,6 @@ from abc import ABC
 from collections import defaultdict
 from importlib.metadata import EntryPoints, entry_points
 from pathlib import Path
-from typing import Dict, List, Optional, Union
 
 import uvicorn
 from fastapi import FastAPI
@@ -44,12 +43,12 @@ class ApiConfig(BaseModel):
 
 class SynchronizerSectionConfig(BaseModel):
     sync_interval: int
-    preprocessor_plugins: List[str]
+    preprocessor_plugins: list[str]
     Api: ApiConfig
 
 
 class SynchronizerConfig(BaseModel):
-    Assetsync: Optional[dict] = None
+    Assetsync: dict | None = None
     Synchronizer: SynchronizerSectionConfig
     Cachedb: CacheDB.Config
 
@@ -71,15 +70,15 @@ class BaseSynchronizer(ABC):
             data_source_plugin_configs: Path to a directory containing data source plugin configuration files.
             config_file: Path to the manager configuration file (e.g., assetman.toml).
         """
-        self.__last_synchronization: Optional[float] = None
+        self.__last_synchronization: float | None = None
         self.cache_db: CacheDB = cache_db
-        self.pending_products: List[Asset | CsafProduct] = []
-        self.pending_relationships: Dict[str, List[Relationship]] = defaultdict(list)
-        self.preprocessed_data: List[Asset | CsafProduct] = []
+        self.pending_products: list[Asset | CsafProduct] = []
+        self.pending_relationships: dict[str, list[Relationship]] = defaultdict(list)
+        self.preprocessed_data: list[Asset | CsafProduct] = []
         self.config_file: Path = config_file
         self.config: SynchronizerConfig = self.load_config(config_file)
 
-        self.data_sources: Dict[str, DataSourcePlugin] = self.__load_datasource_plugins(
+        self.data_sources: dict[str, DataSourcePlugin] = self.__load_datasource_plugins(
             data_source_plugin_configs
         )
         self.preprocessor_plugins = self.__load_preprocessor_plugins(
@@ -99,7 +98,7 @@ class BaseSynchronizer(ABC):
         plugin_name: str,
         entry_points_group: str,
         config_data: DataSourcePlugin.Config | None,
-    ) -> Union[DataSourcePlugin, PreprocessorPlugin]:
+    ) -> DataSourcePlugin | PreprocessorPlugin:
         """
         Load a single plugin from entry points.
 
@@ -146,7 +145,7 @@ class BaseSynchronizer(ABC):
             return SynchronizerConfig.model_validate(tomllib.load(f))
 
     @staticmethod
-    def __load_datasource_plugins(plugin_configs: Path) -> Dict[str, DataSourcePlugin]:
+    def __load_datasource_plugins(plugin_configs: Path) -> dict[str, DataSourcePlugin]:
         """
         Load plugins from configuration files in the specified directory.
 
@@ -167,7 +166,7 @@ class BaseSynchronizer(ABC):
                 f"Plugin configuration directory not found: {plugin_configs}"
             )
 
-        plugins: Dict[str, DataSourcePlugin] = {}
+        plugins: dict[str, DataSourcePlugin] = {}
 
         # Scan the directory for TOML files
         for config_file in plugin_configs.glob("*.toml"):
@@ -209,14 +208,14 @@ class BaseSynchronizer(ABC):
 
     @staticmethod
     def __load_preprocessor_plugins(
-        preprocessor_plugin_names: List[str],
-    ) -> List[PreprocessorPlugin]:
+        preprocessor_plugin_names: list[str],
+    ) -> list[PreprocessorPlugin]:
         """
         Load preprocessor plugins specified in the configuration file.
         Raises:
             KeyError: If the configuration file is missing required fields.
         """
-        preprocessor_plugins: List[PreprocessorPlugin] = []
+        preprocessor_plugins: list[PreprocessorPlugin] = []
         try:
             if not preprocessor_plugin_names:
                 logger.warning("No preprocessor plugins specified in configuration")
@@ -362,16 +361,14 @@ class BaseSynchronizer(ABC):
     async def __api_client(self):
         api = FastAPI()
 
-        @api.get("/start")
+        @api.post("/start")
         async def sync():
             self.__last_synchronization = None
             return {}
 
         @api.get("/status")
-        async def status():
-            return {
-                "last_synchronization": self.__last_synchronization,
-            }
+        async def status() -> SynchronizerStatus:
+            return SynchronizerStatus(last_synchronization=self.__last_synchronization)
 
         # TODO: Add security options
         config = uvicorn.Config(
@@ -381,3 +378,7 @@ class BaseSynchronizer(ABC):
         )
         server = uvicorn.Server(config)
         await server.serve()
+
+
+class SynchronizerStatus(BaseModel):
+    last_synchronization: float | None
