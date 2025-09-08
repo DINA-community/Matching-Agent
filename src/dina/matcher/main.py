@@ -2,8 +2,8 @@ import asyncio
 import tomllib
 
 import uvicorn
-from fastapi import FastAPI, APIRouter
-from pydantic import BaseModel
+from fastapi import APIRouter, FastAPI
+from pydantic import BaseModel, HttpUrl
 
 from dina.common.logging import configure_logging, get_logger
 
@@ -11,6 +11,26 @@ from dina.common.logging import configure_logging, get_logger
 configure_logging()
 
 logger = get_logger(__name__)
+
+
+# TODO: Define correct fields
+class MatchUpdate(BaseModel):
+    asset_id: int
+    csaf_id: int
+    matching_reason: str
+    score: float
+
+
+class MatchSubscription(BaseModel):
+    """
+    :ivar origin_filter: A list of strings representing filters to match specific origins.
+        Usually you will want to only subscribe to matches that match to an asset or csaf
+        that comes from an origin you are interested in.
+    """
+
+    url: HttpUrl
+    secret: str | None = None
+    origin_filter: list[str]
 
 
 class ApiConfig(BaseModel):
@@ -41,9 +61,19 @@ class Matcher:
     async def __serve_api(self):
         api = FastAPI()
 
+        sub_route = APIRouter(prefix="/subscribe")
         task_route = APIRouter(prefix="/task")
+        matches_route = APIRouter(prefix="/matches")
 
-        @task_route.put("/start")
+        @matches_route.get("/")
+        async def get_matches():
+            logger.info("Getting matches")
+
+        @matches_route.get("/{match_id}")
+        async def get_match(match_id: int):
+            logger.info(f"Getting match {match_id}")
+
+        @task_route.post("/start")
         async def start():
             logger.info("Starting matching task")
 
@@ -51,11 +81,24 @@ class Matcher:
         async def status():
             return {"status": "running"}
 
-        @task_route.put("/stop")
+        @task_route.post("/stop")
         async def stop():
             logger.info("Stopping matching task")
 
+        @sub_route.post("/new_match")
+        async def subscribe(body: MatchSubscription) -> None:
+            logger.info(f"Subscribed to match updates from {body.origin_filter}")
+
+        @api.webhooks.post("new_match")
+        async def test(body: MatchUpdate):
+            """
+            When a new match is found, this webhook is triggered and a message containing the match is sent to the registered hook.
+            Subscribing to this hook can be done via the /hooks/subscribe_match_updates endpoint.
+            """
+
         api.include_router(task_route)
+        api.include_router(matches_route)
+        api.include_router(sub_route)
 
         config = uvicorn.Config(
             app=api,

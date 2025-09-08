@@ -7,6 +7,21 @@ It includes two concrete implementations:
 1. **Asset Synchronizer (`assetsync`)**: Fetches and processes asset data.
 2. **CSAF Synchronizer (`csafsync`)**: Fetches and processes CSAF (Common Security Advisory Framework) data.
 
+Furthermore it includes the matcher implementation that uses the data from the synchronizers to match assets.
+The matches can be retrieved via a REST API, and alternatively a hook can be set up to be notified of new matches (WIP).
+
+## Feature Matrix
+
+| Feature               | Status | Notes                                           |
+|-----------------------|--------|-------------------------------------------------|
+| Asset Synchronization | ✅ Done | Basic asset data syncing implemented            |
+| CSAF Synchronization  | ✅ Done | CSAF advisory data syncing implemented          |
+| Asset-CSAF Matching   | 🚧 WIP | A simple Matcher that matches everything is WIP |
+| REST API              | 🚧 WIP | Groundwork has been done. Need to specify API   |
+| Webhook Notifications | 🚧 WIP | Notification system being developed             |
+| Plugin System         | ✅ Done | Extensible plugin architecture ready            |
+| Database Integration  | ✅ Done | PostgreSQL integration complete                 |
+
 ## Project Structure
 
 - `src/dina/synchronizer/`: Shared infrastructure for synchronizer daemons.
@@ -22,6 +37,7 @@ For more details about the synchronizer infrastructure, see the Synchronizer Inf
 ### Installation on Ubuntu
 
 Clone the repository.
+
 ```cd /home
 git clone -b feat/initial_structure https://github.com/DINA-community/Matching-Agent.git
 cd Matching-Agent
@@ -30,13 +46,15 @@ cd Matching-Agent
 Install [uv](https://docs.astral.sh/uv/), docker and docker compose in any way that suits you.
 
 ### after installation
+
 Create the development database:
 
 ```shell
 docker compose -f dev/docker-compose.yml up -d
 ```
 
-Install the dependencies with uv by running in your terminal or inside pycharm (double tap `<Ctrl>` and enter the command)
+Install the dependencies with uv by running in your terminal or inside pycharm (double tap `<Ctrl>` and enter the
+command)
 
 ```shell
 uv sync --all-extras
@@ -65,8 +83,8 @@ If you want to run the linter manually, run the following:
 uv run ruff check
 ```
 
-
 ### Running the application
+
 Targets can be run by typing `uv run <TARGET_NAME>` or by selecting it in the run configurations menu
 in Pycharm.
 For example, try running the following to start the matching agent.
