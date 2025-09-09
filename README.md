@@ -8,7 +8,8 @@ It includes two concrete implementations:
 2. **CSAF Synchronizer (`csafsync`)**: Fetches and processes CSAF (Common Security Advisory Framework) data.
 
 Furthermore it includes the matcher implementation that uses the data from the synchronizers to match assets.
-The matches can be retrieved via a REST API, and alternatively a hook can be set up to be notified of new matches (WIP).
+The matches can be retrieved via a REST API, and alternatively, a hook can be set up to be notified of new matches (
+WIP).
 
 ## Feature Matrix
 
@@ -20,7 +21,6 @@ The matches can be retrieved via a REST API, and alternatively a hook can be set
 | REST API              | 🚧 WIP | Groundwork has been done. Need to specify API   |
 | Webhook Notifications | 🚧 WIP | Notification system being developed             |
 | Plugin System         | ✅ Done | Extensible plugin architecture ready            |
-| Database Integration  | ✅ Done | PostgreSQL integration complete                 |
 
 ## Project Structure
 
