@@ -3,7 +3,7 @@ import logging
 from typing import List, Optional, Type, Union
 
 from pydantic import BaseModel
-from sqlalchemy import delete, select, update
+from sqlalchemy import and_, delete, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -45,6 +45,7 @@ class CacheDB:
     async def connect(self, config: Config) -> None:
         self.engine = create_async_engine(
             f"postgresql+psycopg://{config.username}:{config.password}@{config.host}:{config.port}/{config.database}",
+            echo=True,
         )
         async with self.engine.begin() as conn:
             await conn.execute(CreateSchema("cacheDB", if_not_exists=True))
@@ -138,7 +139,7 @@ class CacheDB:
                     "parent_id": d.parent,
                     "child_id": d.child,
                     "origin_uri": d.origin_uri,
-                    "origin_info": {},
+                    "origin_info": d.origin_info,
                     "last_update": current_time,
                 }
                 for d in data
@@ -207,11 +208,13 @@ class CacheDB:
 
                 csaf_stmt = (
                     select(CsafProduct)
-                    .where(CsafProduct.last_update > stale_timestamp)
+                    .where(CsafProduct.last_update < stale_timestamp)
                     .options(joinedload(CsafProduct.product))
                     .filter(CsafProduct.origin_uri == source.origin_uri)
                 )
                 data.extend((await session.execute(csaf_stmt)).scalars().all())
+
+                await self.__clean_relations(session, source, stale_timestamp, last_run)
 
                 cleanup_results = await source.cleanup_products(data)
                 assets_to_delete = [
@@ -259,6 +262,134 @@ class CacheDB:
                         .values(last_update=last_run.timestamp())
                     )
                     await session.execute(update_stmt)
+
+    async def __clean_relations(
+        self,
+        session: AsyncSession,
+        source: DataSourcePlugin,
+        stale_timestamp: float,
+        last_run: datetime.datetime,
+    ):
+        relations_to_clean: list[MappedRelationship] = []
+        relation_stmt = (
+            select(*product_relationship.c)
+            .where(product_relationship.c.last_update < stale_timestamp)
+            .filter(product_relationship.c.origin_uri == source.origin_uri)
+        )
+        relations_to_clean.extend(
+            [
+                MappedRelationship(
+                    parent=r.parent_id,
+                    child=r.child_id,
+                    ty=Asset,
+                    origin_info=r.origin_info,
+                    origin_uri=r.origin_uri,
+                )
+                for r in (await session.execute(relation_stmt)).all()
+            ]
+        )
+
+        csaf_relation_stmt = (
+            select(*csaf_product_relationship.c)
+            .where(csaf_product_relationship.c.last_update < stale_timestamp)
+            .filter(csaf_product_relationship.c.origin_uri == source.origin_uri)
+        )
+        relations_to_clean.extend(
+            [
+                MappedRelationship(
+                    parent=r.parent_id,
+                    child=r.child_id,
+                    ty=Asset,
+                    origin_info=r.origin_info,
+                    origin_uri=r.origin_uri,
+                )
+                for r in (await session.execute(csaf_relation_stmt)).all()
+            ]
+        )
+
+        relation_cleanup_results = await source.cleanup_relationships(
+            relations_to_clean
+        )
+
+        relations_to_delete = [
+            result
+            for result in relation_cleanup_results
+            if result.ty == Asset and result.can_delete
+        ]
+
+        relations_to_refresh = [
+            result
+            for result in relation_cleanup_results
+            if result.ty == Asset and not result.can_delete
+        ]
+
+        csaf_relations_to_delete = [
+            result
+            for result in relation_cleanup_results
+            if result.ty == CsafProduct and result.can_delete
+        ]
+
+        csaf_relations_to_refresh = [
+            result
+            for result in relation_cleanup_results
+            if result.ty == CsafProduct and not result.can_delete
+        ]
+
+        if relations_to_delete:
+            del_stmt = delete(product_relationship).where(
+                or_(
+                    and_(
+                        product_relationship.c.parent_id == relation.parent,
+                        product_relationship.c.child_id == relation.child,
+                    )
+                    for relation in relations_to_delete
+                )
+            )
+            await session.execute(del_stmt)
+
+        if csaf_relations_to_delete:
+            del_stmt = delete(csaf_product_relationship).where(
+                or_(
+                    and_(
+                        csaf_product_relationship.c.parent_id == relation.parent,
+                        csaf_product_relationship.c.child_id == relation.child,
+                    )
+                    for relation in relations_to_delete
+                )
+            )
+            await session.execute(del_stmt)
+
+        if relations_to_refresh:
+            update_stmt = (
+                update(product_relationship)
+                .where(
+                    or_(
+                        and_(
+                            product_relationship.c.parent_id == relation.parent,
+                            product_relationship.c.child_id == relation.child,
+                        )
+                        for relation in relations_to_refresh
+                    )
+                )
+                .values(last_update=last_run.timestamp())
+            )
+            await session.execute(update_stmt)
+
+        if csaf_relations_to_refresh:
+            update_stmt = (
+                update(csaf_product_relationship)
+                .where(
+                    or_(
+                        and_(
+                            csaf_product_relationship.c.parent_id == relation.parent,
+                            csaf_product_relationship.c.child_id == relation.child,
+                        )
+                        for relation in csaf_relations_to_refresh
+                    )
+                )
+                .values(last_update=last_run.timestamp())
+            )
+            await session.execute(update_stmt)
 
     async def disconnect(self) -> None:
         if self.engine is not None:

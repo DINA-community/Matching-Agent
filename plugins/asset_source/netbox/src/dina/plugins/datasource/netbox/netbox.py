@@ -289,62 +289,6 @@ class NetboxDataSource(DataSourcePlugin):
             assets.append(asset)
 
         return FetchProductsResult(again=False, data=assets)
-        # # In a real implementation, this would use the API URL and token to fetch data
-        #
-        # def find_cachedb_type(nb_type):
-        #     if nb_type == "dcim.device":
-        #         return "Device"
-        #     elif nb_type == "d3c.software":
-        #         return "Software"
-        #     else:
-        #         return None
-        #
-        #
-        # response = await plugins_d3c_hash_list_list.asyncio(client=self.client)
-        # for x in response.results:
-        #     results.append(
-        #         File(
-        #             nb_id=x.id,
-        #             filename=x.filename,
-        #             nb_software_id=x.software.id,
-        #             last_seen=starttime,
-        #         )
-        #     )
-        #
-        # response = await plugins_d3c_filehash_list_list.asyncio(client=self.client)
-        # for x in response.results:
-        #     results.append(
-        #         Hash(
-        #             nb_id=x.id,
-        #             nb_file_id=x.hash_.id,
-        #             algorithm=x.algorithm,
-        #             value=x.value,
-        #             last_seen=starttime,
-        #         )
-        #     )
-        #
-        # response = await plugins_d3c_productrelationship_list_list.asyncio(
-        #     client=self.client
-        # )
-        # for x in response.results:
-        #     source_type = find_cachedb_type(x.source_type)
-        #     target_type = find_cachedb_type(x.destination_type)
-        #     if source_type and target_type:
-        #         results.append(
-        #             ProductRelationship(
-        #                 nb_id=x.id,
-        #                 nb_source_id=x.source_id,
-        #                 source_type=source_type,
-        #                 nb_target_id=x.destination_id,
-        #                 target_type=target_type,
-        #                 category=int(x.category),
-        #                 last_seen=starttime,
-        #             )
-        #         )
-        #
-        # # logger.info(f"DATA: {results}")
-        # await asyncio.sleep(10)
-        # return results
 
     async def fetch_relationships(
         self, fetcher_view: FetcherView
@@ -367,6 +311,7 @@ class NetboxDataSource(DataSourcePlugin):
                             find_cachedb_type(relation.destination_type),
                         ),
                         ty=Asset,
+                        origin_info={"relation_id": relation.id},
                     )
                     for relation in response.results
                 ],
@@ -437,7 +382,12 @@ class NetboxDataSource(DataSourcePlugin):
                     )
 
             mapped.append(
-                MappedRelationship(parent=parent_id, child=child_id, ty=Asset)
+                MappedRelationship(
+                    parent=parent_id,
+                    child=child_id,
+                    ty=Asset,
+                    origin_info=relation.origin_info,
+                )
             )
 
         unique_mapped = {(m.parent, m.child): m for m in mapped}
@@ -501,9 +451,29 @@ class NetboxDataSource(DataSourcePlugin):
         return decisions
 
     async def cleanup_relationships(
-        self, relationships_to_check: List[Relationship]
-    ) -> List[Relationship]:
-        return relationships_to_check
+        self, relationships_to_check: List[MappedRelationship]
+    ) -> List[MappedRelationship]:
+        if not relationships_to_check:
+            return []
+
+        existing_relations = {
+            r.origin_info["relation_id"]: r for r in relationships_to_check
+        }
+        result = []
+        if response := await plugins_d3c_productrelationship_list_list.asyncio(
+            client=self.client,
+            id=list(existing_relations.keys()),
+        ):
+            for relation in response.results:
+                kept_relation = existing_relations.pop(relation.id)
+                kept_relation.can_delete = False
+                result.append(kept_relation)
+
+        for existing_relation in existing_relations.values():
+            existing_relation.can_delete = True
+            result.append(existing_relation)
+
+        return result
 
     @property
     def origin_uri(self):

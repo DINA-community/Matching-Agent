@@ -45,6 +45,7 @@ class Relationship:
     parent: ProductId
     child: ProductId
     ty: Type[Asset | CsafProduct]
+    origin_info: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -53,6 +54,7 @@ class MappedRelationship:
     child: int
     ty: Type[Asset | CsafProduct]
     origin_uri: str = ""
+    origin_info: dict[str, Any] = field(default_factory=dict)
     can_delete: bool = False
 
 
@@ -141,8 +143,8 @@ class DataSourcePlugin(ABC):
 
     @abstractmethod
     async def cleanup_relationships(
-        self, relationships_to_check: List[Relationship]
-    ) -> List[Relationship]:
+        self, relationships_to_check: List[MappedRelationship]
+    ) -> List[MappedRelationship]:
         """Determine which stale relationships should be deleted."""
         ...
 
