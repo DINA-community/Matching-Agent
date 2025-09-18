@@ -1,16 +1,23 @@
 import datetime
 import logging
-from typing import List, Optional, Type, Union, Any, AsyncGenerator
+from typing import List, Optional, Type, Union, AsyncGenerator
 
 from pydantic import BaseModel
-from sqlalchemy import and_, delete, or_, select, update, ColumnExpressionArgument, literal, distinct
+from sqlalchemy import (
+    and_,
+    delete,
+    or_,
+    select,
+    update,
+    literal,
+)
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     create_async_engine,
 )
-from sqlalchemy.orm import joinedload, noload
+from sqlalchemy.orm import joinedload
 from sqlalchemy.sql.ddl import CreateSchema
 
 from dina.cachedb.fetcher_view import FetcherView
@@ -20,7 +27,8 @@ from dina.cachedb.model import (
     CsafProduct,
     Product,
     csaf_product_relationship,
-    product_relationship, Match,
+    product_relationship,
+    Match,
 )
 from dina.synchronizer.plugin_base.data_source import (
     DataSourcePlugin,
@@ -58,9 +66,9 @@ class CacheDB:
             raise Exception("Database not connected")
 
     async def store(
-            self,
-            data: List[Union[Asset, CsafProduct]],
-            relationships: List[MappedRelationship],
+        self,
+        data: List[Union[Asset, CsafProduct]],
+        relationships: List[MappedRelationship],
     ) -> None:
         """
         Stores a list of assets or CSAF documents into the database. This function ensures
@@ -110,22 +118,22 @@ class CacheDB:
         logger.info("Done storing")
 
     async def __upsert_relations(
-            self,
-            session: AsyncSession,
-            ty: Type[Asset | CsafProduct],
-            data: List[MappedRelationship],
+        self,
+        session: AsyncSession,
+        ty: Type[Asset | CsafProduct],
+        data: List[MappedRelationship],
     ):
         chunk_size = 200
-        chunks = [data[i: i + chunk_size] for i in range(0, len(data), chunk_size)]
+        chunks = [data[i : i + chunk_size] for i in range(0, len(data), chunk_size)]
 
         for chunk in chunks:
             await self.__upsert_relations_chunk(session, ty, chunk)
 
     async def __upsert_relations_chunk(
-            self,
-            session: AsyncSession,
-            ty: Type[Asset | CsafProduct],
-            data: List[MappedRelationship],
+        self,
+        session: AsyncSession,
+        ty: Type[Asset | CsafProduct],
+        data: List[MappedRelationship],
     ):
         current_time = datetime.datetime.now().timestamp()
         relation_ty = product_relationship if ty == Asset else csaf_product_relationship
@@ -151,22 +159,22 @@ class CacheDB:
         await session.execute(stmt)
 
     async def __update(
-            self,
-            session: AsyncSession,
-            ty: Type[Asset | CsafProduct],
-            data: List[Asset] | List[CsafProduct],
+        self,
+        session: AsyncSession,
+        ty: Type[Asset | CsafProduct],
+        data: List[Asset] | List[CsafProduct],
     ):
         chunk_size = 200
-        chunks = [data[i: i + chunk_size] for i in range(0, len(data), chunk_size)]
+        chunks = [data[i : i + chunk_size] for i in range(0, len(data), chunk_size)]
 
         for chunk in chunks:
             await self.__update_chunk(session, ty, chunk)
 
     async def __update_chunk(
-            self,
-            session: AsyncSession,
-            ty: Type[Asset | CsafProduct],
-            data: List[Asset] | List[CsafProduct],
+        self,
+        session: AsyncSession,
+        ty: Type[Asset | CsafProduct],
+        data: List[Asset] | List[CsafProduct],
     ):
         if not data:
             return
@@ -264,11 +272,11 @@ class CacheDB:
                     await session.execute(update_stmt)
 
     async def __clean_relations(
-            self,
-            session: AsyncSession,
-            source: DataSourcePlugin,
-            stale_timestamp: float,
-            last_run: datetime.datetime,
+        self,
+        session: AsyncSession,
+        source: DataSourcePlugin,
+        stale_timestamp: float,
+        last_run: datetime.datetime,
     ):
         relations_to_clean: list[MappedRelationship] = []
         relation_stmt = (
@@ -399,28 +407,42 @@ class CacheDB:
             # Sub-Abfrage für die DISTINCT ON Paare
             distinct_pairs_subquery = (
                 select(
-                    CsafProduct.id.label('csaf_id'),
-                    Asset.id.label('asset_id'),
+                    CsafProduct.id.label("csaf_id"),
+                    Asset.id.label("asset_id"),
                     Match.timestamp,
-                    CsafProduct.last_update.label('c_timestamp'),
-                    Asset.last_update.label('a_timestamp')
+                    CsafProduct.last_update.label("c_timestamp"),
+                    Asset.last_update.label("a_timestamp"),
                 )
                 .select_from(CsafProduct)
                 .join(Asset, literal(value=True))
-                .outerjoin(Match, and_(
-                    CsafProduct.id == Match.csaf_product_id,
-                    Asset.id == Match.asset_id
-                ))
+                .outerjoin(
+                    Match,
+                    and_(
+                        CsafProduct.id == Match.csaf_product_id,
+                        Asset.id == Match.asset_id,
+                    ),
+                )
                 .distinct(CsafProduct.id, Asset.id)
-                .order_by(CsafProduct.id, Asset.id, Match.timestamp.desc(), CsafProduct.last_update, Asset.last_update)
+                .order_by(
+                    CsafProduct.id,
+                    Asset.id,
+                    Match.timestamp.desc(),
+                    CsafProduct.last_update,
+                    Asset.last_update,
+                )
             ).subquery()
 
             pairs_subquery = (
-                select(distinct_pairs_subquery)
-                .where(
-                    (distinct_pairs_subquery.c.timestamp.is_(None)) |
-                    (distinct_pairs_subquery.c.c_timestamp > distinct_pairs_subquery.c.timestamp) |
-                    (distinct_pairs_subquery.c.a_timestamp > distinct_pairs_subquery.c.timestamp)
+                select(distinct_pairs_subquery).where(
+                    (distinct_pairs_subquery.c.timestamp.is_(None))
+                    | (
+                        distinct_pairs_subquery.c.c_timestamp
+                        > distinct_pairs_subquery.c.timestamp
+                    )
+                    | (
+                        distinct_pairs_subquery.c.a_timestamp
+                        > distinct_pairs_subquery.c.timestamp
+                    )
                 )
             ).subquery()
 
@@ -429,17 +451,17 @@ class CacheDB:
                 select(CsafProduct, Asset)
                 .select_from(CsafProduct)
                 .join(Asset, literal(value=True))
-                .join(pairs_subquery, and_(
-                    CsafProduct.id == pairs_subquery.c.csaf_id,
-                    Asset.id == pairs_subquery.c.asset_id
-                ))
+                .join(
+                    pairs_subquery,
+                    and_(
+                        CsafProduct.id == pairs_subquery.c.csaf_id,
+                        Asset.id == pairs_subquery.c.asset_id,
+                    ),
+                )
             )
 
-
             while result := (
-                    await session.execute(
-                        query.limit(limit).offset(offset)
-                    )
+                await session.execute(query.limit(limit).offset(offset))
             ).fetchall():
                 offset += limit
                 # We want to remove all instances from the session so that any changes
@@ -450,10 +472,17 @@ class CacheDB:
                     yield value.tuple()
 
     async def store_matches(self, matches: list[Match]):
-        if not matches: return
+        if not matches:
+            return
         async with AsyncSession(self.engine) as session:
             async with session.begin():
                 session.add_all(matches)
+
+    async def get_matches(self) -> list[Match]:
+        async with AsyncSession(self.engine) as session:
+            if result := (await session.execute(select(Match))).scalars().all():
+                return list(result)
+        return []
 
     async def disconnect(self) -> None:
         if self.engine is not None:

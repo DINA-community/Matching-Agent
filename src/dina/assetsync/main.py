@@ -14,6 +14,7 @@ logger = get_logger(__name__)
 if sys.platform.startswith("win"):
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
+
 class AssetSynchronizer(BaseSynchronizer):
     """
     Asset Manager implementation.

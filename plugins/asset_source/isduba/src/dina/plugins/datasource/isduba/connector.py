@@ -45,12 +45,11 @@ def get_csaf_product_tree(
         relationships_list=relationships_list,
     )
 
-def get_relationships(
-        product_tree: dict
-) -> List[Relationship]:
+
+def get_relationships(product_tree: dict) -> List[Relationship]:
     if not product_tree:
         return []
-    
+
     relationships_list: List[Relationship] = [
         Relationship(
             category=r.get("category"),
@@ -61,7 +60,7 @@ def get_relationships(
     ]
 
     return relationships_list
- 
+
 
 def get_product_identification_helper(
     data: dict,

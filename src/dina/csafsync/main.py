@@ -5,6 +5,7 @@ from dina.cachedb.database import CacheDB
 from dina.common.logging import configure_logging, get_logger
 from dina.synchronizer.base import BaseSynchronizer
 import sys
+
 # Configure logging
 configure_logging()
 
@@ -12,6 +13,7 @@ logger = get_logger(__name__)
 
 if sys.platform.startswith("win"):
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 
 class CSAFSynchronizer(BaseSynchronizer):
     """

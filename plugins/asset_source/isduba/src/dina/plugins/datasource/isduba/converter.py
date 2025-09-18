@@ -52,7 +52,9 @@ def convert_into_database_format(
             csaf_product.product = Product(
                 product_type=_determine_product_type(cpe_identifier, helper),
                 name=_list_to_str(products),
-                hardware_name=_list_to_str(products) if _determine_product_type(cpe_identifier, helper) == ProductType.Device else None,
+                hardware_name=_list_to_str(products)
+                if _determine_product_type(cpe_identifier, helper) == ProductType.Device
+                else None,
                 version=product_version,
                 cpe=helper.cpe if helper and helper.cpe else None,
                 purl=helper.purl if helper and helper.purl else None,

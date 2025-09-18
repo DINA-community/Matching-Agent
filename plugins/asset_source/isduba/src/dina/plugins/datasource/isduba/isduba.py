@@ -13,7 +13,7 @@ from dina.cachedb.model import Asset, CsafProduct
 from dina.common import logging
 from dina.plugins.datasource.isduba.connector import (
     get_csaf_product_tree,
-    get_relationships
+    get_relationships,
 )
 from dina.plugins.datasource.isduba.converter import (
     _update_product_fields,
@@ -25,7 +25,7 @@ from dina.synchronizer.plugin_base.data_source import (
     CleanUpDecision,
     FetchProductsResult,
     FetchRelationshipsResult,
-    Relationship
+    Relationship,
 )
 
 logger = logging.get_logger(__name__)
@@ -64,10 +64,10 @@ class IsdubaDataSource(DataSourcePlugin):
                 query = f"$current_release_date {last_run.isoformat()} timestamp >= $current_release_date {datetime.now(timezone.utc).isoformat()} timestamp <="
 
                 api_response = await api_instance.documents_get(
-                    limit=self.__limit, 
+                    limit=self.__limit,
                     offset=self.__offset,
                     query=query,
-                    orders="-critical"
+                    orders="-critical",
                 )
 
                 if not api_response.documents:
@@ -202,7 +202,7 @@ class IsdubaDataSource(DataSourcePlugin):
         configuration.verify_ssl = self.config.DataSource.Plugin.verify_ssl
 
         return configuration
-    
+
     async def fetch_relationships(
         self, fetcher_view: FetcherView
     ) -> FetchRelationshipsResult:
@@ -234,22 +234,34 @@ class IsdubaDataSource(DataSourcePlugin):
                         continue
 
                     relationships: list[Relationship] = []
-                        
-                    existing_relationships : List[Relationship] = get_relationships(product_tree)
+
+                    existing_relationships: List[Relationship] = get_relationships(
+                        product_tree
+                    )
 
                     for rel in existing_relationships:
                         product_ref = await fetcher_view.get_existing(
                             CsafProduct,
                             and_(
-                                cast(CsafProduct.origin_info["product_name_id"].astext, String) == str(rel.product_reference),
-                                cast(CsafProduct.origin_info["path"].astext, String) == doc_id_str,
+                                cast(
+                                    CsafProduct.origin_info["product_name_id"].astext,
+                                    String,
+                                )
+                                == str(rel.product_reference),
+                                cast(CsafProduct.origin_info["path"].astext, String)
+                                == doc_id_str,
                             ),
                         )
                         relates_to_ref = await fetcher_view.get_existing(
                             CsafProduct,
                             and_(
-                                cast(CsafProduct.origin_info["product_name_id"].astext, String) == str(rel.relates_to_product_reference),
-                                cast(CsafProduct.origin_info["path"].astext, String) == doc_id_str,
+                                cast(
+                                    CsafProduct.origin_info["product_name_id"].astext,
+                                    String,
+                                )
+                                == str(rel.relates_to_product_reference),
+                                cast(CsafProduct.origin_info["path"].astext, String)
+                                == doc_id_str,
                             ),
                         )
 
@@ -262,16 +274,13 @@ class IsdubaDataSource(DataSourcePlugin):
                                 )
                             )
 
-                    return FetchRelationshipsResult(
-                        again=False,
-                        data=relationships
-                        )
+                    return FetchRelationshipsResult(again=False, data=relationships)
 
                 except Exception as e:
                     logger.error(f"Error fetching relationships for {prod.id}: {e}")
 
         return FetchRelationshipsResult(again=False)
-    
+
     async def map_relationships(
         self, fetcher_view: FetcherView, relations: List[Relationship]
     ) -> List[MappedRelationship]:
@@ -300,7 +309,9 @@ class IsdubaDataSource(DataSourcePlugin):
             for d in data_to_check:
                 try:
                     doc_id = int(d.origin_info["path"].removeprefix("/api/documents/"))
-                    document_result = await self._safe_documents_id_get(api_instance, doc_id)
+                    document_result = await self._safe_documents_id_get(
+                        api_instance, doc_id
+                    )
 
                     results.append(
                         CleanUpDecision(
@@ -324,7 +335,7 @@ class IsdubaDataSource(DataSourcePlugin):
             async with isduba_api_client.ApiClient(configuration) as new_client:
                 new_instance = isduba_api_client.DefaultApi(new_client)
                 return await new_instance.documents_id_get(doc_id)
-    
+
     async def cleanup_relationships(
         self, relationships_to_check: List[Relationship]
     ) -> List[Relationship]:
