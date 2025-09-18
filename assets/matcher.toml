@@ -1,5 +1,5 @@
 [Matcher]
-
+sync_interval = 60
 
 [Matcher.Api]
 host = "0.0.0.0"

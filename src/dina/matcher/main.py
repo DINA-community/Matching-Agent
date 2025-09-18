@@ -1,6 +1,8 @@
 import asyncio
 import datetime
+import time
 import tomllib
+import traceback
 
 import uvicorn
 from fastapi import APIRouter, FastAPI
@@ -51,6 +53,7 @@ class ApiConfig(BaseModel):
 
 
 class MatcherConfig(BaseModel):
+    sync_interval: int
     Api: ApiConfig
     Cachedb: CacheDB.Config
 
@@ -66,6 +69,7 @@ class Matcher:
         with open("./assets/matcher.toml", "rb") as f:
             self.__config = Matcher.Config.model_validate(tomllib.load(f))
         self.__cache_db = CacheDB()
+        self.__last_synchronization: float | None = None
 
     async def run(self):
         """Run the matcher."""
@@ -76,17 +80,29 @@ class Matcher:
 
     async def __matching_task(self):
         while True:
-            await asyncio.sleep(60)
-            async for csaf, asset in self.__cache_db.fetch_pairs():
-                matches = []
-                match = Match()
-                match.asset_id = asset.id
-                match.csaf_product_id = csaf.id
-                match.score = 100
-                match.timestamp = datetime.datetime.now().timestamp()
-                match.status = ""
-                matches.append(match)
-                await self.__cache_db.store_matches(matches)
+            if (
+                self.__last_synchronization is None
+                or self.__last_synchronization + self.__config.Matcher.sync_interval
+                < time.time()
+            ):
+                try:
+                    async for csaf, asset in self.__cache_db.fetch_pairs():
+                        matches = []
+                        match = Match()
+                        match.asset_id = asset.id
+                        match.csaf_product_id = csaf.id
+                        match.score = 100
+                        match.timestamp = datetime.datetime.now().timestamp()
+                        match.status = ""
+                        matches.append(match)
+                        await self.__cache_db.store_matches(matches)
+                except Exception as e:
+                    logger.error(f"Error fetching matches: {e}")
+                    print(traceback.format_exc())
+
+                self.__last_synchronization = time.time()
+            else:
+                await asyncio.sleep(1)
 
     async def __serve_api(self):
         api = FastAPI()
@@ -117,6 +133,7 @@ class Matcher:
         @task_route.post("/start")
         async def start():
             logger.info("Starting matching task")
+            self.__last_synchronization = None
 
         @task_route.get("/status")
         async def status():
