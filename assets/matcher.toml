@@ -4,3 +4,10 @@
 [Matcher.Api]
 host = "0.0.0.0"
 port = 8998
+
+[Matcher.Cachedb]
+host = "localhost"
+port = 2345
+database = "cachedb"
+username = "admin"
+password = "secret"

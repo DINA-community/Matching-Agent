@@ -1,11 +1,22 @@
 import asyncio
+import datetime
+import time
 import tomllib
 
 import uvicorn
 from fastapi import APIRouter, FastAPI
 from pydantic import BaseModel, HttpUrl
 
+from dina.cachedb.database import CacheDB
+from dina.cachedb.fetcher_view import FetcherView
+from dina.cachedb.model import CsafProduct, Asset, Match
 from dina.common.logging import configure_logging, get_logger
+
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    create_async_engine,
+)
 
 # Configure logging
 configure_logging()
@@ -40,6 +51,7 @@ class ApiConfig(BaseModel):
 
 class MatcherConfig(BaseModel):
     Api: ApiConfig
+    Cachedb: CacheDB.Config
 
 
 class Matcher:
@@ -52,11 +64,30 @@ class Matcher:
         """
         with open("./assets/matcher.toml", "rb") as f:
             self.__config = Matcher.Config.model_validate(tomllib.load(f))
+        self.__cache_db = CacheDB()
 
     async def run(self):
         """Run the matcher."""
+        await self.__cache_db.connect(self.__config.Matcher.Cachedb)
         async with asyncio.TaskGroup() as tg:
             tg.create_task(self.__serve_api())
+            tg.create_task(self.__matching_task())
+
+    async def __matching_task(self):
+        while True:
+            await asyncio.sleep(0.1)
+            async  for csaf, asset in self.__cache_db.fetch_pairs():
+                    matches = []
+                    match = Match()
+                    match.asset_id = asset.id
+                    match.csaf_product_id = csaf.id
+                    match.score = 100
+                    match.timestamp = datetime.datetime.now().timestamp()
+                    match.status = ""
+                    matches.append(match)
+                    await self.__cache_db.store_matches(matches)
+
+
 
     async def __serve_api(self):
         api = FastAPI()
@@ -113,7 +144,6 @@ async def run_matcher():
     """Run the Matcher."""
     # Create and initialize the Matcher
     matcher = Matcher()
-
     try:
         # Find matches
         await matcher.run()

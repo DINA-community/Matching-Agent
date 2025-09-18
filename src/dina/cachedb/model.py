@@ -304,7 +304,7 @@ class Match(Base):
     score: Mapped[float] = mapped_column(nullable=False)
     # TODO: Introduce enum for match status?
     status: Mapped[str] = mapped_column(Text, nullable=False)
-    timestamp: Mapped[datetime.datetime] = mapped_column(nullable=False)
+    timestamp: Mapped[float] = mapped_column(nullable=False)
     csaf_product_id: Mapped[int] = mapped_column(
         ForeignKey("cacheDB.csaf_product.id"), nullable=False
     )
