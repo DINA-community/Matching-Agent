@@ -11,12 +11,15 @@ from pydantic import BaseModel, HttpUrl
 from dina.cachedb.database import CacheDB
 from dina.cachedb.model import Match
 from dina.common.logging import configure_logging, get_logger
+import sys
 
 # Configure logging
 configure_logging()
 
 logger = get_logger(__name__)
 
+if sys.platform.startswith("win"):
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 # TODO: Define correct fields
 class MatchUpdate(BaseModel):
