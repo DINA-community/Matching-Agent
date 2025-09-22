@@ -458,6 +458,7 @@ class CacheDB:
                         Asset.id == pairs_subquery.c.asset_id,
                     ),
                 )
+                .options(joinedload(CsafProduct.product), joinedload(Asset.product))
             )
 
             while result := (
