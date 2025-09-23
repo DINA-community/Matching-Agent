@@ -83,7 +83,7 @@ If you want to run the linter manually, run the following:
 uv run ruff check
 ```
 
-### Running the application
+### Running the applications
 
 Targets can be run by typing `uv run <TARGET_NAME>` or by selecting it in the run configurations menu
 in Pycharm.
@@ -104,3 +104,106 @@ To run the CSAF Synchronizer:
 ```shell
 uv run csafsync
 ```
+
+## Configuration and APIs
+
+This project provides three long-running components: two synchronizers and the matcher. Each reads a TOML
+configuration file from the assets/ directory and exposes a small HTTP API.
+
+- Asset Synchronizer (assetsync)
+  - Config file: assets/assetsync.toml
+  - Default API: http://0.0.0.0:8000
+- CSAF Synchronizer (csafsync)
+  - Config file: assets/csafsync.toml
+  - Default API: http://0.0.0.0:8001
+- Matcher
+  - Config file: assets/matcher.toml
+  - Default API: http://0.0.0.0:8998
+
+You can change host and port for each service in the respective config under the [..Api] section.
+
+### Matcher configuration (assets/matcher.toml)
+
+Minimal example (defaults in repo):
+
+```
+[Matcher]
+sync_interval = 60  # seconds between matching runs
+
+[Matcher.Api]
+host = "0.0.0.0"
+port = 8998
+
+[Matcher.Cachedb]
+host = "localhost"
+port = 2345
+database = "cachedb"
+username = "admin"
+password = "secret"
+```
+
+- Matcher.sync_interval: Minimal delay between matching cycles.
+- Matcher.Api.host/port: Address where the FastAPI server listens.
+- Matcher.Cachedb: Connection to the shared cache DB used by all components.
+
+The API documentation can be found at `http://host:port/docs`.
+
+### Asset Synchronizer configuration (assets/assetsync.toml)
+
+Example (defaults in repo):
+
+```
+[Assetsync]
+# Asset-specific options go here (plugin-specific)
+
+[Synchronizer]
+sync_interval = 60
+preprocessor_plugins = ["identity"]
+
+[Synchronizer.Api]
+host = "0.0.0.0"
+port = 8000
+
+[Cachedb]
+host = "localhost"
+port = 2345
+database = "cachedb"
+username = "admin"
+password = "secret"
+```
+
+- Synchronizer.sync_interval: Minimal delay between fetch cycles.
+- Synchronizer.preprocessor_plugins: List and order of preprocessing plugins.
+- Synchronizer.Api.host/port: Address for the synchronizer API.
+- Cachedb: Connection to the shared cache DB.
+- Data source plugins: Configuration TOML files are loaded from assets/plugin_configs/asset_source/…
+
+The API documentation can be found at `http://host:port/docs`.
+
+### CSAF Synchronizer configuration (assets/csafsync.toml)
+
+Example (defaults in repo):
+
+```
+[Csafsync]
+# CSAF-specific options go here (plugin-specific)
+
+[Synchronizer]
+sync_interval = 60
+preprocessor_plugins = ["identity"]
+
+[Synchronizer.Api]
+host = "0.0.0.0"
+port = 8001
+
+[Cachedb]
+host = "localhost"
+port = 2345
+database = "cachedb"
+username = "admin"
+password = "secret"
+```
+
+- Same meaning as for the Asset Synchronizer; only the default port differs.
+
+The API documentation can be found at `http://host:port/docs`.

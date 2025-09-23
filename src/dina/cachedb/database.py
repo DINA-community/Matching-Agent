@@ -404,7 +404,17 @@ class CacheDB:
             offset = 0
             limit = 200
 
-            # Sub-Abfrage für die DISTINCT ON Paare
+            # This subquery generates unique CSAF-Asset pairs with their latest match status
+            # It selects:
+            # - CSAF product ID and Asset ID for identification
+            # - Match timestamp to track when pairs were last matched
+            # - Last update timestamps for both CSAF and Asset to detect changes
+            # The query:
+            # 1. Starts with all CSAF products
+            # 2. Cross joins with all Assets (using literal(True))
+            # 3. Outer joins with Matches to get existing match data
+            # 4. Ensures uniqueness per CSAF-Asset pair
+            # 5. Orders by IDs and timestamps to get latest match status
             distinct_pairs_subquery = (
                 select(
                     CsafProduct.id.label("csaf_id"),
@@ -434,11 +444,15 @@ class CacheDB:
 
             pairs_subquery = (
                 select(distinct_pairs_subquery).where(
+                    # Filter the pairs based on three conditions:
+                    # 1. No match exists yet (timestamp is NULL)
                     (distinct_pairs_subquery.c.timestamp.is_(None))
+                    # 2. CSAF product was updated after the last match
                     | (
                         distinct_pairs_subquery.c.c_timestamp
                         > distinct_pairs_subquery.c.timestamp
                     )
+                    # 3. Asset was updated after the last match
                     | (
                         distinct_pairs_subquery.c.a_timestamp
                         > distinct_pairs_subquery.c.timestamp
@@ -446,18 +460,30 @@ class CacheDB:
                 )
             ).subquery()
 
-            # Hauptabfrage
+            # Main query to fetch CsafProduct and Asset pairs that need matching
             query = (
+                # Select both CsafProduct and Asset entities
                 select(CsafProduct, Asset)
+                # Start the query from the CsafProduct table
                 .select_from(CsafProduct)
+                # Cross join with Asset table (creates all possible combinations)
+                # literal(True) is used to create a cartesian product
                 .join(Asset, literal(value=True))
+                # Join with the filtered pairs subquery to only get pairs that need matching
+                # This filters out pairs that:
+                # - Have already been matched and haven't been updated since
+                # - Don't need re-matching based on update timestamps
                 .join(
                     pairs_subquery,
                     and_(
+                        # Match CsafProduct IDs between main query and subquery
                         CsafProduct.id == pairs_subquery.c.csaf_id,
+                        # Match Asset IDs between main query and subquery
                         Asset.id == pairs_subquery.c.asset_id,
                     ),
                 )
+                # Eagerly load the related Product entities for both CsafProduct and Asset
+                # This optimizes performance by avoiding separate queries later
                 .options(joinedload(CsafProduct.product), joinedload(Asset.product))
             )
 
@@ -467,7 +493,6 @@ class CacheDB:
                 offset += limit
                 # We want to remove all instances from the session so that any changes
                 # are not directly synced.
-                # The synchronization will occur later after preprocessing during store_data.
                 session.expunge_all()
                 for value in result:
                     yield value.tuple()
