@@ -5,7 +5,7 @@ import tomllib
 import traceback
 
 import uvicorn
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, FastAPI, HTTPException
 from pydantic import BaseModel, HttpUrl
 
 from dina.cachedb.database import CacheDB
@@ -120,8 +120,8 @@ class Matcher:
             return [
                 APIMatch(
                     id=match.id,
-                    csaf_origin="",
-                    asset_origin="",
+                    csaf_origin=match.csaf_product.origin_uri,
+                    asset_origin=match.asset.origin_uri,
                     timestamp=match.timestamp,
                     score=match.score,
                     status=match.status,
@@ -130,8 +130,19 @@ class Matcher:
             ]
 
         @matches_route.get("/{match_id}")
-        async def get_match(match_id: int):
+        async def get_match(match_id: int) -> APIMatch:
             logger.info(f"Getting match {match_id}")
+            match = await self.__cache_db.get_match(match_id)
+            if match is None:
+                raise HTTPException(status_code=404, detail="Match not found")
+            return APIMatch(
+                id=match.id,
+                csaf_origin=match.csaf_product.origin_uri,
+                asset_origin=match.asset.origin_uri,
+                timestamp=match.timestamp,
+                score=match.score,
+                status=match.status,
+            )
 
         @task_route.post("/start")
         async def start():

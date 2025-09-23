@@ -506,9 +506,24 @@ class CacheDB:
 
     async def get_matches(self) -> list[Match]:
         async with AsyncSession(self.engine) as session:
-            if result := (await session.execute(select(Match))).scalars().all():
+            stmt = (
+                select(Match)
+                .options(joinedload(Match.asset), joinedload(Match.csaf_product))
+            )
+            if result := (await session.execute(stmt)).scalars().all():
                 return list(result)
         return []
+
+    async def get_match(self, match_id: int) -> Match | None:
+        async with AsyncSession(self.engine) as session:
+            stmt = (
+                select(Match)
+                .options(joinedload(Match.asset), joinedload(Match.csaf_product))
+                .where(Match.id == match_id)
+            )
+            if result := (await session.execute(stmt)).scalars().first():
+                return result
+        return None
 
     async def disconnect(self) -> None:
         if self.engine is not None:
