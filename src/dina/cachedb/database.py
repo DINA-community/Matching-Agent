@@ -504,10 +504,14 @@ class CacheDB:
             async with session.begin():
                 session.add_all(matches)
 
-    async def get_matches(self) -> list[Match]:
+    async def get_matches(self, limit: int = 100, offset: int = 0) -> list[Match]:
         async with AsyncSession(self.engine) as session:
-            stmt = select(Match).options(
-                joinedload(Match.asset), joinedload(Match.csaf_product)
+            stmt = (
+                select(Match)
+                .options(joinedload(Match.asset), joinedload(Match.csaf_product))
+                .order_by(Match.timestamp.desc(), Match.id.desc())
+                .limit(limit)
+                .offset(offset)
             )
             if result := (await session.execute(stmt)).scalars().all():
                 return list(result)

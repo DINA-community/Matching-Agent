@@ -129,8 +129,24 @@ class Matcher:
         matches_route = APIRouter(prefix="/matches")
 
         @matches_route.get("/")
-        async def get_matches() -> list[APIMatch]:
-            logger.info("Getting matches")
+        async def get_matches(limit: int = 100, offset: int = 0) -> list[APIMatch]:
+            """Get a list of matches between CSAF advisories and assets.
+
+            Parameters:
+                limit (int): Maximum number of matches to return. Defaults to 100.
+                offset (int): Number of matches to skip for pagination. Defaults to 0.
+
+            Returns:
+                list[APIMatch]: A list of matches, each containing:
+                    - id: Unique identifier of the match
+                    - csaf_origin: Full URL to the CSAF advisory
+                    - asset_origin: Full URL to the matched asset
+                    - timestamp: Unix timestamp when the match was created
+                    - score: Matching confidence score (0-100)
+                    - status: Current status of the match
+            """
+            logger.info(f"Getting matches limit={limit} offset={offset}")
+            matches = await self.__cache_db.get_matches(limit=limit, offset=offset)
             return [
                 APIMatch(
                     id=match.id,
@@ -144,7 +160,7 @@ class Matcher:
                     score=match.score,
                     status=match.status,
                 )
-                for match in await self.__cache_db.get_matches()
+                for match in matches
             ]
 
         @matches_route.get("/{match_id}")
