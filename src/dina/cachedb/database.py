@@ -506,9 +506,8 @@ class CacheDB:
 
     async def get_matches(self) -> list[Match]:
         async with AsyncSession(self.engine) as session:
-            stmt = (
-                select(Match)
-                .options(joinedload(Match.asset), joinedload(Match.csaf_product))
+            stmt = select(Match).options(
+                joinedload(Match.asset), joinedload(Match.csaf_product)
             )
             if result := (await session.execute(stmt)).scalars().all():
                 return list(result)

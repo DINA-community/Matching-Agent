@@ -1,5 +1,5 @@
 import datetime
-from typing import Any, Dict, List, Type, AsyncGenerator
+from typing import Any, Dict, List, Type
 
 from sqlalchemy import ColumnExpressionArgument, select
 from sqlalchemy.exc import IntegrityError
@@ -15,9 +15,9 @@ class FetcherView:
         self.__origin = origin
 
     async def get_existing[T: Asset | CsafProduct](
-            self,
-            cls: Type[T],
-            where_clause: ColumnExpressionArgument,
+        self,
+        cls: Type[T],
+        where_clause: ColumnExpressionArgument,
     ) -> List[T]:
         async with AsyncSession(self.__engine) as session:
             result: List[T] = list(

@@ -345,6 +345,10 @@ class IsdubaDataSource(DataSourcePlugin):
     def origin_uri(self):
         return self.config.DataSource.Plugin.url
 
+    def build_resource_path(self, origin_info: dict[str, object]) -> str:
+        path = origin_info.get("path")
+        return str(path) if path else ""
+
 
 def process_document(
     document: dict, response: Any, origin_uri: str

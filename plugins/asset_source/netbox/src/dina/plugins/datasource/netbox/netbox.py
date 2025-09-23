@@ -482,6 +482,19 @@ class NetboxDataSource(DataSourcePlugin):
     def endpoint_info(self) -> str:
         return f"{self.config.DataSource.Plugin.api_url}"
 
+    def build_resource_path(self, origin_info: dict[str, object]) -> str:
+        try:
+            if "device_id" in origin_info:
+                return f"/api/dcim/devices/{int(origin_info['device_id'])}/"
+            if "software_id" in origin_info:
+                return f"/api/plugins/d3c/software/{int(origin_info['software_id'])}/"
+            if "relation_id" in origin_info:
+                # List endpoint in generated client is productrelationship-list
+                return f"/api/plugins/d3c/productrelationship-list/{int(origin_info['relation_id'])}/"
+        except Exception:
+            return ""
+        return ""
+
 
 def find_cachedb_type(netbox_type) -> ProductType:
     """

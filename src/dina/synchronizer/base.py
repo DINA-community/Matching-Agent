@@ -78,7 +78,7 @@ class BaseSynchronizer(ABC):
         self.config_file: Path = config_file
         self.config: SynchronizerConfig = self.load_config(config_file)
 
-        self.data_sources: dict[str, DataSourcePlugin] = self.__load_datasource_plugins(
+        self.data_sources: dict[str, DataSourcePlugin] = load_datasource_plugins(
             data_source_plugin_configs
         )
         self.preprocessor_plugins = self.__load_preprocessor_plugins(
@@ -143,68 +143,6 @@ class BaseSynchronizer(ABC):
 
         with open(config_file, "rb") as f:
             return SynchronizerConfig.model_validate(tomllib.load(f))
-
-    @staticmethod
-    def __load_datasource_plugins(plugin_configs: Path) -> dict[str, DataSourcePlugin]:
-        """
-        Load plugins from configuration files in the specified directory.
-
-        Args:
-            plugin_configs: Path to a directory containing plugin configuration files in TOML format.
-
-        Returns:
-            A list of initialized DataSourcePlugin instances.
-
-        Raises:
-            FileNotFoundError: If the plugin_configs path does not exist or is not a directory.
-            ImportError: If a plugin module cannot be imported.
-            KeyError: If a plugin configuration is missing required fields.
-        """
-        plugin_configs = plugin_configs.resolve()
-        if not plugin_configs.exists() or not plugin_configs.is_dir():
-            raise FileNotFoundError(
-                f"Plugin configuration directory not found: {plugin_configs}"
-            )
-
-        plugins: dict[str, DataSourcePlugin] = {}
-
-        # Scan the directory for TOML files
-        for config_file in plugin_configs.glob("*.toml"):
-            try:
-                # Parse the TOML file
-                with open(config_file, "rb") as f:
-                    config = DataSourcePlugin.Config.model_validate(tomllib.load(f))
-                # Extract plugin information
-                plugin_name = config.DataSource.plugin_name
-                if not plugin_name:
-                    logger.error(
-                        f"Missing required fields in plugin configuration: {config_file}"
-                    )
-                    continue
-
-                plugin_instance = BaseSynchronizer._load_plugin_from_entrypoint(
-                    plugin_name, "dina.plugins.datasource", config
-                )
-                if isinstance(plugin_instance, PreprocessorPlugin):
-                    raise ValueError(
-                        f"Plugin {plugin_name} is a preprocessor plugin, not a data source plugin"
-                    )
-                else:
-                    if plugin_instance.origin_uri in plugins:
-                        raise PluginLoadError(
-                            "Found duplicate origins for plugins. It is not allowed to synchronize with the same api endpoint twice"
-                        )
-                    plugins[plugin_instance.origin_uri] = plugin_instance
-
-                logger.info(
-                    f"Successfully loaded plugin: {plugin_name} with config: {config_file}"
-                )
-
-            except Exception as e:
-                logger.error(f"Error loading plugin from {config_file}: {e}")
-                raise e
-
-        return plugins
 
     @staticmethod
     def __load_preprocessor_plugins(
@@ -378,6 +316,68 @@ class BaseSynchronizer(ABC):
         )
         server = uvicorn.Server(config)
         await server.serve()
+
+
+def load_datasource_plugins(plugin_configs: Path) -> dict[str, DataSourcePlugin]:
+    """
+    Load plugins from configuration files in the specified directory.
+
+    Args:
+        plugin_configs: Path to a directory containing plugin configuration files in TOML format.
+
+    Returns:
+        A list of initialized DataSourcePlugin instances.
+
+    Raises:
+        FileNotFoundError: If the plugin_configs path does not exist or is not a directory.
+        ImportError: If a plugin module cannot be imported.
+        KeyError: If a plugin configuration is missing required fields.
+    """
+    plugin_configs = plugin_configs.resolve()
+    if not plugin_configs.exists() or not plugin_configs.is_dir():
+        raise FileNotFoundError(
+            f"Plugin configuration directory not found: {plugin_configs}"
+        )
+
+    plugins: dict[str, DataSourcePlugin] = {}
+
+    # Scan the directory for TOML files
+    for config_file in plugin_configs.glob("*.toml"):
+        try:
+            # Parse the TOML file
+            with open(config_file, "rb") as f:
+                config = DataSourcePlugin.Config.model_validate(tomllib.load(f))
+            # Extract plugin information
+            plugin_name = config.DataSource.plugin_name
+            if not plugin_name:
+                logger.error(
+                    f"Missing required fields in plugin configuration: {config_file}"
+                )
+                continue
+
+            plugin_instance = BaseSynchronizer._load_plugin_from_entrypoint(
+                plugin_name, "dina.plugins.datasource", config
+            )
+            if isinstance(plugin_instance, PreprocessorPlugin):
+                raise ValueError(
+                    f"Plugin {plugin_name} is a preprocessor plugin, not a data source plugin"
+                )
+            else:
+                if plugin_instance.origin_uri in plugins:
+                    raise PluginLoadError(
+                        "Found duplicate origins for plugins. It is not allowed to synchronize with the same api endpoint twice"
+                    )
+                plugins[plugin_instance.origin_uri] = plugin_instance
+
+            logger.info(
+                f"Successfully loaded plugin: {plugin_name} with config: {config_file}"
+            )
+
+        except Exception as e:
+            logger.error(f"Error loading plugin from {config_file}: {e}")
+            raise e
+
+    return plugins
 
 
 class SynchronizerStatus(BaseModel):

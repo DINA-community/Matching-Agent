@@ -92,6 +92,15 @@ class DataSourcePlugin(ABC):
     def __init__(self, config: Config):
         self.config = config
 
+    def build_resource_path(self, origin_info: dict[str, Any]) -> str:
+        """Return a plugin-specific path component for a given origin_info.
+
+        The returned value should be a path starting with '/', suitable to be
+        concatenated to the plugin's origin_uri. If the plugin cannot determine
+        a stable path from the provided origin_info, it should return an empty string.
+        """
+        return ""
+
     @abstractmethod
     async def fetch_products(self, fetcher_view: FetcherView) -> FetchProductsResult:
         """Fetch products associated with assets or csaf documents from the external data source.

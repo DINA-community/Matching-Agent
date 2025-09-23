@@ -3,6 +3,8 @@ import datetime
 import time
 import tomllib
 import traceback
+from pathlib import Path
+from typing import Any
 
 import uvicorn
 from fastapi import APIRouter, FastAPI, HTTPException
@@ -13,6 +15,8 @@ from dina.cachedb.model import Match
 from dina.common.logging import configure_logging, get_logger
 import sys
 
+from dina.synchronizer.base import load_datasource_plugins
+
 # Configure logging
 configure_logging()
 
@@ -20,6 +24,7 @@ logger = get_logger(__name__)
 
 if sys.platform.startswith("win"):
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 
 # TODO: Define correct fields
 class MatchUpdate(BaseModel):
@@ -31,8 +36,8 @@ class MatchUpdate(BaseModel):
 
 class APIMatch(BaseModel):
     id: int
-    csaf_origin: str
-    asset_origin: str
+    csaf_origin: HttpUrl
+    asset_origin: HttpUrl
     timestamp: float
     score: float
     status: str
@@ -65,7 +70,7 @@ class Matcher:
     class Config(BaseModel):
         Matcher: MatcherConfig
 
-    def __init__(self):
+    def __init__(self) -> None:
         """
         Initialize the Matcher.
         """
@@ -73,6 +78,15 @@ class Matcher:
             self.__config = Matcher.Config.model_validate(tomllib.load(f))
         self.__cache_db = CacheDB()
         self.__last_synchronization: float | None = None
+        self.__data_source_plugins = load_datasource_plugins(
+            Path("./assets/plugin_configs/data_source/asset")
+        )
+        for k, v in load_datasource_plugins(
+            Path("./assets/plugin_configs/data_source/csaf/active")
+        ).items():
+            if k in self.__data_source_plugins:
+                raise ValueError(f"Duplicate origin: {k}")
+            self.__data_source_plugins[k] = v
 
     async def run(self):
         """Run the matcher."""
@@ -120,8 +134,12 @@ class Matcher:
             return [
                 APIMatch(
                     id=match.id,
-                    csaf_origin=match.csaf_product.origin_uri,
-                    asset_origin=match.asset.origin_uri,
+                    csaf_origin=self.build_full_origin_uri(
+                        match.csaf_product.origin_uri, match.csaf_product.origin_info
+                    ),
+                    asset_origin=self.build_full_origin_uri(
+                        match.asset.origin_uri, match.asset.origin_info
+                    ),
                     timestamp=match.timestamp,
                     score=match.score,
                     status=match.status,
@@ -137,8 +155,12 @@ class Matcher:
                 raise HTTPException(status_code=404, detail="Match not found")
             return APIMatch(
                 id=match.id,
-                csaf_origin=match.csaf_product.origin_uri,
-                asset_origin=match.asset.origin_uri,
+                csaf_origin=self.build_full_origin_uri(
+                    match.csaf_product.origin_uri, match.csaf_product.origin_info
+                ),
+                asset_origin=self.build_full_origin_uri(
+                    match.asset.origin_uri, match.asset.origin_info
+                ),
                 timestamp=match.timestamp,
                 score=match.score,
                 status=match.status,
@@ -179,6 +201,25 @@ class Matcher:
         )
         server = uvicorn.Server(config)
         await server.serve()
+
+    def build_full_origin_uri(
+        self, origin_uri: str, origin_info: dict[str, Any]
+    ) -> HttpUrl:
+        """Return origin_uri extended with a plugin-provided path derived from origin_info.
+
+        Strategy:
+        - Iterate over installed data source plugins and ask each one to build a path
+          for the given origin_info; return the first non-empty path.
+        - If no path is available, just return the origin_uri as-is.
+        """
+        path = self.__data_source_plugins[origin_uri].build_resource_path(origin_info)
+        if path:
+            # Ensure we don't duplicate slashes on join
+            if origin_uri.endswith("/") and path.startswith("/"):
+                return HttpUrl(origin_uri[:-1] + path)
+            return HttpUrl(origin_uri + path)
+
+        return HttpUrl(origin_uri)
 
 
 async def run_matcher():
