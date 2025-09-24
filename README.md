@@ -142,6 +142,7 @@ Example (defaults in repo):
 sync_interval = 60
 preprocessor_plugins = ["identity"]
 plugin_configs_path = "./assets/plugin_configs/data_source/asset/"
+cleanup_grace_period = 3600
 
 [Synchronizer.Api]
 host = "0.0.0.0"
@@ -158,6 +159,7 @@ password = "secret"
 - Synchronizer.sync_interval: Minimal delay between fetch cycles.
 - Synchronizer.preprocessor_plugins: List and order of preprocessing plugins.
 - Synchronizer.plugin_configs_path: Path to the directory containing plugin configuration files.
+- Synchronizer.cleanup_grace_period: Time in seconds from the last synchronization after which assets are considered stale and will be deleted.
 - Synchronizer.Api.host/port: Address for the synchronizer API.
 - Cachedb: Connection to the shared cache DB.
 - Data source plugins: Configuration TOML files are loaded from assets/plugin_configs/asset_source/…
@@ -176,6 +178,7 @@ Example (defaults in repo):
 sync_interval = 60
 preprocessor_plugins = ["identity"]
 plugin_configs_path = "./assets/plugin_configs/data_source/csaf/active/"
+cleanup_grace_period = 3600
 
 [Synchronizer.Api]
 host = "0.0.0.0"

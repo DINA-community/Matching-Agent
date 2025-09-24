@@ -12,7 +12,6 @@ import datetime
 import logging
 import time
 import tomllib
-import traceback
 from abc import ABC
 from collections import defaultdict
 from importlib.metadata import EntryPoints, entry_points
@@ -46,6 +45,10 @@ class SynchronizerSectionConfig(BaseModel):
     preprocessor_plugins: list[str]
     Api: ApiConfig
     plugin_configs_path: Path
+    # Number of seconds before last_run to consider records stale for cleanup
+    cleanup_grace_period: int
+    # The cleanup procedure is executed every cleanup_interval seconds
+    cleanup_interval: int
 
 
 class SynchronizerConfig(BaseModel):
@@ -70,6 +73,7 @@ class BaseSynchronizer(ABC):
             config_file: Path to the manager configuration file (e.g., assetman.toml).
         """
         self.__last_synchronization: float | None = None
+        self.__last_cleanup: float | None = None
         self.cache_db: CacheDB = cache_db
         self.pending_products: list[Asset | CsafProduct] = []
         self.pending_relationships: dict[str, list[Relationship]] = defaultdict(list)
@@ -210,7 +214,6 @@ class BaseSynchronizer(ABC):
                     await fetcher_view.set_last_run(datetime.datetime.now())
                 except Exception as e:
                     logger.error(f"Error fetching data from {source.debug_info()}: {e}")
-                    print(traceback.format_exc())
 
                 self.__last_synchronization = time.time()
             else:
@@ -288,9 +291,19 @@ class BaseSynchronizer(ABC):
 
     async def cleanup_task(self, source: DataSourcePlugin):
         while True:
-            await self.cache_db.run_cleanup_for_plugin(source)
-            # TODO: Refactor to only sleep a second and instead check the cleanup interval
-            await asyncio.sleep(10)
+            if (
+                self.__last_cleanup is None
+                or self.__last_cleanup + self.config.Synchronizer.sync_interval
+                < time.time()
+            ):
+                logger.info(f"Running cleanup for {source.debug_info()}")
+                await self.cache_db.run_cleanup_for_plugin(
+                    source,
+                    self.config.Synchronizer.cleanup_grace_period,
+                )
+                self.__last_cleanup = time.time()
+            else:
+                await asyncio.sleep(1)
 
     async def cleanup(self):
         await self.cache_db.disconnect()

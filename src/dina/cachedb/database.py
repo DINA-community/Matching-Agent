@@ -190,7 +190,9 @@ class CacheDB:
         )
         await session.execute(stmt)
 
-    async def run_cleanup_for_plugin(self, source: DataSourcePlugin):
+    async def run_cleanup_for_plugin(
+        self, source: DataSourcePlugin, grace_period_seconds: int
+    ) -> None:
         async with AsyncSession(self.engine) as session:
             async with session.begin():
                 fetcher_view = self.fetcher_view(source.origin_uri)
@@ -202,8 +204,7 @@ class CacheDB:
                 last_run = last_run.astimezone(tz=datetime.timezone.utc)
 
                 data: List[Asset | CsafProduct] = []
-                # TODO: Make the time configurable
-                stale_timestamp = last_run.timestamp() - 60
+                stale_timestamp = last_run.timestamp() - grace_period_seconds
                 # We want to check if anything that was fetched X seconds before the last run is still valid
                 stmt = (
                     select(Asset)
@@ -223,6 +224,8 @@ class CacheDB:
 
                 await self.__clean_relations(session, source, stale_timestamp, last_run)
 
+                if not data:
+                    return None
                 cleanup_results = await source.cleanup_products(data)
                 assets_to_delete = [
                     result.id
