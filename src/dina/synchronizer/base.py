@@ -45,6 +45,7 @@ class SynchronizerSectionConfig(BaseModel):
     sync_interval: int
     preprocessor_plugins: list[str]
     Api: ApiConfig
+    plugin_configs_path: Path
 
 
 class SynchronizerConfig(BaseModel):
@@ -60,9 +61,7 @@ class PluginLoadError(Exception):
 class BaseSynchronizer(ABC):
     starttime = 0
 
-    def __init__(
-        self, cache_db: CacheDB, data_source_plugin_configs: Path, config_file: Path
-    ):
+    def __init__(self, cache_db: CacheDB, config_file: Path):
         """Initialize the BaseManager.
 
         Args:
@@ -79,7 +78,7 @@ class BaseSynchronizer(ABC):
         self.config: SynchronizerConfig = self.load_config(config_file)
 
         self.data_sources: dict[str, DataSourcePlugin] = load_datasource_plugins(
-            data_source_plugin_configs
+            self.config.Synchronizer.plugin_configs_path
         )
         self.preprocessor_plugins = self.__load_preprocessor_plugins(
             self.config.Synchronizer.preprocessor_plugins

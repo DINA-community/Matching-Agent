@@ -10,6 +10,8 @@
 # Synchronization inetrval in seconds.
 # The synchronizer will perform a fetching task every X seconds.
 sync_interval = 60
+# Path to the directory containing CSAF data source plugin configuration TOML files
+plugin_configs_path = "./assets/plugin_configs/data_source/csaf/active/"
 
 # A list of preprocessor plugins. The order in which they are provided
 # here is the order in which they are executed on the data.

@@ -64,6 +64,8 @@ class MatcherConfig(BaseModel):
     sync_interval: int
     Api: ApiConfig
     Cachedb: CacheDB.Config
+    asset_plugins_path: Path
+    csaf_plugins_path: Path
 
 
 class Matcher:
@@ -79,10 +81,10 @@ class Matcher:
         self.__cache_db = CacheDB()
         self.__last_synchronization: float | None = None
         self.__data_source_plugins = load_datasource_plugins(
-            Path("./assets/plugin_configs/data_source/asset")
+            Path(self.__config.Matcher.asset_plugins_path)
         )
         for k, v in load_datasource_plugins(
-            Path("./assets/plugin_configs/data_source/csaf/active")
+            Path(self.__config.Matcher.csaf_plugins_path)
         ).items():
             if k in self.__data_source_plugins:
                 raise ValueError(f"Duplicate origin: {k}")

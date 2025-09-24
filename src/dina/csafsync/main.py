@@ -29,7 +29,6 @@ class CSAFSynchronizer(BaseSynchronizer):
         cache_db = CacheDB()
         super().__init__(
             cache_db,
-            Path("./assets/plugin_configs/data_source/csaf/active/"),
             Path("./assets/csafsync.toml"),
         )
         # TODO: Initialize connections to asset databases and the cache database.
