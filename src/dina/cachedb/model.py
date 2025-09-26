@@ -16,6 +16,7 @@ from sqlalchemy import (
     Table,
     Text,
     TypeDecorator,
+    Index,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 
@@ -112,6 +113,8 @@ class Product(Base):
             "(csaf_product_id IS NULL) != (asset_id IS NULL)",
             name="check_exclusive_foreign_keys",
         ),
+        Index("product_ix_csaf_product_id", "csaf_product_id", unique=True),
+        Index("product_ix_asset_id", "asset_id", unique=True),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -299,6 +302,11 @@ class Asset(Base, MetaInfo):
 
 class Match(Base):
     __tablename__ = "match"
+    __table_args__ = (
+        Index("ix_match_csaf_product_id", "csaf_product_id"),
+        Index("ix_match_asset_id", "asset_id"),
+        Index("ix_match_csaf_product_asset", "csaf_product_id", "asset_id"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     score: Mapped[float] = mapped_column(nullable=False)

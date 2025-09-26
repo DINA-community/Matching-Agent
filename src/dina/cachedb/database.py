@@ -10,6 +10,7 @@ from sqlalchemy import (
     select,
     update,
     literal,
+    func,
 )
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import (
@@ -403,101 +404,96 @@ class CacheDB:
 
     async def fetch_pairs(self) -> AsyncGenerator[tuple[CsafProduct, Asset]]:
         async with AsyncSession(self.engine) as session:
-            offset = 0
-            limit = 200
+            csaf_offset = 0
+            csaf_limit = 1000
 
-            # This subquery generates unique CSAF-Asset pairs with their latest match status
-            # It selects:
-            # - CSAF product ID and Asset ID for identification
-            # - Match timestamp to track when pairs were last matched
-            # - Last update timestamps for both CSAF and Asset to detect changes
-            # The query:
-            # 1. Starts with all CSAF products
-            # 2. Cross joins with all Assets (using literal(True))
-            # 3. Outer joins with Matches to get existing match data
-            # 4. Ensures uniqueness per CSAF-Asset pair
-            # 5. Orders by IDs and timestamps to get latest match status
-            distinct_pairs_subquery = (
-                select(
-                    CsafProduct.id.label("csaf_id"),
-                    Asset.id.label("asset_id"),
-                    Match.timestamp,
-                    CsafProduct.last_update.label("c_timestamp"),
-                    Asset.last_update.label("a_timestamp"),
-                )
-                .select_from(CsafProduct)
-                .join(Asset, literal(value=True))
-                .outerjoin(
-                    Match,
-                    and_(
-                        CsafProduct.id == Match.csaf_product_id,
-                        Asset.id == Match.asset_id,
-                    ),
-                )
-                .distinct(CsafProduct.id, Asset.id)
-                .order_by(
-                    CsafProduct.id,
-                    Asset.id,
-                    Match.timestamp.desc(),
-                    CsafProduct.last_update,
-                    Asset.last_update,
-                )
-            ).subquery()
+            csaf_count = int(
+                (await session.execute(func.count(CsafProduct.id))).scalar()
+            )  # type: ignore
+            asset_count = int((await session.execute(func.count(Asset.id))).scalar())  # type: ignore
 
-            pairs_subquery = (
-                select(distinct_pairs_subquery).where(
-                    # Filter the pairs based on three conditions:
-                    # 1. No match exists yet (timestamp is NULL)
-                    (distinct_pairs_subquery.c.timestamp.is_(None))
-                    # 2. CSAF product was updated after the last match
-                    | (
-                        distinct_pairs_subquery.c.c_timestamp
-                        > distinct_pairs_subquery.c.timestamp
+            while True:
+                logger.trace(f"Fetching csaf product offset: {csaf_offset}")
+                csaf_subquery = (
+                    select(CsafProduct).limit(csaf_limit).offset(csaf_offset)
+                ).subquery("csaf")
+                asset_offset = 0
+                asset_limit = 1000
+                while True:
+                    logger.trace(f"Fetching asset offset: {asset_offset}")
+                    asset_subquery = (
+                        select(Asset)
+                        .limit(asset_limit)
+                        .offset(asset_offset)
+                        .subquery("assets")
                     )
-                    # 3. Asset was updated after the last match
-                    | (
-                        distinct_pairs_subquery.c.a_timestamp
-                        > distinct_pairs_subquery.c.timestamp
+                    pairs = (
+                        select(
+                            Match.id.label("match_id"),
+                            Match.timestamp.label("match_timestamp"),
+                            asset_subquery.c.id.label("asset_id"),
+                            asset_subquery.c.last_update.label("asset_timestamp"),
+                            csaf_subquery.c.id.label("csaf_id"),
+                            csaf_subquery.c.last_update.label("csaf_timestamp"),
+                        )
+                        .select_from(asset_subquery)
+                        .join(csaf_subquery, literal(value=True))
+                        .join(
+                            Match,
+                            and_(
+                                Match.asset_id == asset_subquery.c.id,
+                                Match.csaf_product_id == csaf_subquery.c.id,
+                            ),
+                            full=True,
+                        )
+                        .distinct(asset_subquery.c.id, csaf_subquery.c.id)
+                        .order_by(
+                            asset_subquery.c.id,
+                            csaf_subquery.c.id,
+                            Match.timestamp.desc(),
+                        )
+                    ).subquery("pairs")
+
+                    query = (
+                        select(CsafProduct, Asset)
+                        .select_from(pairs)
+                        .where(
+                            or_(
+                                pairs.c.match_id.is_(None),
+                                pairs.c.match_timestamp < pairs.c.asset_timestamp,
+                                pairs.c.match_timestamp < pairs.c.csaf_timestamp,
+                            )
+                        )
+                        .join(CsafProduct, CsafProduct.id == pairs.c.csaf_id)
+                        .join(Asset, Asset.id == pairs.c.asset_id)
+                        .options(
+                            joinedload(CsafProduct.product), joinedload(Asset.product)
+                        )
                     )
-                )
-            ).subquery()
 
-            # Main query to fetch CsafProduct and Asset pairs that need matching
-            query = (
-                # Select both CsafProduct and Asset entities
-                select(CsafProduct, Asset)
-                # Start the query from the CsafProduct table
-                .select_from(CsafProduct)
-                # Cross join with Asset table (creates all possible combinations)
-                # literal(True) is used to create a cartesian product
-                .join(Asset, literal(value=True))
-                # Join with the filtered pairs subquery to only get pairs that need matching
-                # This filters out pairs that:
-                # - Have already been matched and haven't been updated since
-                # - Don't need re-matching based on update timestamps
-                .join(
-                    pairs_subquery,
-                    and_(
-                        # Match CsafProduct IDs between main query and subquery
-                        CsafProduct.id == pairs_subquery.c.csaf_id,
-                        # Match Asset IDs between main query and subquery
-                        Asset.id == pairs_subquery.c.asset_id,
-                    ),
-                )
-                # Eagerly load the related Product entities for both CsafProduct and Asset
-                # This optimizes performance by avoiding separate queries later
-                .options(joinedload(CsafProduct.product), joinedload(Asset.product))
-            )
+                    result = (await session.execute(query)).fetchall()
+                    if result:
+                        for result in result:
+                            yield result.tuple()
 
-            while result := (
-                await session.execute(query.limit(limit).offset(offset))
-            ).fetchall():
-                offset += limit
-                # We want to remove all instances from the session so that any changes
-                # are not directly synced.
-                session.expunge_all()
-                for value in result:
-                    yield value.tuple()
+                    asset_offset += asset_limit
+                    if asset_offset >= asset_count:
+                        break
+
+                csaf_offset += csaf_limit
+                if csaf_offset >= csaf_count:
+                    break
+
+            return
+            # while result := (
+            #     await session.execute(pairs.limit(limit).offset(offset))
+            # ).fetchall():
+            #     offset += limit
+            #     # We want to remove all instances from the session so that any changes
+            #     # are not directly synced.
+            #     session.expunge_all()
+            #     for value in result:
+            #         yield value.tuple()
 
     async def store_matches(self, matches: list[Match]):
         if not matches:

@@ -78,6 +78,8 @@ class Matcher:
         """
         with open("./assets/matcher.toml", "rb") as f:
             self.__config = Matcher.Config.model_validate(tomllib.load(f))
+
+        self.__matches: list[Match] = []
         self.__cache_db = CacheDB()
         self.__last_synchronization: float | None = None
         self.__data_source_plugins = load_datasource_plugins(
@@ -96,6 +98,7 @@ class Matcher:
         async with asyncio.TaskGroup() as tg:
             tg.create_task(self.__serve_api())
             tg.create_task(self.__matching_task())
+            tg.create_task(self.__store_matches_task())
 
     async def __matching_task(self):
         while True:
@@ -105,21 +108,33 @@ class Matcher:
                 < time.time()
             ):
                 try:
+                    counter = 0
                     async for csaf, asset in self.__cache_db.fetch_pairs():
-                        matches = []
+                        if counter % 10000 == 0:
+                            logger.debug(f"Matching... {counter}")
+                        counter += 1
                         match = Match()
                         match.asset_id = asset.id
                         match.csaf_product_id = csaf.id
                         match.score = 100
                         match.timestamp = datetime.datetime.now().timestamp()
                         match.status = ""
-                        matches.append(match)
-                        await self.__cache_db.store_matches(matches)
+                        self.__matches.append(match)
                 except Exception as e:
                     logger.error(f"Error fetching matches: {e}")
                     print(traceback.format_exc())
 
                 self.__last_synchronization = time.time()
+            else:
+                await asyncio.sleep(1)
+
+    async def __store_matches_task(self):
+        while True:
+            if self.__matches:
+                matches = self.__matches
+                self.__matches = []
+                logger.debug(f"Storing {len(matches)} matches")
+                await self.__cache_db.store_matches(matches)
             else:
                 await asyncio.sleep(1)
 
