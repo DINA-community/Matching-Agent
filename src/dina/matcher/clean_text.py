@@ -303,6 +303,7 @@ def parse_version_freetext(expr: str):
     return d
 
 def parse_version(expr: str):
+    # TODO: take all values not only one  
     if isinstance(expr, pl.Series):
         if expr.is_empty():
             return json.dumps({})

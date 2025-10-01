@@ -111,7 +111,8 @@ class Matching:
 
         if not tokens1 or not tokens2:
             return 0.0
-
+        
+        # TODO: clarify whether token order should matter for matching
         scores = []
         for t1 in tokens1:
             best_score = 0

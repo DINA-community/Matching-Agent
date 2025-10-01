@@ -127,6 +127,7 @@ class Matcher:
 
                         # df = pl.DataFrame([{**csaf_dict, **asset_dict}])
 
+                        # TODO: add cpe and purl
                         # freetext_fields = [
                         #     "name", "hardware_name", "manufacturer_name",
                         #     "device_family"
