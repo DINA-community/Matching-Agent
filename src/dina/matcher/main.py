@@ -122,25 +122,30 @@ class Matcher:
                             logger.debug(f"Matching... {counter}")
                         counter += 1
 
+
+                        # TODO: add product_type, sbom_urls and file
                         # csaf_dict = {f"csaf_{k}": v for k, v in self.__to_dict(csaf.product).items()}
                         # asset_dict = {f"asset_{k}": v for k, v in self.__to_dict(asset.product).items()}
 
                         # df = pl.DataFrame([{**csaf_dict, **asset_dict}])
 
-                        # TODO: add cpe and purl
                         # freetext_fields = [
-                        #     "name", "hardware_name", "manufacturer_name",
-                        #     "device_family"
+                        #     # "name", "hardware_name", "manufacturer_name",
+                        #     # "device_family"
                         # ]
                     
                         # ordered_fields = [
-                        #     "version", "model", "model_numbers",
-                        #     "part_numbers"
+                        #     # "version", "model", "model_numbers",
+                        #     # "part_numbers"
+                        # ]
+
+                        # other_fields = [
+                        #     "cpe", "purl"
                         # ]
 
                         # pl.Config.set_fmt_str_lengths(2000)
 
-                        # normalizer = Normalizer(freetext_fields, ordered_fields)
+                        # normalizer = Normalizer(freetext_fields, ordered_fields, other_fields)
                         # df_norm = normalizer.apply(df)
                         
                         # # for field in freetext_fields:

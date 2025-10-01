@@ -149,20 +149,43 @@ def parse_csaf_wildcard(expr: str):
     return d
 
 def parse_rpm(expr: str):
-    m = re.match(r"(?P<name>[a-z0-9+._-]+)-(?:(?P<epoch>\d+):)?(?P<version>[0-9][0-9A-Za-z._-]*)-(?P<release>[0-9A-Za-z._-]+)\.(?P<arch>[a-z0-9_]+)(?:\.rpm)?", expr)
-    
-    if not m:
-        return None
-    
-    g = m.groupdict()
+    full = re.match(
+        r"^(?P<name>[a-z0-9+._-]+)"
+        r"-(?:(?P<epoch>\d+):)?"
+        r"(?P<version>[0-9][0-9A-Za-z._-]*)"
+        r"-(?P<release>[0-9A-Za-z._-]+)"
+        r"\.(?P<arch>[a-z0-9_]+)"
+        r"(?:\.rpm)?$",
+        expr,
+    )
 
-    d = _base_dict(Standards.RPM.value, expr)
-    d["package"] = g["name"]
-    d["architecture"] = g["arch"]
-    d["build_number"] = g["release"]
-    d["min_max_version"] = [{"min": g["version"], "max": g["version"]}]
+    if full:
+        g = full.groupdict()
+        d = _base_dict(Standards.RPM.value, expr)
+        d["package"] = g["name"]
+        d["epoch"] = g["epoch"]
+        d["architecture"] = g["arch"]
+        d["build_number"] = g["release"]
+        d["min_max_version"] = [{"min": g["version"], "max": g["version"]}]
+        return d
 
-    return d
+    evr = re.match(
+        r"^(?:(?P<epoch>\d+):)?"
+        r"(?P<version>[0-9][0-9A-Za-z._-]*)"
+        r"-(?P<release>[0-9A-Za-z.+~:_-]+)$",
+        expr,
+    )
+
+    if evr:
+        g = evr.groupdict()
+        d = _base_dict(Standards.RPM.value, expr)
+        d["epoch"] = g["epoch"]
+        d["build_number"] = g["release"]
+        d["min_max_version"] = [{"min": g["version"], "max": g["version"]}]
+        return d
+
+    return None
+
 
 def parse_deb(expr: str):
     if ":" not in expr and "-" not in expr:
@@ -306,11 +329,11 @@ def parse_version(expr: str):
     # TODO: take all values not only one  
     if isinstance(expr, pl.Series):
         if expr.is_empty():
-            return json.dumps({})
+            return {}
         expr = expr[0]
 
     if expr is None:
-        return json.dumps({})
+        return {}
     
     expr = expr.lower()
     expr = re.sub(r"\s*\+\s*", "+", expr).strip()
@@ -340,7 +363,7 @@ def parse_version(expr: str):
         case _:
             result = parse_version_freetext(expr)
     
-    return json.dumps(result or {})
+    return result
 
 def parse_freetext(expr: str):
     separator = "."
@@ -350,10 +373,110 @@ def parse_freetext(expr: str):
 
     return expr
 
+def _base_cpe_dict(raw: str) -> dict:
+    return {
+        "raw": raw,
+        "part": None,
+        "vendor": None,
+        "product": None,
+        "version": {},
+        "update": None,
+        "edition": None,
+        "language": None,
+        "sw_edition": None,
+        "target_sw": None,
+        "target_hw": None,
+        "other": None,
+    }
+
+def parse_cpe(cpe: str) -> dict:
+    d = _base_cpe_dict(cpe)
+
+    if cpe.startswith("cpe:2.3:"):
+        parts = cpe.split(":")[2:]
+        fields = list(d.keys())[1:]
+        for i, field in enumerate(fields):
+            if i < len(parts):
+                d[field] = parts[i] if parts[i] else None
+
+    elif cpe.startswith("cpe:/"):
+        parts_raw = cpe.split(":")
+        d["part"] = parts_raw[1][1:] if len(parts_raw) > 1 else None
+        d["vendor"] = parts_raw[2] if len(parts_raw) > 2 else None
+        d["product"] = parts_raw[3] if len(parts_raw) > 3 else None
+        d["version"] = parse_version(parts_raw[4]) if len(parts_raw) > 4 else {}
+        d["update"] = parts_raw[5] if len(parts_raw) > 5 and parts_raw[5] != "" else None
+        d["edition"] = parts_raw[6] if len(parts_raw) > 6 else None
+
+    else:
+         return {}
+
+    return d
+
+def _base_purl_dict(raw: str) -> dict:
+    return {
+        "raw": raw,
+        "type": None,
+        "namespace": None,
+        "name": None,
+        "version": {},
+        "qualifiers": {},
+        "subpath": None,
+    }
+
+def parse_purl(purl: str) -> dict:
+    d = _base_purl_dict(purl)
+
+    if not purl.startswith("pkg:"):
+         return {}
+
+    purl_body = purl[4:]
+
+    if "#" in purl_body:
+        purl_body, subpath = purl_body.split("#", 1)
+        d["subpath"] = subpath or None
+
+    if "?" in purl_body:
+        purl_body, qualifiers_str = purl_body.split("?", 1)
+        qualifiers = {}
+        for q in qualifiers_str.split("&"):
+            if "=" in q:
+                k, v = q.split("=", 1)
+                qualifiers[k] = v
+            else:
+                qualifiers[q] = None
+        d["qualifiers"] = qualifiers
+
+    version = None
+    if "@" in purl_body:
+        purl_body, version = purl_body.split("@", 1)
+        d["version"] = parse_version(version) or {}
+
+    parts = purl_body.split("/")
+    d["type"] = parts[0] if len(parts) > 0 else None
+
+    if len(parts) == 2:
+        d["name"] = parts[1] or None
+    elif len(parts) >= 3:
+        d["namespace"] = "/".join(parts[1:-1]) or None
+        d["name"] = parts[-1] or None
+    else:
+        d["name"] = None
+
+    for key in ("type", "namespace", "name", "subpath"):
+        if d[key] in (None, ""):
+            d[key] = None
+
+    if not d["qualifiers"]:
+        d["qualifiers"] = {}
+
+    return d
+
 class Normalizer:
-    def __init__(self, freetext_fields: list[str], ordered_fields: list[str]):
+    def __init__(self, freetext_fields: list[str], ordered_fields: list[str], other_fields: list[str]):
         self.freetext_fields = freetext_fields
         self.ordered_fields = ordered_fields
+        self.other_fields = other_fields
 
     def apply(self, df: pl.DataFrame) -> pl.DataFrame:
         updates = []
@@ -364,18 +487,33 @@ class Normalizer:
 
                 if full_col in df.columns:
                     expr = pl.col(full_col)
-                    expr = expr.map_elements(parse_freetext, return_dtype=pl.Utf8)
+                    expr = expr.map_elements(lambda x: json.dumps(parse_freetext(x)), return_dtype=pl.Utf8)
                     expr = expr.alias(f"{full_col}_norm")
                     updates.append(expr)
 
         for col in self.ordered_fields:
-             for prefix in ("csaf_", "asset_"):
+            for prefix in ("csaf_", "asset_"):
                 full_col = f"{prefix}{col}"
 
                 if full_col in df.columns:
-                    expr = pl.col(full_col).map_elements(parse_version, return_dtype=pl.Utf8)
+                    expr = pl.col(full_col).map_elements(lambda x: json.dumps(parse_version(x)), return_dtype=pl.Utf8)
                     expr = expr.alias(f"{full_col}_norm")
                     updates.append(expr)
+
+        for col in self.other_fields:
+            for prefix in ("csaf_", "asset_"):
+                full_col = f"{prefix}{col}"
+
+                if full_col in df.columns:
+                    match col:
+                        case "cpe":
+                            expr = pl.col(full_col).map_elements(lambda x: json.dumps(parse_cpe(x)), return_dtype=pl.Utf8)
+                            expr = expr.alias(f"{full_col}_norm")
+                            updates.append(expr)
+                        case "purl":
+                            expr = pl.col(full_col).map_elements(lambda x: json.dumps(parse_purl(x)), return_dtype=pl.Utf8)
+                            expr = expr.alias(f"{full_col}_norm")
+                            updates.append(expr)
 
         # ---- for tests   
         # if updates:
@@ -391,41 +529,41 @@ class Normalizer:
 
 # def main():
 #     examples = [
-#         "<V4.2.5015",
-#         "grafana-0:5.2.4-6.el7rhgs.src",
-#         "22.1.4_2024-11-11_Hot_Fix",
-#         ">= 3.12.0",
-#         "vers:all/*",
-#         "vers:all/<V3.1.2.1",
-#         "<=3.4.2.2.6",
-#         "0.81",
-#         "R15B_PC4",
-#         "22.04",
-#         "V6 + SP9 + Upd2",
-#         "6.+.9.+.2",
-#         "1.0.post1",
-#         "1.0a1",
-#         "1:2.31.1-0ubuntu9.9",
-#         ">=0.68|<=0.80",
-#         "vers:pypi/>=1.0,<2.0|>=2.0",
-#         "vers:pypi/>=1.0|<2.0",
-#         "vers:pypi/1.5",
-#         "5.1.106.0",
-#         "1.3.4",
-#         "R15B",
-#         "R15B_PC4",
-#         "R17A_SP3",
-#         "2024.11.11",
-#         "nginx-1:1.18.0-1.amd64.rpm",
-#         "v4.2sp3",
-#         "R18C_MR2",
-#         "0.81.0",
-#         "2.1.0rc2",
-#         "1.0.dev2",
-#         "6.+.9",
-#         "+.1",
-#         "2.31.1-1",
-#         "random-string",
+#         # "<V4.2.5015",
+#         # "grafana-0:5.2.4-6.el7rhgs.src",
+#         # "22.1.4_2024-11-11_Hot_Fix",
+#         # ">= 3.12.0",
+#         # "vers:all/*",
+#         # "vers:all/<V3.1.2.1",
+#         # "<=3.4.2.2.6",
+#         # "0.81",
+#         # "R15B_PC4",
+#         # "22.04",
+#         # "V6 + SP9 + Upd2",
+#         # "6.+.9.+.2",
+#         # "1.0.post1",
+#         # "1.0a1",
+#         # "1:2.31.1-0ubuntu9.9",
+#         # ">=0.68|<=0.80",
+#         # "vers:pypi/>=1.0,<2.0|>=2.0",
+#         # "vers:pypi/>=1.0|<2.0",
+#         # "vers:pypi/1.5",
+#         # "5.1.106.0",
+#         # "1.3.4",
+#         # "R15B",
+#         # "R15B_PC4",
+#         # "R17A_SP3",
+#         # "2024.11.11",
+#         # "nginx-1:1.18.0-1.amd64.rpm",
+#         # "v4.2sp3",
+#         # "R18C_MR2",
+#         # "0.81.0",
+#         # "2.1.0rc2",
+#         # "1.0.dev2",
+#         # "6.+.9",
+#         # "+.1",
+#         # "2.31.1-1",
+#         # "random-string",
 #     ]
 
 #     for ex in examples:
@@ -457,6 +595,16 @@ class Normalizer:
 #                 print(parse_deb(ex))
 #             case _:
 #                 print(parse_freetext(ex))
+
+#     # print(parse_cpe("cpe:/a:redhat:rhel_eus:8.1::appstream"))
+#     # print(parse_cpe("cpe:/a:redhat:jboss_fuse:6.3"))
+#     # print(parse_cpe("cpe:2.3:a:versa-networks:versa_director:22.1.4:2024-11-11_Hot_Fix:*:*:*:*:*:*"))
+
+#     # print(parse_purl("pkg:npm/angular/animation@12.3.1"))
+#     # print(parse_purl("pkg:deb/debian/curl@7.50.3-1?arch=i386&distro=jessie"))
+#     # print(parse_purl("pkg:rpm/redhat/openssl"))
+#     # print(parse_purl("pkg:oci/multicluster-observability-rhel8-operator@sha256:94974d6bf61f1c71b46e270464caefb9c90b5006533a894cffada70f836ff19b?arch=s390x&repository_url=registry.redhat.io/rhacm2/multicluster-observability-rhel8-operator&tag=v2.6.1-1"))
+#     # print(parse_purl("pkg:rpm/redhat/servicemesh-proxy-wasm@2.1.3-1.el8?arch=noarch"))
 
 # if __name__ == "__main__":
 #     main()
