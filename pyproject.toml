@@ -25,6 +25,9 @@ dependencies = [
     "pydantic>=2.11.7",
     "lazy-imports",
     "psycopg[binary]>=3.2.9",
+    "polars>=0.20.30",
+    "rapidfuzz>=3.9.7",
+    "packaging>=24.1"
 ]
 
 [project.optional-dependencies]

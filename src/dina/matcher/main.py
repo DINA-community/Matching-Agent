@@ -9,11 +9,16 @@ from typing import Any
 import uvicorn
 from fastapi import APIRouter, FastAPI, HTTPException
 from pydantic import BaseModel, HttpUrl
+# import polars as pl
 
 from dina.cachedb.database import CacheDB
 from dina.cachedb.model import Match
 from dina.common.logging import configure_logging, get_logger
 import sys
+
+# from dina.matcher.calculate_score import Score
+# from dina.matcher.clean_text import Normalizer
+# from dina.matcher.matching import Matching
 
 from dina.synchronizer.base import load_datasource_plugins
 
@@ -100,6 +105,9 @@ class Matcher:
             tg.create_task(self.__matching_task())
             tg.create_task(self.__store_matches_task())
 
+    def __to_dict(self, obj):
+        return {c.name: getattr(obj, c.name) for c in obj.__table__.columns}
+
     async def __matching_task(self):
         while True:
             if (
@@ -113,6 +121,54 @@ class Matcher:
                         if counter % 10000 == 0:
                             logger.debug(f"Matching... {counter}")
                         counter += 1
+
+                        # csaf_dict = {f"csaf_{k}": v for k, v in self.__to_dict(csaf.product).items()}
+                        # asset_dict = {f"asset_{k}": v for k, v in self.__to_dict(asset.product).items()}
+
+                        # df = pl.DataFrame([{**csaf_dict, **asset_dict}])
+
+                        # freetext_fields = [
+                        #     "name", "hardware_name", "manufacturer_name",
+                        #     "device_family"
+                        # ]
+                    
+                        # ordered_fields = [
+                        #     "version", "model", "model_numbers",
+                        #     "part_numbers"
+                        # ]
+
+                        # pl.Config.set_fmt_str_lengths(2000)
+
+                        # normalizer = Normalizer(freetext_fields, ordered_fields)
+                        # df_norm = normalizer.apply(df)
+                        
+                        # # for field in freetext_fields:
+                        # #     print(df_norm.select([f"csaf_{field}", f"asset_{field}"]))
+                        # #     print(df_norm.select([f"csaf_{field}_norm", f"asset_{field}_norm"]))
+
+                        # # for field in ordered_fields:
+                        # #     print(df_norm.select([f"csaf_{field}", f"asset_{field}"]))
+                        # #     print(df_norm.select([f"csaf_{field}_norm", f"asset_{field}_norm"]))
+
+                        # matching = Matching(freetext_fields, ordered_fields)
+                        # df_norm_matches = matching.df_matching(df_norm)
+
+                        # score = Score(freetext_fields, ordered_fields)
+                        # result, reason, score_procent = score.calculate_overall_score(df_norm_matches)
+
+                        # # for field in freetext_fields:
+                        # #     print(df_norm_matches.select([f"{field}_match"]))
+
+                        # # for field in ordered_fields:
+                        # #     print(df_norm_matches.select([f"{field}_match"]))
+
+                        # match = Match()
+                        # match.asset_id = asset.id
+                        # match.csaf_product_id = csaf.id
+                        # match.score = score_procent
+                        # match.timestamp = datetime.datetime.now().timestamp()
+                        # match.status = f"result: {result}, reason: {reason}"
+
                         match = Match()
                         match.asset_id = asset.id
                         match.csaf_product_id = csaf.id
@@ -120,6 +176,7 @@ class Matcher:
                         match.timestamp = datetime.datetime.now().timestamp()
                         match.status = ""
                         self.__matches.append(match)
+
                 except Exception as e:
                     logger.error(f"Error fetching matches: {e}")
                     print(traceback.format_exc())
