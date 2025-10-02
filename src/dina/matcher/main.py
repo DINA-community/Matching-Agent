@@ -102,7 +102,7 @@ class Matcher:
         await self.__cache_db.connect(self.__config.Matcher.Cachedb)
         async with asyncio.TaskGroup() as tg:
             tg.create_task(self.__serve_api())
-            tg.create_task(self.__matching_task())
+            # tg.create_task(self.__matching_task())
             tg.create_task(self.__store_matches_task())
 
     def __to_dict(self, obj):
@@ -133,7 +133,7 @@ class Matcher:
                         #     # "name", "hardware_name", "manufacturer_name",
                         #     # "device_family"
                         # ]
-                    
+
                         # ordered_fields = [
                         #     # "version", "model", "model_numbers",
                         #     # "part_numbers"
@@ -147,7 +147,7 @@ class Matcher:
 
                         # normalizer = Normalizer(freetext_fields, ordered_fields, other_fields)
                         # df_norm = normalizer.apply(df)
-                        
+
                         # # for field in freetext_fields:
                         # #     print(df_norm.select([f"csaf_{field}", f"asset_{field}"]))
                         # #     print(df_norm.select([f"csaf_{field}_norm", f"asset_{field}_norm"]))
@@ -209,12 +209,15 @@ class Matcher:
         matches_route = APIRouter(prefix="/matches")
 
         @matches_route.get("/")
-        async def get_matches(limit: int = 100, offset: int = 0) -> list[APIMatch]:
+        async def get_matches(
+            limit: int = 100, offset: int = 0, origin_uri: str | None = None
+        ) -> list[APIMatch]:
             """Get a list of matches between CSAF advisories and assets.
 
             Parameters:
                 limit (int): Maximum number of matches to return. Defaults to 100.
                 offset (int): Number of matches to skip for pagination. Defaults to 0.
+                origin_uri (HttpUrl | None): Filter matches to only include matches from a specific origin.
 
             Returns:
                 list[APIMatch]: A list of matches, each containing:
@@ -226,7 +229,9 @@ class Matcher:
                     - status: Current status of the match
             """
             logger.info(f"Getting matches limit={limit} offset={offset}")
-            matches = await self.__cache_db.get_matches(limit=limit, offset=offset)
+            matches = await self.__cache_db.get_matches(
+                limit=limit, offset=offset, origin_uri=origin_uri
+            )
             return [
                 APIMatch(
                     id=match.id,

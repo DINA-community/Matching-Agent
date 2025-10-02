@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import (
     AsyncSession,
     create_async_engine,
 )
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, contains_eager
 from sqlalchemy.sql.ddl import CreateSchema
 
 from dina.cachedb.fetcher_view import FetcherView
@@ -502,16 +502,33 @@ class CacheDB:
             async with session.begin():
                 session.add_all(matches)
 
-    async def get_matches(self, limit: int = 100, offset: int = 0) -> list[Match]:
+    async def get_matches(
+        self, limit: int = 100, offset: int = 0, origin_uri: str | None = None
+    ) -> list[Match]:
         async with AsyncSession(self.engine) as session:
-            stmt = (
+            sel = (
                 select(Match)
-                .options(joinedload(Match.asset), joinedload(Match.csaf_product))
-                .order_by(Match.timestamp.desc(), Match.id.desc())
+                .join(Match.asset)
+                .join(Match.csaf_product)
+                .options(
+                    contains_eager(Match.asset), contains_eager(Match.csaf_product)
+                )
+            )
+            if origin_uri is not None:
+                stmt = sel.filter(
+                    or_(
+                        Asset.origin_uri == origin_uri,
+                        CsafProduct.origin_uri == origin_uri,
+                    )
+                )
+            else:
+                stmt = sel
+            ordered = (
+                stmt.order_by(Match.timestamp.desc(), Match.id.desc())
                 .limit(limit)
                 .offset(offset)
             )
-            if result := (await session.execute(stmt)).scalars().all():
+            if result := (await session.execute(ordered)).scalars().all():
                 return list(result)
         return []
 
