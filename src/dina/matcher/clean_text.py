@@ -362,8 +362,8 @@ def parse_version(expr: str):
             result = parse_deb(expr)
         case _:
             result = parse_version_freetext(expr)
-    
-    return result
+
+    return result or {}
 
 def parse_freetext(expr: str):
     separator = "."
@@ -505,14 +505,20 @@ class Normalizer:
                 full_col = f"{prefix}{col}"
 
                 if full_col in df.columns:
-                    match col:
-                        case "cpe":
-                            expr = pl.col(full_col).map_elements(lambda x: json.dumps(parse_cpe(x)), return_dtype=pl.Utf8)
-                            expr = expr.alias(f"{full_col}_norm")
-                            updates.append(expr)
-                        case "purl":
-                            expr = pl.col(full_col).map_elements(lambda x: json.dumps(parse_purl(x)), return_dtype=pl.Utf8)
-                            expr = expr.alias(f"{full_col}_norm")
+                    parsers = {
+                        "cpe": parse_cpe,
+                        "purl": parse_purl,
+                        # "file": parse_file,
+                    }
+
+                    if col in parsers:
+                        parser = parsers[col]
+                        if parser:
+                            expr = (
+                                pl.col(full_col)
+                                .map_elements(lambda x: json.dumps(parser(x)), return_dtype=pl.Utf8)
+                                .alias(f"{full_col}_norm")
+                            )
                             updates.append(expr)
 
         # ---- for tests   
