@@ -31,8 +31,6 @@ class AssetSynchronizer(BaseSynchronizer):
             cache_db,
             Path("./assets/assetsync.toml"),
         )
-        # TODO: Initialize connections to asset databases and the cache database.
-        # TODO: Find the appropriate transformer plugins.
 
 
 async def run_asset_manager():

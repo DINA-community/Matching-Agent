@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import (
     AsyncSession,
     create_async_engine,
 )
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, contains_eager
 from sqlalchemy.sql.ddl import CreateSchema
 
 from dina.cachedb.fetcher_view import FetcherView
@@ -402,10 +402,13 @@ class CacheDB:
             )
             await session.execute(update_stmt)
 
-    async def fetch_pairs(self) -> AsyncGenerator[tuple[CsafProduct, Asset]]:
+    async def fetch_pairs_batches(
+        self,
+        batch_size_sqrt: int = 50,
+    ) -> AsyncGenerator[list[tuple[CsafProduct, Asset]]]:
         async with AsyncSession(self.engine) as session:
             csaf_offset = 0
-            csaf_limit = 1000
+            csaf_limit = batch_size_sqrt
 
             csaf_count = int(
                 (await session.execute(func.count(CsafProduct.id))).scalar()
@@ -418,7 +421,7 @@ class CacheDB:
                     select(CsafProduct).limit(csaf_limit).offset(csaf_offset)
                 ).subquery("csaf")
                 asset_offset = 0
-                asset_limit = 1000
+                asset_limit = batch_size_sqrt
                 while True:
                     logger.trace(f"Fetching asset offset: {asset_offset}")
                     asset_subquery = (
@@ -471,10 +474,8 @@ class CacheDB:
                         )
                     )
 
-                    result = (await session.execute(query)).fetchall()
-                    if result:
-                        for result in result:
-                            yield result.tuple()
+                    result = (await session.execute(query)).tuples().all()
+                    yield result  # type: ignore
 
                     asset_offset += asset_limit
                     if asset_offset >= asset_count:
@@ -485,15 +486,6 @@ class CacheDB:
                     break
 
             return
-            # while result := (
-            #     await session.execute(pairs.limit(limit).offset(offset))
-            # ).fetchall():
-            #     offset += limit
-            #     # We want to remove all instances from the session so that any changes
-            #     # are not directly synced.
-            #     session.expunge_all()
-            #     for value in result:
-            #         yield value.tuple()
 
     async def store_matches(self, matches: list[Match]):
         if not matches:
@@ -502,16 +494,33 @@ class CacheDB:
             async with session.begin():
                 session.add_all(matches)
 
-    async def get_matches(self, limit: int = 100, offset: int = 0) -> list[Match]:
+    async def get_matches(
+        self, limit: int = 100, offset: int = 0, origin_uri: str | None = None
+    ) -> list[Match]:
         async with AsyncSession(self.engine) as session:
-            stmt = (
+            sel = (
                 select(Match)
-                .options(joinedload(Match.asset), joinedload(Match.csaf_product))
-                .order_by(Match.timestamp.desc(), Match.id.desc())
+                .join(Match.asset)
+                .join(Match.csaf_product)
+                .options(
+                    contains_eager(Match.asset), contains_eager(Match.csaf_product)
+                )
+            )
+            if origin_uri is not None:
+                stmt = sel.filter(
+                    or_(
+                        Asset.origin_uri == origin_uri,
+                        CsafProduct.origin_uri == origin_uri,
+                    )
+                )
+            else:
+                stmt = sel
+            ordered = (
+                stmt.order_by(Match.timestamp.desc(), Match.id.desc())
                 .limit(limit)
                 .offset(offset)
             )
-            if result := (await session.execute(stmt)).scalars().all():
+            if result := (await session.execute(ordered)).scalars().all():
                 return list(result)
         return []
 
