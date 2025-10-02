@@ -288,6 +288,9 @@ def match_pairs(matches: queue.Queue, pairs: list[tuple[CsafProduct, Asset]]):
     logger.debug(f"Matching batch with {len(pairs)} pairs")
     batch = []
     for csaf, asset in pairs:
+        if not (csaf and csaf.product and asset and asset.product):
+            continue
+
         # TODO: add product_type, sbom_urls and file
         csaf_dict = {f"csaf_{k}": v for k, v in csaf.product.to_dict().items()}
         asset_dict = {f"asset_{k}": v for k, v in asset.product.to_dict().items()}
@@ -322,7 +325,7 @@ def match_pairs(matches: queue.Queue, pairs: list[tuple[CsafProduct, Asset]]):
         df_norm_matches = matching.df_matching(df_norm)
 
         score = Score(freetext_fields, ordered_fields)
-        result, reason, score_procent = score.calculate_overall_score(df_norm_matches)
+        result, reason, score_percent = score.calculate_overall_score(df_norm_matches)
 
         # for field in freetext_fields:
         #     print(df_norm_matches.select([f"{field}_match"]))
@@ -333,7 +336,7 @@ def match_pairs(matches: queue.Queue, pairs: list[tuple[CsafProduct, Asset]]):
         match = Match()
         match.asset_id = asset.id
         match.csaf_product_id = csaf.id
-        match.score = score_procent
+        match.score = score_percent
         match.timestamp = datetime.datetime.now().timestamp()
         match.status = f"result: {result}, reason: {reason}"
         # match = Match()
