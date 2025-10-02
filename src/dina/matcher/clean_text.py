@@ -472,6 +472,32 @@ def parse_purl(purl: str) -> dict:
 
     return d
 
+def _base_file_dict(name: str) -> dict:
+    return {
+        "name": name if name else None,
+        "hash_algorithm": None,
+        "file_hash": None
+    }
+
+def parse_files(files: list[dict]) -> list[dict]:
+    results = []
+
+    for file in files:
+        name = file.get("name")
+        hash_algorithm = file.get("hash_algorithm")
+        file_hash = file.get("file_hash")
+
+        name = parse_freetext(name) if name else None
+        file_hash = parse_freetext(file_hash) if file_hash else None
+
+        d = _base_file_dict(name)
+        d["hash_algorithm"] = hash_algorithm or None
+        d["file_hash"] = file_hash or None
+
+        results.append(d)
+
+    return results
+
 class Normalizer:
     def __init__(self, freetext_fields: list[str], ordered_fields: list[str], other_fields: list[str]):
         self.freetext_fields = freetext_fields
@@ -508,7 +534,7 @@ class Normalizer:
                     parsers = {
                         "cpe": parse_cpe,
                         "purl": parse_purl,
-                        # "file": parse_file,
+                        "files": parse_files,
                     }
 
                     if col in parsers:
@@ -611,6 +637,12 @@ class Normalizer:
 #     # print(parse_purl("pkg:rpm/redhat/openssl"))
 #     # print(parse_purl("pkg:oci/multicluster-observability-rhel8-operator@sha256:94974d6bf61f1c71b46e270464caefb9c90b5006533a894cffada70f836ff19b?arch=s390x&repository_url=registry.redhat.io/rhacm2/multicluster-observability-rhel8-operator&tag=v2.6.1-1"))
 #     # print(parse_purl("pkg:rpm/redhat/servicemesh-proxy-wasm@2.1.3-1.el8?arch=noarch"))
+#     # files = [
+#     #     {"name": "mybinary-1.0.0-linux-x86_64.tar.gz", "hash_algorithm": "sha256", "file_hash": "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"},
+#     #     {"name": "test-1.0.0-linux-x86_64.tar.gz", "hash_algorithm": "sha256", "file_hash": "94974d6bf61f1c71b46e270464caefb9c90b5006533a894cffada70f836ff19b?arch=s390x"},
+#     # ]
+
+#     # print(parse_files(files))
 
 # if __name__ == "__main__":
 #     main()

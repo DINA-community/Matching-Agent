@@ -122,7 +122,6 @@ class Matcher:
                             logger.debug(f"Matching... {counter}")
                         counter += 1
 
-
                         # TODO: add product_type, sbom_urls and file
                         # csaf_dict = {f"csaf_{k}": v for k, v in self.__to_dict(csaf.product).items()}
                         # asset_dict = {f"asset_{k}": v for k, v in self.__to_dict(asset.product).items()}
@@ -130,20 +129,20 @@ class Matcher:
                         # df = pl.DataFrame([{**csaf_dict, **asset_dict}])
 
                         # freetext_fields = [
-                        #     # "name", "hardware_name", "manufacturer_name",
-                        #     # "device_family"
+                        #     "name", "hardware_name", "manufacturer_name",
+                        #     "device_family"
                         # ]
                     
                         # ordered_fields = [
-                        #     # "version", "model", "model_numbers",
-                        #     # "part_numbers"
+                        #     "version", "model", "model_numbers",
+                        #     "part_numbers"
                         # ]
 
                         # other_fields = [
-                        #     "cpe", "purl"
+                        #     "cpe", "purl", "files"
                         # ]
 
-                        # pl.Config.set_fmt_str_lengths(2000)
+                        # # pl.Config.set_fmt_str_lengths(2000)
 
                         # normalizer = Normalizer(freetext_fields, ordered_fields, other_fields)
                         # df_norm = normalizer.apply(df)
@@ -153,6 +152,10 @@ class Matcher:
                         # #     print(df_norm.select([f"csaf_{field}_norm", f"asset_{field}_norm"]))
 
                         # # for field in ordered_fields:
+                        # #     print(df_norm.select([f"csaf_{field}", f"asset_{field}"]))
+                        # #     print(df_norm.select([f"csaf_{field}_norm", f"asset_{field}_norm"]))
+
+                        # # for field in other_fields:
                         # #     print(df_norm.select([f"csaf_{field}", f"asset_{field}"]))
                         # #     print(df_norm.select([f"csaf_{field}_norm", f"asset_{field}_norm"]))
 
@@ -166,6 +169,9 @@ class Matcher:
                         # #     print(df_norm_matches.select([f"{field}_match"]))
 
                         # # for field in ordered_fields:
+                        # #     print(df_norm_matches.select([f"{field}_match"]))
+
+                        # # for field in other_fields:
                         # #     print(df_norm_matches.select([f"{field}_match"]))
 
                         # match = Match()
