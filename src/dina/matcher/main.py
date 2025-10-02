@@ -1,24 +1,28 @@
 import asyncio
+import concurrent.futures
 import datetime
+import multiprocessing
+import queue
 import time
 import tomllib
 import traceback
 from pathlib import Path
+from queue import Empty, Queue
 from typing import Any
 
 import uvicorn
 from fastapi import APIRouter, FastAPI, HTTPException
 from pydantic import BaseModel, HttpUrl
-# import polars as pl
+import polars as pl
 
 from dina.cachedb.database import CacheDB
-from dina.cachedb.model import Match
+from dina.cachedb.model import Match, CsafProduct, Asset
 from dina.common.logging import configure_logging, get_logger
 import sys
 
-# from dina.matcher.calculate_score import Score
-# from dina.matcher.clean_text import Normalizer
-# from dina.matcher.matching import Matching
+from dina.matcher.calculate_score import Score
+from dina.matcher.clean_text import Normalizer
+from dina.matcher.matching import Matching
 
 from dina.synchronizer.base import load_datasource_plugins
 
@@ -84,9 +88,10 @@ class Matcher:
         with open("./assets/matcher.toml", "rb") as f:
             self.__config = Matcher.Config.model_validate(tomllib.load(f))
 
-        self.__matches: list[Match] = []
+        self.__manager = multiprocessing.Manager()
+        self.__matches: Queue[list[Match]] = self.__manager.Queue()
         self.__cache_db = CacheDB()
-        self.__last_synchronization: float | None = None
+        self.__last_matching: float | None = None
         self.__data_source_plugins = load_datasource_plugins(
             Path(self.__config.Matcher.asset_plugins_path)
         )
@@ -102,104 +107,60 @@ class Matcher:
         await self.__cache_db.connect(self.__config.Matcher.Cachedb)
         async with asyncio.TaskGroup() as tg:
             tg.create_task(self.__serve_api())
-            # tg.create_task(self.__matching_task())
+            tg.create_task(self.__matching_task())
             tg.create_task(self.__store_matches_task())
 
-    def __to_dict(self, obj):
-        return {c.name: getattr(obj, c.name) for c in obj.__table__.columns}
-
-    async def __matching_task(self):
+    async def __matching_task(self) -> None:
         while True:
             if (
-                self.__last_synchronization is None
-                or self.__last_synchronization + self.__config.Matcher.sync_interval
+                self.__last_matching is None
+                or self.__last_matching + self.__config.Matcher.sync_interval
                 < time.time()
             ):
                 try:
-                    counter = 0
-                    async for csaf, asset in self.__cache_db.fetch_pairs():
-                        if counter % 10000 == 0:
-                            logger.debug(f"Matching... {counter}")
-                        counter += 1
-
-
-                        # TODO: add product_type, sbom_urls and file
-                        # csaf_dict = {f"csaf_{k}": v for k, v in self.__to_dict(csaf.product).items()}
-                        # asset_dict = {f"asset_{k}": v for k, v in self.__to_dict(asset.product).items()}
-
-                        # df = pl.DataFrame([{**csaf_dict, **asset_dict}])
-
-                        # freetext_fields = [
-                        #     # "name", "hardware_name", "manufacturer_name",
-                        #     # "device_family"
-                        # ]
-
-                        # ordered_fields = [
-                        #     # "version", "model", "model_numbers",
-                        #     # "part_numbers"
-                        # ]
-
-                        # other_fields = [
-                        #     "cpe", "purl"
-                        # ]
-
-                        # pl.Config.set_fmt_str_lengths(2000)
-
-                        # normalizer = Normalizer(freetext_fields, ordered_fields, other_fields)
-                        # df_norm = normalizer.apply(df)
-
-                        # # for field in freetext_fields:
-                        # #     print(df_norm.select([f"csaf_{field}", f"asset_{field}"]))
-                        # #     print(df_norm.select([f"csaf_{field}_norm", f"asset_{field}_norm"]))
-
-                        # # for field in ordered_fields:
-                        # #     print(df_norm.select([f"csaf_{field}", f"asset_{field}"]))
-                        # #     print(df_norm.select([f"csaf_{field}_norm", f"asset_{field}_norm"]))
-
-                        # matching = Matching(freetext_fields, ordered_fields)
-                        # df_norm_matches = matching.df_matching(df_norm)
-
-                        # score = Score(freetext_fields, ordered_fields)
-                        # result, reason, score_procent = score.calculate_overall_score(df_norm_matches)
-
-                        # # for field in freetext_fields:
-                        # #     print(df_norm_matches.select([f"{field}_match"]))
-
-                        # # for field in ordered_fields:
-                        # #     print(df_norm_matches.select([f"{field}_match"]))
-
-                        # match = Match()
-                        # match.asset_id = asset.id
-                        # match.csaf_product_id = csaf.id
-                        # match.score = score_procent
-                        # match.timestamp = datetime.datetime.now().timestamp()
-                        # match.status = f"result: {result}, reason: {reason}"
-
-                        match = Match()
-                        match.asset_id = asset.id
-                        match.csaf_product_id = csaf.id
-                        match.score = 100
-                        match.timestamp = datetime.datetime.now().timestamp()
-                        match.status = ""
-                        self.__matches.append(match)
-
+                    parallel_tasks = []
+                    num_processes = multiprocessing.cpu_count()
+                    with concurrent.futures.ProcessPoolExecutor() as pool:
+                        loop = asyncio.get_event_loop()
+                        async for batch in self.__cache_db.fetch_pairs_batches(20):
+                            if not batch:
+                                continue
+                            while self.__matches.qsize() > num_processes * 2:
+                                await asyncio.sleep(0.1)
+                            parallel_tasks.append(
+                                loop.run_in_executor(
+                                    pool,
+                                    match_pairs,
+                                    self.__matches,
+                                    batch,
+                                )
+                            )
+                            if len(parallel_tasks) >= num_processes:
+                                await asyncio.gather(*parallel_tasks)
+                                parallel_tasks = []
                 except Exception as e:
                     logger.error(f"Error fetching matches: {e}")
                     print(traceback.format_exc())
 
-                self.__last_synchronization = time.time()
+                self.__last_matching = time.time()
             else:
                 await asyncio.sleep(1)
 
     async def __store_matches_task(self):
         while True:
-            if self.__matches:
-                matches = self.__matches
-                self.__matches = []
-                logger.debug(f"Storing {len(matches)} matches")
-                await self.__cache_db.store_matches(matches)
-            else:
-                await asyncio.sleep(1)
+            tasks = []
+            while not self.__matches.empty():
+                try:
+                    matches_batch = self.__matches.get(block=False)
+                    logger.debug(
+                        f"Storing {len(matches_batch)} matches. ~{self.__matches.qsize()} batches remaining."
+                    )
+                    tasks.append(self.__cache_db.store_matches(matches_batch))
+                except Empty:
+                    pass
+            if tasks:
+                await asyncio.gather(*tasks)
+            await asyncio.sleep(0.1)
 
     async def __serve_api(self):
         api = FastAPI()
@@ -270,7 +231,7 @@ class Matcher:
         @task_route.post("/start")
         async def start():
             logger.info("Starting matching task")
-            self.__last_synchronization = None
+            self.__last_matching = None
 
         @task_route.get("/status")
         async def status():
@@ -321,6 +282,68 @@ class Matcher:
             return HttpUrl(origin_uri + path)
 
         return HttpUrl(origin_uri)
+
+
+def match_pairs(matches: queue.Queue, pairs: list[tuple[CsafProduct, Asset]]):
+    logger.debug(f"Matching batch with {len(pairs)} pairs")
+    batch = []
+    for csaf, asset in pairs:
+        # TODO: add product_type, sbom_urls and file
+        csaf_dict = {f"csaf_{k}": v for k, v in csaf.product.to_dict().items()}
+        asset_dict = {f"asset_{k}": v for k, v in asset.product.to_dict().items()}
+
+        df = pl.DataFrame([{**csaf_dict, **asset_dict}])
+
+        freetext_fields = [
+            "name",
+            "hardware_name",
+            "manufacturer_name",
+            "device_family",
+        ]
+
+        ordered_fields = ["version", "model", "model_numbers", "part_numbers"]
+
+        other_fields = ["cpe", "purl"]
+
+        pl.Config.set_fmt_str_lengths(2000)
+
+        normalizer = Normalizer(freetext_fields, ordered_fields, other_fields)
+        df_norm = normalizer.apply(df)
+
+        # for field in freetext_fields:
+        #     print(df_norm.select([f"csaf_{field}", f"asset_{field}"]))
+        #     print(df_norm.select([f"csaf_{field}_norm", f"asset_{field}_norm"]))
+
+        # for field in ordered_fields:
+        #     print(df_norm.select([f"csaf_{field}", f"asset_{field}"]))
+        #     print(df_norm.select([f"csaf_{field}_norm", f"asset_{field}_norm"]))
+
+        matching = Matching(freetext_fields, ordered_fields)
+        df_norm_matches = matching.df_matching(df_norm)
+
+        score = Score(freetext_fields, ordered_fields)
+        result, reason, score_procent = score.calculate_overall_score(df_norm_matches)
+
+        # for field in freetext_fields:
+        #     print(df_norm_matches.select([f"{field}_match"]))
+
+        # for field in ordered_fields:
+        #     print(df_norm_matches.select([f"{field}_match"]))
+
+        match = Match()
+        match.asset_id = asset.id
+        match.csaf_product_id = csaf.id
+        match.score = score_procent
+        match.timestamp = datetime.datetime.now().timestamp()
+        match.status = f"result: {result}, reason: {reason}"
+        # match = Match()
+        # match.asset_id = asset.id
+        # match.csaf_product_id = csaf.id
+        # match.score = 100
+        # match.timestamp = datetime.datetime.now().timestamp()
+        # match.status = ""
+        batch.append(match)
+    matches.put(batch)
 
 
 async def run_matcher():

@@ -1,9 +1,0 @@
-# An invalid plugin configuration
-
-[DataSource]
-plugin_name = "sample"
-timeout_seconds = 30
-update_interval = 60
-
-[DataSource.YourPluginSection]
-some_param = "hello"
