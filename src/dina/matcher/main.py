@@ -1,9 +1,13 @@
 import asyncio
+import concurrent.futures
 import datetime
+import multiprocessing
+import queue
 import time
 import tomllib
 import traceback
 from pathlib import Path
+from queue import Empty, Queue
 from typing import Any
 
 import uvicorn
@@ -11,7 +15,7 @@ from fastapi import APIRouter, FastAPI, HTTPException
 from pydantic import BaseModel, HttpUrl
 
 from dina.cachedb.database import CacheDB
-from dina.cachedb.model import Match
+from dina.cachedb.model import Match, CsafProduct, Asset
 from dina.common.logging import configure_logging, get_logger
 import sys
 
@@ -79,7 +83,8 @@ class Matcher:
         with open("./assets/matcher.toml", "rb") as f:
             self.__config = Matcher.Config.model_validate(tomllib.load(f))
 
-        self.__matches: list[Match] = []
+        self.__manager = multiprocessing.Manager()
+        self.__matches: Queue[list[Match]] = self.__manager.Queue()
         self.__cache_db = CacheDB()
         self.__last_synchronization: float | None = None
         self.__data_source_plugins = load_datasource_plugins(
@@ -100,7 +105,7 @@ class Matcher:
             tg.create_task(self.__matching_task())
             tg.create_task(self.__store_matches_task())
 
-    async def __matching_task(self):
+    async def __matching_task(self) -> None:
         while True:
             if (
                 self.__last_synchronization is None
@@ -108,18 +113,26 @@ class Matcher:
                 < time.time()
             ):
                 try:
-                    counter = 0
-                    async for csaf, asset in self.__cache_db.fetch_pairs():
-                        if counter % 10000 == 0:
-                            logger.debug(f"Matching... {counter}")
-                        counter += 1
-                        match = Match()
-                        match.asset_id = asset.id
-                        match.csaf_product_id = csaf.id
-                        match.score = 100
-                        match.timestamp = datetime.datetime.now().timestamp()
-                        match.status = ""
-                        self.__matches.append(match)
+                    parallel_tasks = []
+                    num_processes = 4
+                    with concurrent.futures.ProcessPoolExecutor() as pool:
+                        loop = asyncio.get_event_loop()
+                        async for batch in self.__cache_db.fetch_pairs_batches():
+                            if not batch:
+                                continue
+                            while self.__matches.qsize() > 10:
+                                await asyncio.sleep(0.1)
+                            parallel_tasks.append(
+                                loop.run_in_executor(
+                                    pool,
+                                    match_pairs,
+                                    self.__matches,
+                                    batch,
+                                )
+                            )
+                            if len(parallel_tasks) >= num_processes:
+                                await asyncio.gather(*parallel_tasks)
+                                parallel_tasks = []
                 except Exception as e:
                     logger.error(f"Error fetching matches: {e}")
                     print(traceback.format_exc())
@@ -130,13 +143,19 @@ class Matcher:
 
     async def __store_matches_task(self):
         while True:
-            if self.__matches:
-                matches = self.__matches
-                self.__matches = []
-                logger.debug(f"Storing {len(matches)} matches")
-                await self.__cache_db.store_matches(matches)
-            else:
-                await asyncio.sleep(1)
+            tasks = []
+            while not self.__matches.empty():
+                try:
+                    matches_batch = self.__matches.get(block=False)
+                    logger.debug(
+                        f"Storing {len(matches_batch)} matches. ~{self.__matches.qsize()} batches remaining."
+                    )
+                    tasks.append(self.__cache_db.store_matches(matches_batch))
+                except Empty:
+                    pass
+            if tasks:
+                await asyncio.gather(*tasks)
+            await asyncio.sleep(0.1)
 
     async def __serve_api(self):
         api = FastAPI()
@@ -253,6 +272,20 @@ class Matcher:
             return HttpUrl(origin_uri + path)
 
         return HttpUrl(origin_uri)
+
+
+def match_pairs(matches: queue.Queue, pairs: list[tuple[CsafProduct, Asset]]):
+    logger.debug(f"Matching batch with {len(pairs)} pairs")
+    batch = []
+    for csaf, asset in pairs:
+        match = Match()
+        match.asset_id = asset.id
+        match.csaf_product_id = csaf.id
+        match.score = 100
+        match.timestamp = datetime.datetime.now().timestamp()
+        match.status = ""
+        batch.append(match)
+    matches.put(batch)
 
 
 async def run_matcher():

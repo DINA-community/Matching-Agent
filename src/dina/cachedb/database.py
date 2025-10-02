@@ -402,10 +402,12 @@ class CacheDB:
             )
             await session.execute(update_stmt)
 
-    async def fetch_pairs(self) -> AsyncGenerator[tuple[CsafProduct, Asset]]:
+    async def fetch_pairs_batches(
+        self,
+    ) -> AsyncGenerator[list[tuple[CsafProduct, Asset]]]:
         async with AsyncSession(self.engine) as session:
             csaf_offset = 0
-            csaf_limit = 1000
+            csaf_limit = 500
 
             csaf_count = int(
                 (await session.execute(func.count(CsafProduct.id))).scalar()
@@ -418,7 +420,7 @@ class CacheDB:
                     select(CsafProduct).limit(csaf_limit).offset(csaf_offset)
                 ).subquery("csaf")
                 asset_offset = 0
-                asset_limit = 1000
+                asset_limit = 500
                 while True:
                     logger.trace(f"Fetching asset offset: {asset_offset}")
                     asset_subquery = (
@@ -471,10 +473,8 @@ class CacheDB:
                         )
                     )
 
-                    result = (await session.execute(query)).fetchall()
-                    if result:
-                        for result in result:
-                            yield result.tuple()
+                    result = (await session.execute(query)).tuples().all()
+                    yield result  # type: ignore
 
                     asset_offset += asset_limit
                     if asset_offset >= asset_count:
@@ -485,15 +485,6 @@ class CacheDB:
                     break
 
             return
-            # while result := (
-            #     await session.execute(pairs.limit(limit).offset(offset))
-            # ).fetchall():
-            #     offset += limit
-            #     # We want to remove all instances from the session so that any changes
-            #     # are not directly synced.
-            #     session.expunge_all()
-            #     for value in result:
-            #         yield value.tuple()
 
     async def store_matches(self, matches: list[Match]):
         if not matches:
