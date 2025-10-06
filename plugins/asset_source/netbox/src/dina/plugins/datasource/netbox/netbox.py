@@ -24,6 +24,7 @@ from dina.plugins.datasource.netbox.generated.api_client.api.plugins import (
     plugins_d3c_productrelationship_list_list,
     plugins_d3c_software_list_list,
 )
+from dina.plugins.datasource.netbox.generated.api_client.errors import UnexpectedStatus
 from dina.plugins.datasource.netbox.generated.api_client.models import (
     DeviceTypeCustomFields,
 )
@@ -55,7 +56,10 @@ class NetboxDataSource(DataSourcePlugin):
         try:
             netbox = self.config.DataSource.Plugin
             self.client = AuthenticatedClient(
-                base_url=netbox.api_url, prefix="Token", token=netbox.api_token
+                base_url=netbox.api_url,
+                prefix="Token",
+                token=netbox.api_token,
+                raise_on_unexpected_status=True,
             )
         except KeyError:
             raise KeyError("Missing Netbox configuration parameter")
@@ -88,33 +92,46 @@ class NetboxDataSource(DataSourcePlugin):
             dcim_manufacturers_list.asyncio(
                 client=self.client, last_updated_gt=[last_run]
             ),
+            return_exceptions=True,
         )
 
-        if devices_result:
+        try:
+            devices_result = validate_response(devices_result)
             devices = {device.id: device for device in devices_result.results}
-        else:
-            raise Exception("what dis")
+        except UnexpectedStatus as e:
+            logger.error(f"Failed to fetch devices: {e.status_code}")
+            devices = {}
 
-        if software_results:
+        try:
+            software_results = validate_response(software_results)
             software = {sw.id: sw for sw in software_results.results}
-        else:
-            raise Exception("what dis")
+        except UnexpectedStatus as e:
+            logger.error(f"Failed to fetch software: {e.status_code}")
+            if e.status_code == 404:
+                logger.warning(
+                    "Received 404 when fetching software. This might be because the D3C plugin is not installed on the provided netbox instance."
+                )
+            software = {}
 
-        if device_types_result:
+        try:
+            device_types_result = validate_response(device_types_result)
             device_types = {
                 device_type.id: device_type
                 for device_type in device_types_result.results
             }
-        else:
-            raise Exception("what dis")
+        except UnexpectedStatus as e:
+            logger.error(f"Failed to fetch device_types: {e.status_code}")
+            device_types = {}
 
-        if manufacturers_result:
+        try:
+            manufacturers_result = validate_response(manufacturers_result)
             manufacturers = {
                 manufacturer.id: manufacturer
                 for manufacturer in manufacturers_result.results
             }
-        else:
-            raise Exception("what dis")
+        except UnexpectedStatus as e:
+            logger.error(f"Failed to fetch manufacturers: {e.status_code}")
+            manufacturers = {}
 
         # TODO: Maybe we can use graphql instead to reduce the amount of communication needed?
         if manufacturers:
@@ -506,3 +523,11 @@ def find_cachedb_type(netbox_type) -> ProductType:
         return ProductType.Software
     else:
         return ProductType.Undefined
+
+
+def validate_response[T](response: T | BaseException | None) -> T:
+    if response is None:
+        raise RuntimeError("No response")
+    if isinstance(response, BaseException):
+        raise response
+    return response
