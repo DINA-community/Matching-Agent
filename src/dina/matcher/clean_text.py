@@ -539,10 +539,11 @@ class Normalizer:
 
                     if col in parsers:
                         parser = parsers[col]
+
                         if parser:
                             expr = (
                                 pl.col(full_col)
-                                .map_elements(lambda x: json.dumps(parser(x)), return_dtype=pl.Utf8)
+                                .map_elements(lambda x, parser=parser: json.dumps(parser(x)), return_dtype=pl.Utf8)
                                 .alias(f"{full_col}_norm")
                             )
                             updates.append(expr)
