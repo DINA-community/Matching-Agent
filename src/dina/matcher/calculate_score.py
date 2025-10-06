@@ -1,15 +1,15 @@
 
 class Score:
-    def __init__(self, freetext_fields: list[str], ordered_fields: list[str]):
-        self.fields = freetext_fields + ordered_fields
+    def __init__(self, freetext_fields: list[str], ordered_fields: list[str], other_fields: list[str]):
+        self.fields = freetext_fields + ordered_fields + other_fields
 
     def calculate_overall_score(self, df_norm):
         vendor_score = product_name_score = product_family_score = version_score = keyword_score = 0.0
-        vendor_threshold = 80
-        product_family_threshold = 80
-        product_name_threshold = 80
-        keyword_threshold = 80
-        version_threshold = 80
+        vendor_threshold = 0
+        product_family_threshold = 0
+        product_name_threshold = 20
+        keyword_threshold = 0
+        version_threshold = 20
 
         keyword_scores = []
 

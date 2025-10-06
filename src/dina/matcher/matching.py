@@ -200,14 +200,12 @@ class Matching:
                 )
             )
     
-    def compare_fields(self, csaf_field: dict | str | None, asset_field: dict | str | None) -> float:
+    def compare_fields(self, csaf_field: dict | str | None, asset_field: dict | str | None) -> float:        
         if not csaf_field or not asset_field:
             return 0.0
 
         if isinstance(csaf_field, str) and isinstance(asset_field, str):
-            procent = self._compare_freetext_with_order(csaf_field, asset_field)
-            print(csaf_field, asset_field, procent)
-            return procent
+            return self._compare_freetext_with_order(csaf_field, asset_field)
 
         if isinstance(csaf_field, dict) and isinstance(asset_field, dict):
             matches = 0.0
@@ -230,12 +228,15 @@ class Matching:
             if total == 0:
                 return 0.0
             
-            procent = matches / total
-
-            print(csaf_field, asset_field, procent)
-
-            return procent
-
+            return matches / total
+        
+        if isinstance(csaf_field, list) and isinstance(asset_field, list):            
+            for a_field in asset_field:
+                for c_field in csaf_field:
+                    if isinstance(a_field, str) and isinstance(c_field, str):
+                        if c_field == a_field:
+                            return 1.0
+                        
         return 0.0
 
     def df_matching(self, df_norm: pl.DataFrame) -> pl.DataFrame:
@@ -350,35 +351,44 @@ class Matching:
 # def main():
 #     matcher = Matching([], [], [])
 
-#     csaf_field = {
-#         "raw": "cpe:2.3:o:redhat:enterprise_linux:7:*:computenode:*:*:*:*:*:*",
-#         "part": "o",
-#         "vendor": "redhat",
-#         "product": "enterprise_linux",
-#         "version": {
-#             "schema": "pep-440",
-#             "raw": "7",
-#             "release_number": "7",
-#             "min_max_version": [{"min": "7", "max": "7"}],
-#         },
-#         "edition": "computenode",
-#     }
+#     # csaf_field = {
+#     #     "raw": "cpe:2.3:o:redhat:enterprise_linux:7:*:computenode:*:*:*:*:*:*",
+#     #     "part": "o",
+#     #     "vendor": "redhat",
+#     #     "product": "enterprise_linux",
+#     #     "version": {
+#     #         "schema": "pep-440",
+#     #         "raw": "7",
+#     #         "release_number": "7",
+#     #         "min_max_version": [{"min": "7", "max": "7"}],
+#     #     },
+#     #     "edition": "computenode",
+#     # }
 
-#     asset_field = {
-#         "raw": "cpe:2.3:o:redhat:enterprise_linux:6:*:workstation:*:*:*:*:*:*",
-#         "part": "o",
-#         "vendor": "redhat",
-#         "product": "enterprise_linux",
-#         "version": {
-#             "schema": "pep-440",
-#             "raw": "6",
-#             "release_number": "6",
-#             "min_max_version": [{"min": "6", "max": "6"}],
-#         },
-#         "edition": "workstation",
-#     }
+#     # asset_field = {
+#     #     "raw": "cpe:2.3:o:redhat:enterprise_linux:6:*:workstation:*:*:*:*:*:*",
+#     #     "part": "o",
+#     #     "vendor": "redhat",
+#     #     "product": "enterprise_linux",
+#     #     "version": {
+#     #         "schema": "pep-440",
+#     #         "raw": "6",
+#     #         "release_number": "6",
+#     #         "min_max_version": [{"min": "6", "max": "6"}],
+#     #     },
+#     #     "edition": "workstation",
+#     # }
 
-#     score = matcher.compare_fields(csaf_field, asset_field)
+#     # score = matcher.compare_fields(csaf_field, asset_field)
+#     # csaf_sbom_urls = ["https://www.free.org/news/python-switch-statement-switch-case-example/", "https://www.test.org"]
+#     # asset_sbom_urls = ["https://www.freecodecamp.org/news/python-switch-statement-switch-case-example/"]
+
+#     # score = matcher.compare_fields(csaf_sbom_urls, asset_sbom_urls)
+
+#     # csaf_product_type = "Device"
+#     # asset_product_type = "Undefined"
+
+#     # score = matcher.compare_fields(csaf_product_type, asset_product_type)
 
 # if __name__ == "__main__":
 #     main()

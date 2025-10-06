@@ -291,22 +291,17 @@ def match_pairs(matches: queue.Queue, pairs: list[tuple[CsafProduct, Asset]]):
         if not (csaf and csaf.product and asset and asset.product):
             continue
 
-        # TODO: add product_type, sbom_urls and file
+        # TODO: add file
         csaf_dict = {f"csaf_{k}": v for k, v in csaf.product.to_dict().items()}
         asset_dict = {f"asset_{k}": v for k, v in asset.product.to_dict().items()}
 
         df = pl.DataFrame([{**csaf_dict, **asset_dict}])
 
-        freetext_fields = [
-            "name",
-            "hardware_name",
-            "manufacturer_name",
-            "device_family",
-        ]
+        freetext_fields = ["name", "hardware_name", "manufacturer_name", "device_family"]
 
         ordered_fields = ["version", "model", "model_numbers", "part_numbers"]
 
-        other_fields = ["cpe", "purl"]
+        other_fields = ["cpe", "purl", "product_type", "sbom_urls"]
 
         pl.Config.set_fmt_str_lengths(2000)
 
@@ -324,7 +319,7 @@ def match_pairs(matches: queue.Queue, pairs: list[tuple[CsafProduct, Asset]]):
         matching = Matching(freetext_fields, ordered_fields, other_fields)
         df_norm_matches = matching.df_matching(df_norm)
 
-        score = Score(freetext_fields, ordered_fields)
+        score = Score(freetext_fields, ordered_fields, other_fields)
         result, reason, score_percent = score.calculate_overall_score(df_norm_matches)
 
         # for field in freetext_fields:

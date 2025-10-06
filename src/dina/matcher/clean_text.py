@@ -567,7 +567,11 @@ class Normalizer:
                                 .map_elements(lambda x, parser=parser: json.dumps(parser(x)), return_dtype=pl.Utf8)
                                 .alias(f"{full_col}_norm")
                             )
-                            updates.append(expr)
+                    else: 
+                        expr = pl.col(full_col).alias(f"{full_col}_norm")
+
+                    updates.append(expr)
+
 
         # ---- for tests   
         # if updates:
