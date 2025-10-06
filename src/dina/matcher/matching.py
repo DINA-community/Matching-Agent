@@ -6,9 +6,10 @@ from rapidfuzz import fuzz
 from packaging.version import Version, InvalidVersion
 
 class Matching:
-    def __init__(self, freetext_fields: list[str], ordered_fields: list[str]):
+    def __init__(self, freetext_fields: list[str], ordered_fields: list[str], other_fields: list[str]):
         self.freetext_fields = freetext_fields
         self.ordered_fields = ordered_fields
+        self.other_fields = other_fields
 
     def _safe_version(self, val: str):
         if not val:
@@ -199,6 +200,44 @@ class Matching:
                 )
             )
     
+    def compare_fields(self, csaf_field: dict | str | None, asset_field: dict | str | None) -> float:
+        if not csaf_field or not asset_field:
+            return 0.0
+
+        if isinstance(csaf_field, str) and isinstance(asset_field, str):
+            procent = self._compare_freetext_with_order(csaf_field, asset_field)
+            print(csaf_field, asset_field, procent)
+            return procent
+
+        if isinstance(csaf_field, dict) and isinstance(asset_field, dict):
+            matches = 0.0
+            total = 0
+
+            for key in csaf_field.keys() & asset_field.keys():
+                val1 = csaf_field[key]
+                val2 = asset_field[key]
+
+                if key == "version" and isinstance(val1, dict) and isinstance(val2, dict):
+                    total += 1
+                    matches += self._compare_versions(val1, val2)
+                    continue
+
+                if isinstance(val1, (str, dict)) and isinstance(val2, (str, dict)):
+                    total += 1
+                    similarity = self.compare_fields(val1, val2)
+                    matches += similarity
+
+            if total == 0:
+                return 0.0
+            
+            procent = matches / total
+
+            print(csaf_field, asset_field, procent)
+
+            return procent
+
+        return 0.0
+
     def df_matching(self, df_norm: pl.DataFrame) -> pl.DataFrame:
         csaf_cpe_norm = "csaf_cpe_norm"
         csaf_purl_norm = "csaf_purl_norm"
@@ -285,6 +324,61 @@ class Matching:
                         .alias(f"{field}_{csaf_purl_norm}_match")
                     )
 
-                    # print(df_norm.select([csaf_purl_norm, asset_norm, f"{field}_csaf_purl_match"]))
+                    # print(df_norm.select([csaf_purl_norm, asset_norm, f"{field}_{csaf_purl_norm}_match"]))
+
+        for field in self.other_fields:
+            csaf_norm, asset_norm = f"csaf_{field}_norm", f"asset_{field}_norm"
+
+            if csaf_norm in df_norm and asset_norm in df_norm:
+                df_norm = df_norm.with_columns(
+                    pl.struct([csaf_norm, asset_norm])
+                    .map_elements(
+                        lambda row: self.compare_fields(
+                            self._safe_load(row[csaf_norm]),
+                            self._safe_load(row[asset_norm]),
+                        ),
+                        return_dtype=pl.Float64,
+                    )
+                    .alias(f"{field}_match")
+                )
+
+                # print(df_norm.select([f"csaf_{field}_norm", f"asset_{field}_norm", f"{field}_match"]))
 
         return df_norm
+    
+
+# def main():
+#     matcher = Matching([], [], [])
+
+#     csaf_field = {
+#         "raw": "cpe:2.3:o:redhat:enterprise_linux:7:*:computenode:*:*:*:*:*:*",
+#         "part": "o",
+#         "vendor": "redhat",
+#         "product": "enterprise_linux",
+#         "version": {
+#             "schema": "pep-440",
+#             "raw": "7",
+#             "release_number": "7",
+#             "min_max_version": [{"min": "7", "max": "7"}],
+#         },
+#         "edition": "computenode",
+#     }
+
+#     asset_field = {
+#         "raw": "cpe:2.3:o:redhat:enterprise_linux:6:*:workstation:*:*:*:*:*:*",
+#         "part": "o",
+#         "vendor": "redhat",
+#         "product": "enterprise_linux",
+#         "version": {
+#             "schema": "pep-440",
+#             "raw": "6",
+#             "release_number": "6",
+#             "min_max_version": [{"min": "6", "max": "6"}],
+#         },
+#         "edition": "workstation",
+#     }
+
+#     score = matcher.compare_fields(csaf_field, asset_field)
+
+# if __name__ == "__main__":
+#     main()

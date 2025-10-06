@@ -321,7 +321,7 @@ def match_pairs(matches: queue.Queue, pairs: list[tuple[CsafProduct, Asset]]):
         #     print(df_norm.select([f"csaf_{field}", f"asset_{field}"]))
         #     print(df_norm.select([f"csaf_{field}_norm", f"asset_{field}_norm"]))
 
-        matching = Matching(freetext_fields, ordered_fields)
+        matching = Matching(freetext_fields, ordered_fields, other_fields)
         df_norm_matches = matching.df_matching(df_norm)
 
         score = Score(freetext_fields, ordered_fields)

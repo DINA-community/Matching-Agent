@@ -399,6 +399,8 @@ def parse_cpe(cpe: str) -> dict:
             if i < len(parts):
                 d[field] = parts[i] if parts[i] else None
 
+        d["raw"] = "cpe:2.3:" + ":".join(d.get(f, "*") or "*" for f in fields)
+
     elif cpe.startswith("cpe:/"):
         parts_raw = cpe.split(":")
         d["part"] = parts_raw[1][1:] if len(parts_raw) > 1 else None
@@ -407,6 +409,25 @@ def parse_cpe(cpe: str) -> dict:
         d["version"] = parse_version(parts_raw[4]) if len(parts_raw) > 4 else {}
         d["update"] = parts_raw[5] if len(parts_raw) > 5 and parts_raw[5] != "" else None
         d["edition"] = parts_raw[6] if len(parts_raw) > 6 else None
+        fields_23 = [
+            "part", "vendor", "product", "version", "update", "edition",
+            "language", "sw_edition", "target_sw", "target_hw", "other",
+        ]
+
+        raw_parts = []
+
+        for f in fields_23:
+            val = d.get(f, "*")
+
+            if isinstance(val, dict):
+                val = val.get("raw", "*")
+
+            if not isinstance(val, str) or not val:
+                val = "*"
+
+            raw_parts.append(val)
+
+        d["raw"] = f"cpe:2.3:{':'.join(raw_parts)}"
 
     else:
          return {}
