@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.13"
 
 [manifest]
@@ -238,17 +238,17 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-datasource-isduba = [
+isduba-fetcher = [
     { name = "dina-plugins-datasource-isduba-fetcher" },
 ]
-datasource-netbox = [
+netbox-fetcher = [
     { name = "dina-plugins-datasource-netbox-fetcher" },
-]
-datasource-sample = [
-    { name = "dina-plugins-datasource-sample" },
 ]
 preprocessor-identity = [
     { name = "dina-plugins-preprocessing-identity" },
+]
+sample = [
+    { name = "dina-plugins-datasource-sample" },
 ]
 
 [package.dev-dependencies]
@@ -264,9 +264,9 @@ dev = [
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.12.13" },
     { name = "colorlog", specifier = ">=6.9.0" },
-    { name = "dina-plugins-datasource-isduba-fetcher", marker = "extra == 'datasource-isduba'", editable = "plugins/asset_source/isduba" },
-    { name = "dina-plugins-datasource-netbox-fetcher", marker = "extra == 'datasource-netbox'", editable = "plugins/asset_source/netbox" },
-    { name = "dina-plugins-datasource-sample", marker = "extra == 'datasource-sample'", editable = "plugins/asset_source/sample" },
+    { name = "dina-plugins-datasource-isduba-fetcher", marker = "extra == 'isduba-fetcher'", editable = "plugins/asset_source/isduba" },
+    { name = "dina-plugins-datasource-netbox-fetcher", marker = "extra == 'netbox-fetcher'", editable = "plugins/asset_source/netbox" },
+    { name = "dina-plugins-datasource-sample", marker = "extra == 'sample'", editable = "plugins/asset_source/sample" },
     { name = "dina-plugins-preprocessing-identity", marker = "extra == 'preprocessor-identity'", editable = "plugins/preprocessing/identity" },
     { name = "fastapi", specifier = ">=0.116.1" },
     { name = "hatchling", specifier = ">=1.27.0" },
@@ -285,7 +285,7 @@ requires-dist = [
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.0" },
     { name = "uvicorn", specifier = ">=0.35.0" },
 ]
-provides-extras = ["datasource-netbox", "datasource-isduba", "datasource-sample", "preprocessor-identity"]
+provides-extras = ["netbox-fetcher", "isduba-fetcher", "sample", "preprocessor-identity"]
 
 [package.metadata.requires-dev]
 dev = [

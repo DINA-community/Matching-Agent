@@ -11,7 +11,7 @@
 # The synchronizer will perform a fetching task every X seconds.
 sync_interval = 86400
 # Path to the directory containing CSAF data source plugin configuration TOML files
-plugin_configs_path = "./assets/plugin_configs/data_source/csaf/active/"
+plugin_configs_path = "./assets/plugin_configs/data_source/csaf"
 # Number of seconds before last successful run; entries older than (last_run - cleanup_grace_period)
 cleanup_grace_period = 86400
 cleanup_interval = 60
@@ -26,7 +26,7 @@ preprocessor_plugins = ["identity"]
 host = "0.0.0.0"
 
 # The port to serve on.
-port = 8001
+port = 8991
 
 [Cachedb]
 host = "localhost"

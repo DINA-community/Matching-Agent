@@ -1,5 +1,5 @@
 services:
-  postgres:
+  postgres-cachedb:
     image: postgres:15
     container_name: cachedb-postgres
     environment:
@@ -11,10 +11,248 @@ services:
       - "2345:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-scripts:/docker-entrypoint-initdb.d
+      - ./init-scripts:/docker-entrypoint-initdb.d:z,ro
     restart: unless-stopped
     shm_size: 1G
+
+  keycloak:
+    image: keycloak/keycloak:26.0
+    container_name: "isduba-keycloak"
+    ports:
+      - "8080:8080"
+    command: ["start-dev"]
+    environment:
+      KC_DB: postgres
+      KC_DB_SCHEMA: public
+      KC_DB_URL: jdbc:postgresql://isduba-db/keycloak
+
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
+
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: secret
+
+      KC_HOSTNAME: http://localhost:8080
+      # Optional, reduce memory usage
+      JAVA_OPTS: >
+        -XX:MaxHeapFreeRatio=10
+        -XX:MinHeapFreeRatio=10
+        -XX:MinMetaspaceFreeRatio=10
+        -XX:MaxMetaspaceFreeRatio=10
+    networks:
+      - isduba
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "timeout 1 bash -c 'cat < /dev/null > /dev/tcp/localhost/8080'",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      isduba-db:
+        condition: service_healthy
+
+  keycloak-setup:
+    image: keycloak/keycloak:26.0
+    container_name: "isduba-keycloak-setup"
+    restart: "no"
+    entrypoint: ["bash", "/opt/keycloak/init.sh"]
+    networks:
+      - isduba
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: secret
+      CLIENT_HOSTNAME_URL: http://localhost:5371
+    volumes:
+      - ./isduba/docker/keycloak/init.sh:/opt/keycloak/init.sh
+    depends_on:
+      keycloak:
+        condition: service_healthy
+
+  isduba-db:
+    container_name: "isduba-db"
+    image: library/postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: postgres
+    networks:
+      - isduba
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - ./isduba/docker/db/init.sh:/docker-entrypoint-initdb.d/init.sh
+
+  isduba-server:
+    container_name: "isduba-server"
+    build:
+      context: ./isduba
+      dockerfile: ../isduba.Dockerfile
+      args:
+        BUILD_VERSION: v0.0.0
+    networks:
+      - isduba
+    environment:
+      ISDUBA_CLIENT_KEYCLOAK_URL: http://localhost:8080
+      ISDUBA_CLIENT_KEYCLOAK_REALM: "isduba"
+      ISDUBA_CLIENT_KEYCLOAK_CLIENT_ID: "auth"
+      ISDUBA_CLIENT_IDLE_TIMEOUT: "30m"
+    ports:
+      - "5371:8081"
+    depends_on:
+      isduba-db:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+
+  # redis
+  redis:
+    image: docker.io/valkey/valkey:8.1-alpine
+    command:
+      - sh
+      - -c # this is to evaluate the $REDIS_PASSWORD from the env
+      - valkey-server --appendonly yes --requirepass $$REDIS_PASSWORD ## $$ because of docker-compose
+    healthcheck: &redis-healthcheck
+      test: '[ $$(valkey-cli --pass "$${REDIS_PASSWORD}" ping) = ''PONG'' ]'
+      start_period: 5s
+      timeout: 3s
+      interval: 1s
+      retries: 5
+    env_file: netbox/env/redis.env
+    networks:
+      - netbox
+    volumes:
+      - netbox-redis-data:/data
+
+  redis-cache:
+    image: docker.io/valkey/valkey:8.1-alpine
+    command:
+      - sh
+      - -c # this is to evaluate the $REDIS_PASSWORD from the env
+      - valkey-server --requirepass $$REDIS_PASSWORD ## $$ because of docker-compose
+    healthcheck: *redis-healthcheck
+    env_file: netbox/env/redis-cache.env
+    networks:
+      - netbox
+    volumes:
+      - netbox-redis-cache-data:/data
+
+  netbox: &netbox
+    build:
+      context: ./
+      dockerfile: netbox.Dockerfile
+      args:
+        BUILD_VERSION: v0.0.0
+    ports:
+      - "8800:8080"
+    depends_on:
+      - postgres
+      - redis
+      - redis-cache
+    env_file: netbox/env/netbox.env
+    user: "unit:root"
+    healthcheck:
+      test: curl -f http://localhost:8080/login/ || exit 1
+      start_period: 180s
+      timeout: 3s
+      interval: 15s
+    networks:
+      - netbox
+    volumes:
+      - ./configuration:/etc/netbox/config:z,ro
+      - ./init-scripts:/opt/netbox/init-scripts:z,ro
+      - netbox-media-files:/opt/netbox/netbox/media:rw
+      - netbox-reports-files:/opt/netbox/netbox/reports:rw
+      - netbox-scripts-files:/opt/netbox/netbox/scripts:rw
+
+  netbox-worker:
+    <<: *netbox
+    depends_on:
+      netbox:
+        condition: service_healthy
+    command:
+      - /opt/netbox/venv/bin/python
+      - /opt/netbox/netbox/manage.py
+      - rqworker
+    ports: []
+    healthcheck:
+      test: ps -aux | grep -v grep | grep -q rqworker || exit 1
+      start_period: 20s
+      timeout: 3s
+      interval: 15s
+    networks:
+      - netbox
+
+  netbox-housekeeping:
+    <<: *netbox
+    depends_on:
+      netbox:
+        condition: service_healthy
+    command:
+      - /opt/netbox/housekeeping.sh
+    ports: []
+    healthcheck:
+      test: ps -aux | grep -v grep | grep -q housekeeping || exit 1
+      start_period: 20s
+      timeout: 3s
+      interval: 15s
+    networks:
+      - netbox
+
+  netbox-setup:
+    <<: *netbox
+    container_name: netbox-setup
+    restart: "no"
+    ports: []
+    depends_on:
+      netbox:
+        condition: service_healthy
+    entrypoint: ["bash", "/opt/netbox/init-scripts/netbox-token.sh"]
+    environment:
+      DJANGO_SUPERUSER_PASSWORD: ${NETBOX_SUPERUSER_PASSWORD:-admin}
+      NETBOX_SUPERUSER_NAME: ${NETBOX_SUPERUSER_NAME:-admin}
+      NETBOX_SUPERUSER_EMAIL: ${NETBOX_SUPERUSER_EMAIL:-admin@example.com}
+    networks:
+      - netbox
+
+  # postgres
+  postgres:
+    image: docker.io/postgres:17-alpine
+    healthcheck:
+      test: pg_isready -q -t 2 -d $$POSTGRES_DB -U $$POSTGRES_USER
+      start_period: 20s
+      timeout: 30s
+      interval: 10s
+      retries: 5
+    networks:
+      - netbox
+    env_file: netbox/env/postgres.env
+    volumes:
+      - netbox-postgres-data:/var/lib/postgresql/data
 
 
 volumes:
   postgres_data:
+  netbox-media-files:
+    driver: local
+  netbox-postgres-data:
+    driver: local
+  netbox-redis-cache-data:
+    driver: local
+  netbox-redis-data:
+    driver: local
+  netbox-reports-files:
+    driver: local
+  netbox-scripts-files:
+    driver: local
+
+
+networks:
+  isduba:
+    name: isduba
+  netbox:
+    name: netbox

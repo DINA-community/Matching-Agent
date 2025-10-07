@@ -82,15 +82,17 @@ class NetboxDataSource(DataSourcePlugin):
             device_types_result,
             manufacturers_result,
         ) = await asyncio.gather(
-            dcim_devices_list.asyncio(client=self.client, last_updated_gt=[last_run]),
+            dcim_devices_list.asyncio(
+                client=self.client, last_updated_gt=[last_run], ordering="-id"
+            ),
             plugins_d3c_software_list_list.asyncio(
-                client=self.client, last_updated_gt=[last_run]
+                client=self.client, last_updated_gt=[last_run], ordering="-id"
             ),
             dcim_device_types_list.asyncio(
-                client=self.client, last_updated_gt=[last_run]
+                client=self.client, last_updated_gt=[last_run], ordering="-id"
             ),
             dcim_manufacturers_list.asyncio(
-                client=self.client, last_updated_gt=[last_run]
+                client=self.client, last_updated_gt=[last_run], ordering="-id"
             ),
             return_exceptions=True,
         )
@@ -106,7 +108,7 @@ class NetboxDataSource(DataSourcePlugin):
             software_results = validate_response(software_results)
             software = {sw.id: sw for sw in software_results.results}
         except UnexpectedStatus as e:
-            logger.error(f"Failed to fetch software: {e.status_code}")
+            logger.error(f"Failed to fetch software: {e.status_code} {e.content}")
             if e.status_code == 404:
                 logger.warning(
                     "Received 404 when fetching software. This might be because the D3C plugin is not installed on the provided netbox instance."
@@ -140,18 +142,28 @@ class NetboxDataSource(DataSourcePlugin):
                 client=self.client,
                 manufacturer_id=list(manufacturers.keys()),
                 id_n=list(devices.keys()),
+                ordering="-id",
             ):
                 for device in devices_result.results:
                     if device.id not in devices:
                         devices[device.id] = device
 
-            if software_results := await plugins_d3c_software_list_list.asyncio(
-                client=self.client, id_n=list(software.keys())
-            ):
+            try:
+                software_results = await plugins_d3c_software_list_list.asyncio(
+                    client=self.client, id_n=list(software.keys()), ordering="-id"
+                )
+                software_results = validate_response(software_results)
                 for sw in software_results.results:
                     # TODO: The netbox api needs to support filtering on manufacturer_id
                     if sw.id not in software and sw.manufacturer.id in manufacturers:
                         software[sw.id] = sw
+            except UnexpectedStatus as e:
+                logger.error(f"Failed to fetch software: {e.status_code}")
+                if e.status_code == 404:
+                    logger.warning(
+                        "Received 404 when fetching software. This might be because the D3C plugin is not installed on the provided netbox instance."
+                    )
+                software = {}
 
         # Extend the devices we need to update with devices that received an update to the device_type only.
         if device_types:
@@ -159,6 +171,7 @@ class NetboxDataSource(DataSourcePlugin):
                 client=self.client,
                 device_type_id=list(device_types.keys()),
                 id_n=list(devices.keys()),
+                ordering="-id",
             ):
                 for device in devices_result.results:
                     if device.id not in devices:
@@ -173,8 +186,7 @@ class NetboxDataSource(DataSourcePlugin):
             }
             if missing_device_type_ids:
                 if device_types_result := await dcim_device_types_list.asyncio(
-                    client=self.client,
-                    id=list(missing_device_type_ids),
+                    client=self.client, id=list(missing_device_type_ids), ordering="-id"
                 ):
                     device_types.update(
                         {
@@ -192,6 +204,7 @@ class NetboxDataSource(DataSourcePlugin):
                 if manufacturers_result := await dcim_manufacturers_list.asyncio(
                     client=self.client,
                     id=list(missing_manufacturer_ids),
+                    ordering="-id",
                 ):
                     manufacturers.update(
                         {
@@ -312,10 +325,11 @@ class NetboxDataSource(DataSourcePlugin):
     ) -> FetchRelationshipsResult:
         last_run = (await fetcher_view.last_run()).astimezone(tz=timezone.utc)
 
-        if response := await plugins_d3c_productrelationship_list_list.asyncio(
-            client=self.client,
-            last_updated_gt=[last_run],
-        ):
+        try:
+            response = await plugins_d3c_productrelationship_list_list.asyncio(
+                client=self.client, last_updated_gt=[last_run], ordering="-id"
+            )
+            response = validate_response(response)
             return FetchRelationshipsResult(
                 again=False,
                 data=[
@@ -333,8 +347,9 @@ class NetboxDataSource(DataSourcePlugin):
                     for relation in response.results
                 ],
             )
-
-        return FetchRelationshipsResult(again=False)
+        except UnexpectedStatus as e:
+            logger.error(f"Failed to fetch relationships: {e.status_code}")
+            return FetchRelationshipsResult(again=False)
 
     async def map_relationships(
         self, fetcher_view: FetcherView, relations: List[Relationship]
@@ -428,28 +443,37 @@ class NetboxDataSource(DataSourcePlugin):
         }
 
         devices_result, software_result = await asyncio.gather(
-            dcim_devices_list.asyncio(client=self.client, id=list(devices.keys())),
-            plugins_d3c_software_list_list.asyncio(
-                client=self.client, id=list(software_set.keys())
+            dcim_devices_list.asyncio(
+                client=self.client, id=list(devices.keys()), ordering="-id"
             ),
+            plugins_d3c_software_list_list.asyncio(
+                client=self.client, id=list(software_set.keys()), ordering="-id"
+            ),
+            return_exceptions=True,
         )
 
         decisions: List[CleanUpDecision] = []
 
-        if devices_result:
+        try:
+            devices_result = validate_response(devices_result)
             for device in devices_result.results:
                 # The device still exists. Remove it from the set and mark it as kept
                 kept_device = devices.pop(device.id)
                 decisions.append(
                     CleanUpDecision(can_delete=False, id=kept_device.id, ty=Asset)
                 )
+        except UnexpectedStatus as e:
+            logger.error(f"Failed to fetch devices: {e.status_code}")
 
-        if software_result:
+        try:
+            software_result = validate_response(software_result)
             for software in software_result.results:
                 kept_software = software_set.pop(software.id)
                 decisions.append(
                     CleanUpDecision(can_delete=False, id=kept_software.id, ty=Asset)
                 )
+        except UnexpectedStatus as e:
+            logger.error(f"Failed to fetch software: {e.status_code}")
 
         # Add the remaining devices and software to the decisions as to be deleted.
         decisions.extend(
@@ -477,18 +501,21 @@ class NetboxDataSource(DataSourcePlugin):
             r.origin_info["relation_id"]: r for r in relationships_to_check
         }
         result = []
-        if response := await plugins_d3c_productrelationship_list_list.asyncio(
-            client=self.client,
-            id=list(existing_relations.keys()),
-        ):
+        try:
+            response = await plugins_d3c_productrelationship_list_list.asyncio(
+                client=self.client, id=list(existing_relations.keys()), ordering="-id"
+            )
+            response = validate_response(response)
             for relation in response.results:
                 kept_relation = existing_relations.pop(relation.id)
                 kept_relation.can_delete = False
                 result.append(kept_relation)
 
-        for existing_relation in existing_relations.values():
-            existing_relation.can_delete = True
-            result.append(existing_relation)
+            for existing_relation in existing_relations.values():
+                existing_relation.can_delete = True
+                result.append(existing_relation)
+        except UnexpectedStatus as e:
+            logger.error(f"Failed to fetch relationships: {e.status_code}")
 
         return result
 

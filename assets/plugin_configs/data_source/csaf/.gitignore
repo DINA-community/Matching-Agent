@@ -1,1 +1,3 @@
-active/isduba.toml
+*.toml
+
+!sample/isduba.toml

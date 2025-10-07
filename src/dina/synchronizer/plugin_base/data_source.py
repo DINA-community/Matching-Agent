@@ -10,8 +10,6 @@ from dina.cachedb.model import Asset, CsafProduct, ProductType
 
 class DataSourceConfig(BaseModel):
     plugin_name: str
-    timeout_seconds: int
-    update_interval: int
     Plugin: Any = object()
 
 

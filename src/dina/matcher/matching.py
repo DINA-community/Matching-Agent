@@ -5,6 +5,7 @@ import polars as pl
 from rapidfuzz import fuzz
 from packaging.version import Version, InvalidVersion
 
+
 class Matching:
     def __init__(self, freetext_fields: list[str], ordered_fields: list[str]):
         self.freetext_fields = freetext_fields
@@ -35,14 +36,20 @@ class Matching:
             return False
         return True
 
-
-    def _compare_versions(self, csaf_version: dict, asset_version: dict) -> float:        
+    def _compare_versions(self, csaf_version: dict, asset_version: dict) -> float:
         subfields = [
-            "package", "release_prefix", "release_number",
-            "release_branch", "build_number", "qualifier",
-            "architecture", "date", "epoch", "min_max_version"
+            "package",
+            "release_prefix",
+            "release_number",
+            "release_branch",
+            "build_number",
+            "qualifier",
+            "architecture",
+            "date",
+            "epoch",
+            "min_max_version",
         ]
-        
+
         scores = []
 
         for subfield in subfields:
@@ -58,7 +65,10 @@ class Matching:
                     continue
 
                 valid = all(
-                    any(self._range_in_range(a_range, c_range) for c_range in csaf_ranges)
+                    any(
+                        self._range_in_range(a_range, c_range)
+                        for c_range in csaf_ranges
+                    )
                     for a_range in asset_ranges
                 )
 
@@ -73,7 +83,7 @@ class Matching:
 
                 if len(csaf_qualifier) != len(asset_qualifier):
                     scores.append(0.0)
-                    continue  
+                    continue
 
                 part_scores = []
 
@@ -98,7 +108,7 @@ class Matching:
                 scores.append(ft_score / 100.0)
 
         return sum(scores) / len(scores) if scores else 0.0
-        
+
     def _compare_freetext_with_order(self, s1: str, s2: str) -> float:
         s1 = (s1 or "").strip().lower()
         s2 = (s2 or "").strip().lower()
@@ -111,7 +121,7 @@ class Matching:
 
         if not tokens1 or not tokens2:
             return 0.0
-        
+
         # TODO: clarify whether token order should matter for matching
         scores = []
         for t1 in tokens1:
@@ -126,7 +136,7 @@ class Matching:
             scores.append(best_score)
 
         return float(sum(scores) / len(scores))
-        
+
     def _compare_freetext(self, s1: str, s2: str) -> float:
         s1 = (s1 or "").strip().lower()
         s2 = (s2 or "").strip().lower()
@@ -153,7 +163,7 @@ class Matching:
             scores.append(best_score)
 
         return float(sum(scores) / len(scores))
-    
+
     def _safe_load(self, val):
         if not val:
             return {}
@@ -161,39 +171,47 @@ class Matching:
             return json.loads(val)
         except Exception:
             return {}
-        
+
     def df_matching(self, df_norm):
         for field in self.freetext_fields:
             csaf_norm = f"csaf_{field}_norm"
             asset_norm = f"asset_{field}_norm"
 
             if csaf_norm in df_norm and asset_norm in df_norm:
-                df_norm = df_norm.with_columns([
-                pl.struct([csaf_norm, asset_norm])
-                    .map_elements(lambda row: self._compare_freetext( row[csaf_norm], row[asset_norm]),
-                                    return_dtype=pl.Float64)
-                    .alias(f"{field}_match")
-                ])
+                df_norm = df_norm.with_columns(
+                    [
+                        pl.struct([csaf_norm, asset_norm])
+                        .map_elements(
+                            lambda row: self._compare_freetext(
+                                row[csaf_norm], row[asset_norm]
+                            ),
+                            return_dtype=pl.Float64,
+                        )
+                        .alias(f"{field}_match")
+                    ]
+                )
 
                 # print(df_norm.select([csaf_norm, asset_norm, f"{field}_match"]))
-            
+
         for field in self.ordered_fields:
             csaf_norm = f"csaf_{field}_norm"
             asset_norm = f"asset_{field}_norm"
 
             if csaf_norm in df_norm and asset_norm in df_norm:
-                df_norm = df_norm.with_columns([
-                    pl.struct([csaf_norm, asset_norm])
-                    .map_elements(
+                df_norm = df_norm.with_columns(
+                    [
+                        pl.struct([csaf_norm, asset_norm])
+                        .map_elements(
                             lambda row: self._compare_versions(
                                 self._safe_load(row[csaf_norm]),
-                                self._safe_load(row[asset_norm])
+                                self._safe_load(row[asset_norm]),
                             ),
                             return_dtype=pl.Float64,
                         )
-                    .alias(f"{field}_match")
-                ])
+                        .alias(f"{field}_match")
+                    ]
+                )
 
                 # print(df_norm.select([csaf_norm, asset_norm, f"{field}_match"]))
-        
-        return df_norm            
+
+        return df_norm

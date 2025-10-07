@@ -47,20 +47,61 @@ Install [uv](https://docs.astral.sh/uv/), docker and docker compose in any way t
 
 ### after installation
 
-Create the development database:
+There are two possible ways to set up a development environment.
+First, you can use externally installed asset or csaf inventories and only set up a local database:
+
+```shell
+docker compose -f dev/docker-compose-silab.yml up -d
+```
+
+You will need to configure the netbox and ISDuBa fetcher plugins according to your setup, similar to the instructions for the local environment below.
+
+Alternatively, you can set up a fully local environment with a netbox and ISDuBa installation:
 
 ```shell
 docker compose -f dev/docker-compose.yml up -d
 ```
+The netbox and ISDuBa containers will be available on the following ports:
+- Netbox: 8800
+- ISDuBa: 5371
 
-Install the dependencies with uv by running in your terminal or inside pycharm (double tap `<Ctrl>` and enter the
-command)
+This also creates admin users for netbox and ISDuBa and an API-token for the netbox api.
+The API token can be read with the following command:
+```shell
+docker compose -f dev/docker-compose.yml logs netbox-setup
+```
+The API token is printed to the console.
+
+To configure the netbox fetcher plugin, copy the file [assets/plugin_configs/data_source/asset/sample/netbox.toml](assets/plugin_configs/data_source/asset/sample/netbox.toml) to `assets/plugin_configs/data_source/asset/netbox_local.toml`.
+The file can be named any way you like, but it must be a toml file.
+Replace the `api_token` with the API token printed by the netbox-setup container.
+Replace the `url` with the url of the netbox instance (http://localhost:8800).
+
+To configure the ISDuBa fetcher plugin, copy the file [assets/plugin_configs/data_source/csaf/sample/isduba.toml](assets/plugin_configs/data_source/csaf/sample/isduba.toml) to `assets/plugin_configs/data_source/csaf/isduba_local.toml`.
+The file can be named any way you like, but it must be a toml file.
+Replace the `url` with the url of the ISDuBa instance http://localhost:5371.
+Replace the `username` and `password` with the credentials of the ISDuBa user (user/user).
+Replace the `keycloak_url` with the url of the keycloak instance http://localhost:8080.
+
+The ISDuBa interface can be reached at http://localhost:5371/ and the netbox interface at http://localhost:8800/.
+The default credentials are:
+- Netbox: admin / admin
+- ISDuBa: user / user
+
+Before starting the synchronizers, make sure to create some assets and csaf advisories in the netbox and ISDuBa instances.
+Follow the corresponding instructions in the netbox and ISDuBa documentation.
+
+Next, install the python dependencies with uv by running in your terminal or inside pycharm (double tap `<Ctrl>` and enter the
+command) to set up the local python environment:
 
 ```shell
 uv sync --all-extras
 ```
 
-to set up the local dev environment.
+This will install all the available plugins in the `plugins/` directory in addition to the base package.
+If you want to install only the base package, just run `uv sync`.
+The plugins can be installed with `uv sync --extra <PLUGIN_NAME>` later on.
+To install multiple extras, provie multiple `--extra` arguments.
 
 ### Setting up git pre-commit hooks
 
@@ -108,7 +149,7 @@ Minimal example (defaults in repo):
 [Matcher]
 sync_interval = 60  # seconds between matching runs
 asset_plugins_path = "./assets/plugin_configs/data_source/asset"
-csaf_plugins_path = "./assets/plugin_configs/data_source/csaf/active"
+csaf_plugins_path = "./assets/plugin_configs/data_source/csaf"
 
 [Matcher.Api]
 host = "0.0.0.0"
@@ -141,12 +182,12 @@ Example (defaults in repo):
 [Synchronizer]
 sync_interval = 60
 preprocessor_plugins = ["identity"]
-plugin_configs_path = "./assets/plugin_configs/data_source/asset/"
+plugin_configs_path = "./assets/plugin_configs/data_source/asset"
 cleanup_grace_period = 3600
 
 [Synchronizer.Api]
 host = "0.0.0.0"
-port = 8000
+port = 8992
 
 [Cachedb]
 host = "localhost"
@@ -177,12 +218,12 @@ Example (defaults in repo):
 [Synchronizer]
 sync_interval = 60
 preprocessor_plugins = ["identity"]
-plugin_configs_path = "./assets/plugin_configs/data_source/csaf/active/"
+plugin_configs_path = "./assets/plugin_configs/data_source/csaf"
 cleanup_grace_period = 3600
 
 [Synchronizer.Api]
 host = "0.0.0.0"
-port = 8001
+port = 8991
 
 [Cachedb]
 host = "localhost"

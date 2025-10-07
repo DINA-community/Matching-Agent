@@ -4,6 +4,7 @@ import polars as pl
 import enum
 from packaging.version import Version
 
+
 class Standards(enum.Enum):
     VERS = "csaf-cpe-syntax-vers"
     VLS = "csaf-constraint-vls"
@@ -17,22 +18,38 @@ class Standards(enum.Enum):
     SEMVER = "semantic-versioning"
     FREETEXT = "freetext"
 
-def detect_schema(s: str) -> str:    
+
+def detect_schema(s: str) -> str:
     patterns_in_order = [
         (Standards.VERS, r"^vers:[a-z0-9_\-]+/.+"),
         (Standards.VLS, r"^(<=|>=|<|>|==|!=)\s*v?[0-9][0-9A-Za-z:._+\-]*(\|.*|,.*)?$"),
         # Standards.CALVER should stand before Standards.WILDCARD and Standards.SEMVER
         (Standards.CALVER, r"^([0-9]{2}|[0-9]{4})\.\d{2}(?:\.\d{1,2})?$"),
         # Standards.RPM should stand before Standards.DEB
-        (Standards.RPM, r"^[a-z0-9+._-]+(-\d+:)?[0-9][0-9A-Za-z._-]*-[0-9A-Za-z._-]+\.(src|[a-z0-9_]+)(?:\.rpm)?$"),
+        (
+            Standards.RPM,
+            r"^[a-z0-9+._-]+(-\d+:)?[0-9][0-9A-Za-z._-]*-[0-9A-Za-z._-]+\.(src|[a-z0-9_]+)(?:\.rpm)?$",
+        ),
         (Standards.SAP, r"^v[0-9]+(\.[0-9]+)?([\s+]*sp[0-9]+)?([\s+]*upd[0-9]+)?$"),
-        (Standards.ERICSSON_RELEASE_SCHEMA, r"^r[0-9]+[a-z](?:_(?:pc|sp|uc|mr)[0-9]+)?$"),
+        (
+            Standards.ERICSSON_RELEASE_SCHEMA,
+            r"^r[0-9]+[a-z](?:_(?:pc|sp|uc|mr)[0-9]+)?$",
+        ),
         # Standards.SEMVER should stand before Standards.PEP440
         (Standards.SEMVER, r"^(0|[1-9]\d*)\.(0|[1-9]\d*)(?:\.(0|[1-9]\d*))?$"),
-        (Standards.PEP440, r"^(0|[1-9]\d*)(\.(0|[1-9]\d*))*((a|b|rc)([1-9]\d*))?(\.post([1-9]\d*))?(\.dev([1-9]\d*))?$"),
+        (
+            Standards.PEP440,
+            r"^(0|[1-9]\d*)(\.(0|[1-9]\d*))*((a|b|rc)([1-9]\d*))?(\.post([1-9]\d*))?(\.dev([1-9]\d*))?$",
+        ),
         # Standards.WILDCARD should stand before Standards.DEB
-        (Standards.WILDCARD, r"^(?:\d+|\+)(?:\.(?:\d+|\+))*\+$|^(?:\+)(?:\.(?:\d+|\+))*$"),
-        (Standards.DEB, r"^(?:\d+:)?(0|[1-9]\d*)(\.(0|[1-9]\d*))*([A-Za-z.+:~\-]*)?(?:-[0-9A-Za-z.+:~]+)?$")
+        (
+            Standards.WILDCARD,
+            r"^(?:\d+|\+)(?:\.(?:\d+|\+))*\+$|^(?:\+)(?:\.(?:\d+|\+))*$",
+        ),
+        (
+            Standards.DEB,
+            r"^(?:\d+:)?(0|[1-9]\d*)(\.(0|[1-9]\d*))*([A-Za-z.+:~\-]*)?(?:-[0-9A-Za-z.+:~]+)?$",
+        ),
     ]
 
     for name, pat in patterns_in_order:
@@ -40,6 +57,7 @@ def detect_schema(s: str) -> str:
             return name
 
     return Standards.FREETEXT
+
 
 def _base_dict(schema, raw):
     return {
@@ -54,16 +72,16 @@ def _base_dict(schema, raw):
         "architecture": None,
         "date": None,
         "epoch": None,
-        "min_max_version": None
+        "min_max_version": None,
     }
+
 
 def parse_csaf(schema, expr: str):
     """Parser für CSAF / CPE-Syntax (vers:/vls-Form)."""
     parts = expr.split("/", 1)
 
     d = _base_dict(
-        Standards.VERS.value if schema == Standards.VERS else Standards.VLS.value,
-        expr
+        Standards.VERS.value if schema == Standards.VERS else Standards.VLS.value, expr
     )
 
     if schema == Standards.VERS:
@@ -90,7 +108,7 @@ def parse_csaf(schema, expr: str):
                 for symbol in (">=", "<=", ">", "<", "="):
                     if cond.startswith(symbol):
                         op = symbol
-                        cond = cond[len(symbol):]
+                        cond = cond[len(symbol) :]
                         break
 
                 cond = cond.lstrip("v")
@@ -117,6 +135,7 @@ def parse_csaf(schema, expr: str):
     d["min_max_version"] = results if results else None
     return d
 
+
 def parse_calver(expr: str):
     m = re.match(r"^([0-9]{2}|[0-9]{4})\.(\d{2})(?:\.(\d{1,2}))?$", expr)
 
@@ -137,16 +156,18 @@ def parse_calver(expr: str):
 
     return d
 
+
 def parse_csaf_wildcard(expr: str):
     d = _base_dict(Standards.WILDCARD.value, expr)
     parts = expr.split(".")
-    
+
     min_parts = ["0" if p == "+" else p for p in parts]
     max_parts = ["9999" if p == "+" else p for p in parts]
 
     d["min_max_version"] = [{"min": ".".join(min_parts), "max": ".".join(max_parts)}]
 
     return d
+
 
 def parse_rpm(expr: str):
     full = re.match(
@@ -190,12 +211,12 @@ def parse_rpm(expr: str):
 def parse_deb(expr: str):
     if ":" not in expr and "-" not in expr:
         return None
-    
+
     m = re.match(r"^(?:(\d+):)?([0-9A-Za-z.+:~]+)(?:-([0-9A-Za-z+.~]+))?$", expr)
 
     if not m:
         return None
-    
+
     epoch, upstream, revision = m.groups()
 
     d = _base_dict(Standards.DEB.value, expr)
@@ -205,13 +226,14 @@ def parse_deb(expr: str):
 
     return d
 
+
 def parse_sap(expr: str):
     normalized = expr.lower().replace("+", "").replace(" ", "")
 
     m = re.match(r"v(\d+)(?:\.(\d+))?(?:sp(\d+))?(?:upd(\d+))?", normalized)
     if not m:
         return None
-    
+
     major, minor, sp, upd = m.groups()
 
     major = int(major) if major else 0
@@ -230,6 +252,7 @@ def parse_sap(expr: str):
     d["min_max_version"] = [{"min": normalized_version, "max": normalized_version}]
 
     return d
+
 
 def parse_semver(expr: str):
     parts = expr.split(".")
@@ -260,16 +283,22 @@ def parse_semver(expr: str):
             patch = None
 
     d = _base_dict(Standards.SEMVER.value, expr)
-    d["min_max_version"] = [{"min": f"{major or 0}.{minor or 0}.{patch or 0}", "max": f"{major or 9999}.{minor or 9999}.{patch or 9999}"}]
+    d["min_max_version"] = [
+        {
+            "min": f"{major or 0}.{minor or 0}.{patch or 0}",
+            "max": f"{major or 9999}.{minor or 9999}.{patch or 9999}",
+        }
+    ]
 
     return d
+
 
 def parse_ericsson(expr: str):
     m = re.match(r"^r(\d+)([a-z])(?:_(pc|sp|uc|mr)(\d+))?$", expr.lower())
 
     if not m:
         return None
- 
+
     rel, branch, qtype, qnum = m.groups()
     rel = int(rel)
 
@@ -285,13 +314,14 @@ def parse_ericsson(expr: str):
 
     return d
 
+
 def parse_pep440(expr: str):
     m = re.match(
-        r"^([0-9]+(?:\.[0-9]+)*)" # base
-        r"(?:(a|b|rc)(\d+))?" # prerelease
-        r"(?:\.post(\d+))?" # post-release
-        r"(?:\.dev(\d+))?$", # dev-release
-        expr
+        r"^([0-9]+(?:\.[0-9]+)*)"  # base
+        r"(?:(a|b|rc)(\d+))?"  # prerelease
+        r"(?:\.post(\d+))?"  # post-release
+        r"(?:\.dev(\d+))?$",  # dev-release
+        expr,
     )
 
     if not m:
@@ -314,6 +344,7 @@ def parse_pep440(expr: str):
 
     return d
 
+
 def parse_version_freetext(expr: str):
     separator = "."
     expr = expr.lower()
@@ -325,8 +356,9 @@ def parse_version_freetext(expr: str):
 
     return d
 
+
 def parse_version(expr: str):
-    # TODO: take all values not only one  
+    # TODO: take all values not only one
     if isinstance(expr, pl.Series):
         if expr.is_empty():
             return {}
@@ -334,7 +366,7 @@ def parse_version(expr: str):
 
     if expr is None:
         return {}
-    
+
     expr = expr.lower()
     expr = re.sub(r"\s*\+\s*", "+", expr).strip()
     schema = detect_schema(expr)
@@ -362,8 +394,9 @@ def parse_version(expr: str):
             result = parse_deb(expr)
         case _:
             result = parse_version_freetext(expr)
-    
+
     return result
+
 
 def parse_freetext(expr: str):
     separator = "."
@@ -372,6 +405,7 @@ def parse_freetext(expr: str):
     expr = expr.strip(separator)
 
     return expr
+
 
 def _base_cpe_dict(raw: str) -> dict:
     return {
@@ -389,6 +423,7 @@ def _base_cpe_dict(raw: str) -> dict:
         "other": None,
     }
 
+
 def parse_cpe(cpe: str) -> dict:
     d = _base_cpe_dict(cpe)
 
@@ -405,13 +440,16 @@ def parse_cpe(cpe: str) -> dict:
         d["vendor"] = parts_raw[2] if len(parts_raw) > 2 else None
         d["product"] = parts_raw[3] if len(parts_raw) > 3 else None
         d["version"] = parse_version(parts_raw[4]) if len(parts_raw) > 4 else {}
-        d["update"] = parts_raw[5] if len(parts_raw) > 5 and parts_raw[5] != "" else None
+        d["update"] = (
+            parts_raw[5] if len(parts_raw) > 5 and parts_raw[5] != "" else None
+        )
         d["edition"] = parts_raw[6] if len(parts_raw) > 6 else None
 
     else:
-         return {}
+        return {}
 
     return d
+
 
 def _base_purl_dict(raw: str) -> dict:
     return {
@@ -424,11 +462,12 @@ def _base_purl_dict(raw: str) -> dict:
         "subpath": None,
     }
 
+
 def parse_purl(purl: str) -> dict:
     d = _base_purl_dict(purl)
 
     if not purl.startswith("pkg:"):
-         return {}
+        return {}
 
     purl_body = purl[4:]
 
@@ -472,8 +511,14 @@ def parse_purl(purl: str) -> dict:
 
     return d
 
+
 class Normalizer:
-    def __init__(self, freetext_fields: list[str], ordered_fields: list[str], other_fields: list[str]):
+    def __init__(
+        self,
+        freetext_fields: list[str],
+        ordered_fields: list[str],
+        other_fields: list[str],
+    ):
         self.freetext_fields = freetext_fields
         self.ordered_fields = ordered_fields
         self.other_fields = other_fields
@@ -487,7 +532,9 @@ class Normalizer:
 
                 if full_col in df.columns:
                     expr = pl.col(full_col)
-                    expr = expr.map_elements(lambda x: json.dumps(parse_freetext(x)), return_dtype=pl.Utf8)
+                    expr = expr.map_elements(
+                        lambda x: json.dumps(parse_freetext(x)), return_dtype=pl.Utf8
+                    )
                     expr = expr.alias(f"{full_col}_norm")
                     updates.append(expr)
 
@@ -496,7 +543,9 @@ class Normalizer:
                 full_col = f"{prefix}{col}"
 
                 if full_col in df.columns:
-                    expr = pl.col(full_col).map_elements(lambda x: json.dumps(parse_version(x)), return_dtype=pl.Utf8)
+                    expr = pl.col(full_col).map_elements(
+                        lambda x: json.dumps(parse_version(x)), return_dtype=pl.Utf8
+                    )
                     expr = expr.alias(f"{full_col}_norm")
                     updates.append(expr)
 
@@ -507,15 +556,20 @@ class Normalizer:
                 if full_col in df.columns:
                     match col:
                         case "cpe":
-                            expr = pl.col(full_col).map_elements(lambda x: json.dumps(parse_cpe(x)), return_dtype=pl.Utf8)
+                            expr = pl.col(full_col).map_elements(
+                                lambda x: json.dumps(parse_cpe(x)), return_dtype=pl.Utf8
+                            )
                             expr = expr.alias(f"{full_col}_norm")
                             updates.append(expr)
                         case "purl":
-                            expr = pl.col(full_col).map_elements(lambda x: json.dumps(parse_purl(x)), return_dtype=pl.Utf8)
+                            expr = pl.col(full_col).map_elements(
+                                lambda x: json.dumps(parse_purl(x)),
+                                return_dtype=pl.Utf8,
+                            )
                             expr = expr.alias(f"{full_col}_norm")
                             updates.append(expr)
 
-        # ---- for tests   
+        # ---- for tests
         # if updates:
         #     df = df.with_columns(updates)
 
@@ -526,6 +580,7 @@ class Normalizer:
         # -----
 
         return df.with_columns(updates)
+
 
 # def main():
 #     examples = [
@@ -573,17 +628,17 @@ class Normalizer:
 
 #         print(f"'{ex}': '{detect}'")
 #         match detect:
-#             case Standards.VERS: 
+#             case Standards.VERS:
 #                 print(parse_csaf(Standards.VERS, ex))
 #             case Standards.VLS:
 #                 print(parse_csaf(Standards.VLS, ex))
-#             case Standards.CALVER: 
+#             case Standards.CALVER:
 #                 print(parse_calver(ex))
-#             case Standards.RPM: 
+#             case Standards.RPM:
 #                 print(parse_rpm(ex))
-#             case Standards.SAP: 
+#             case Standards.SAP:
 #                 print(parse_sap(ex))
-#             case Standards.PEP440: 
+#             case Standards.PEP440:
 #                 print(parse_pep440(ex))
 #             case Standards.ERICSSON_RELEASE_SCHEMA:
 #                 print(parse_ericsson(ex))
@@ -591,7 +646,7 @@ class Normalizer:
 #                 print(parse_semver(ex))
 #             case Standards.WILDCARD:
 #                 print(parse_csaf_wildcard(ex))
-#             case Standards.DEB: 
+#             case Standards.DEB:
 #                 print(parse_deb(ex))
 #             case _:
 #                 print(parse_freetext(ex))

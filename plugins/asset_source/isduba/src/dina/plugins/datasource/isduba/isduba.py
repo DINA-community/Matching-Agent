@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Any, List
 
 import httpx
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 from sqlalchemy import String, and_, cast
 
 from dina.cachedb.database import MappedRelationship
@@ -36,7 +36,8 @@ class IsdubaDataSource(DataSourcePlugin):
         username: str
         password: str
         verify_ssl: bool
-        url: str
+        url: HttpUrl
+        keycloak_url: HttpUrl
 
     def __init__(self, config):
         config.DataSource.Plugin = IsdubaDataSource.Config.model_validate(
@@ -54,7 +55,7 @@ class IsdubaDataSource(DataSourcePlugin):
 
     async def fetch_products(self, fetcher_view: FetcherView) -> FetchProductsResult:
         """Fetch data from the data source and return it as a list of Assets or CsafDocuments."""
-        token = await self._get_token(self.origin_uri)
+        token = await self._get_token(self.config.DataSource.Plugin.keycloak_url)
         configuration = self._create_api_config(self.origin_uri, token)
         async with isduba_api_client.ApiClient(configuration) as api_client:
             api_instance = isduba_api_client.DefaultApi(api_client)
@@ -172,9 +173,9 @@ class IsdubaDataSource(DataSourcePlugin):
 
         return FetchProductsResult(again=False)
 
-    async def _get_token(self, origin_uri: str) -> str:
+    async def _get_token(self, keycloak_uri: HttpUrl) -> str:
         """Retrieve an access token via Keycloak."""
-        token_url = f"{origin_uri}:8081/realms/isduba/protocol/openid-connect/token"
+        token_url = f"{keycloak_uri.unicode_string()}/realms/isduba/protocol/openid-connect/token"
         response = httpx.post(
             token_url,
             data={
@@ -192,7 +193,7 @@ class IsdubaDataSource(DataSourcePlugin):
         self, origin_uri: str, token: str
     ) -> isduba_api_client.Configuration:
         """Build API configuration for the isduba API client."""
-        api_url = f"{origin_uri}/api"
+        api_url = f"{origin_uri}api"
         configuration = isduba_api_client.Configuration(
             host=api_url,
             api_key={"bearerAuth": token},
@@ -215,7 +216,7 @@ class IsdubaDataSource(DataSourcePlugin):
         if not existing_products:
             return FetchRelationshipsResult(again=False)
 
-        token = await self._get_token(self.origin_uri)
+        token = await self._get_token(self.config.DataSource.Plugin.keycloak_url)
         config = self._create_api_config(self.origin_uri, token)
 
         async with isduba_api_client.ApiClient(config) as api_client:
@@ -298,7 +299,7 @@ class IsdubaDataSource(DataSourcePlugin):
         if not data_to_check:
             return []
 
-        token = await self._get_token(self.origin_uri)
+        token = await self._get_token(self.config.DataSource.Plugin.keycloak_url)
         configuration = self._create_api_config(self.origin_uri, token)
 
         async with isduba_api_client.ApiClient(configuration) as api_client:
@@ -330,7 +331,7 @@ class IsdubaDataSource(DataSourcePlugin):
         try:
             return await api_instance.documents_id_get(doc_id)
         except isduba_api_client.exceptions.UnauthorizedException:
-            token = await self._get_token(self.origin_uri)
+            token = await self._get_token(self.config.DataSource.Plugin.keycloak_url)
             configuration = self._create_api_config(self.origin_uri, token)
             async with isduba_api_client.ApiClient(configuration) as new_client:
                 new_instance = isduba_api_client.DefaultApi(new_client)
@@ -343,7 +344,7 @@ class IsdubaDataSource(DataSourcePlugin):
 
     @property
     def origin_uri(self):
-        return self.config.DataSource.Plugin.url
+        return self.config.DataSource.Plugin.url.unicode_string()
 
     def build_resource_path(self, origin_info: dict[str, object]) -> str:
         path = origin_info.get("path")
