@@ -37,7 +37,22 @@ class Matching:
         return True
 
 
-    def _compare_versions(self, csaf_version: dict, asset_version: dict) -> float:        
+    def _compare_versions(self, csaf_version: dict | list, asset_version: dict | list) -> float:
+        if isinstance(csaf_version, list):
+            score = 0.0
+            if isinstance(asset_version, list):
+                for v1 in asset_version:
+                    for v2 in csaf_version:
+                        score = max(score, self._compare_versions(v1, v2))
+            else:
+                for v2 in csaf_version:
+                    score = max(score, self._compare_versions(v2, asset_version))
+
+            return score
+
+        if not isinstance(csaf_version, dict) or not isinstance(asset_version, dict):
+            return 0.0
+                
         subfields = [
             "package", "release_prefix", "release_number",
             "release_branch", "build_number", "qualifier",

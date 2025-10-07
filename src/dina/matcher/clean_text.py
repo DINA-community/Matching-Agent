@@ -326,14 +326,24 @@ def parse_version_freetext(expr: str):
     return d
 
 def parse_version(expr: str):
-    # TODO: take all values not only one  
-    if isinstance(expr, pl.Series):
-        if expr.is_empty():
+    if isinstance(expr, pl.Series) or isinstance(expr, list):
+        if isinstance(expr, pl.Series):
+            if expr.is_empty():
+                return {}
+            expr = expr.to_list()
+
+        if not expr:
             return {}
-        expr = expr[0]
+
+        expr_list = []
+
+        for e in expr:
+            expr_list.append(parse_version(e))
+
+        return expr_list
 
     if expr is None:
-        return {}
+        return {}       
     
     expr = expr.lower()
     expr = re.sub(r"\s*\+\s*", "+", expr).strip()
@@ -669,6 +679,8 @@ class Normalizer:
 #     # ]
 
 #     # print(parse_files(files))
+
+#     print(parse_version(examples))
 
 # if __name__ == "__main__":
 #     main()
