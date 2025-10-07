@@ -14,26 +14,19 @@ class Score:
         keyword_scores = []
 
         for field in self.fields:
-            match field:
-                case "manufacturer_name":
-                    val = df_norm.select([f"{field}_match"]).to_series()
-                    if not val.is_empty():
+            val = df_norm.select([f"{field}_match"]).to_series()
+
+            if not val.is_empty():
+                match field:
+                    case "manufacturer_name":
                         vendor_score = val.item() * 100
-                case "name":
-                    val = df_norm.select([f"{field}_match"]).to_series()
-                    if not val.is_empty():
+                    case "name":
                         product_name_score = val.item() * 100
-                case "device_family":
-                    val = df_norm.select([f"{field}_match"]).to_series()
-                    if not val.is_empty():
+                    case "device_family":
                         product_family_score = val.item() * 100
-                case "version":
-                    val = df_norm.select([f"{field}_match"]).to_series()
-                    if not val.is_empty():
+                    case "version":
                         version_score = val.item() * 100
-                case _:
-                    val = df_norm.select([f"{field}_match"]).to_series()
-                    if not val.is_empty():
+                    case _:
                         keyword_scores.append(val.item() * 100)
 
         keyword_score = sum(keyword_scores) / len(keyword_scores) if keyword_scores else 0.0

@@ -215,35 +215,12 @@ class Matching:
                 )
             )
     
-    def compare_fields(self, csaf_field: dict | str | None, asset_field: dict | str | None) -> float:        
+    def compare_fields(self, csaf_field: dict | str | None, asset_field: dict | str | None, weight: dict = None) -> float:        
         if not csaf_field or not asset_field:
             return 0.0
 
         if isinstance(csaf_field, str) and isinstance(asset_field, str):
             return self._compare_freetext_with_order(csaf_field, asset_field)
-
-        if isinstance(csaf_field, dict) and isinstance(asset_field, dict):
-            matches = 0.0
-            total = 0
-
-            for key in csaf_field.keys() & asset_field.keys():
-                val1 = csaf_field[key]
-                val2 = asset_field[key]
-
-                if key == "version" and isinstance(val1, dict) and isinstance(val2, dict):
-                    total += 1
-                    matches += self._compare_versions(val1, val2)
-                    continue
-
-                if isinstance(val1, (str, dict)) and isinstance(val2, (str, dict)):
-                    total += 1
-                    similarity = self.compare_fields(val1, val2)
-                    matches += similarity
-
-            if total == 0:
-                return 0.0
-            
-            return matches / total
         
         if isinstance(csaf_field, list) and isinstance(asset_field, list):            
             for a_field in asset_field:
@@ -251,6 +228,24 @@ class Matching:
                     if isinstance(a_field, str) and isinstance(c_field, str):
                         if c_field == a_field:
                             return 1.0
+
+        if weight and isinstance(csaf_field, dict) and isinstance(asset_field, dict):
+            matches = 0.0
+
+            for key in csaf_field.keys() & asset_field.keys():
+                val1 = csaf_field[key]
+                val2 = asset_field[key]
+                cpe_weight = weight.get(key, 0.0)
+
+                if key == "version" and isinstance(val1, dict) and isinstance(val2, dict):
+                    matches += self._compare_versions(val1, val2) * cpe_weight
+                    continue
+
+                if isinstance(val1, (str, dict)) and isinstance(val2, (str, dict)):
+                    similarity = self._compare_freetext_with_order(val1, val2) * cpe_weight
+                    matches += similarity
+            
+            return matches
                         
         return 0.0
 
@@ -345,6 +340,33 @@ class Matching:
         for field in self.other_fields:
             csaf_norm, asset_norm = f"csaf_{field}_norm", f"asset_{field}_norm"
 
+            weight = None
+
+            match field: 
+                case "cpe": weight = {
+                        "raw": 0.01,
+                        "part": 0.05,
+                        "vendor": 0.15,
+                        "product": 0.35,
+                        "version": 0.30,
+                        "update": 0.05,
+                        "edition": 0.02,
+                        "language": 0.00,
+                        "sw_edition": 0.02,
+                        "target_sw": 0.02,
+                        "target_hw": 0.02,
+                        "other": 0.01,
+                    }
+                case "purl": weight = {
+                        "raw": 0.02,
+                        "type": 0.15,
+                        "namespace": 0.10,
+                        "name": 0.35,
+                        "version": 0.30,
+                        "qualifiers": 0.05,
+                        "subpath": 0.03,
+                    }
+
             if csaf_norm in df_norm and asset_norm in df_norm:
                 df_norm = df_norm.with_columns(
                     pl.struct([csaf_norm, asset_norm])
@@ -352,6 +374,7 @@ class Matching:
                         lambda row: self.compare_fields(
                             self._safe_load(row[csaf_norm]),
                             self._safe_load(row[asset_norm]),
+                            weight
                         ),
                         return_dtype=pl.Float64,
                     )
@@ -394,7 +417,24 @@ class Matching:
 #     #     "edition": "workstation",
 #     # }
 
-#     # score = matcher.compare_fields(csaf_field, asset_field)
+#     # score = matcher.compare_fields(
+#     #     csaf_field, 
+#     #     asset_field, 
+#     #     {
+#     #         "raw": 0.01,
+#     #         "part": 0.05,
+#     #         "vendor": 0.15,
+#     #         "product": 0.35,
+#     #         "version": 0.30,
+#     #         "update": 0.05,
+#     #         "edition": 0.02,
+#     #         "language": 0.00,
+#     #         "sw_edition": 0.02,
+#     #         "target_sw": 0.02,
+#     #         "target_hw": 0.02,
+#     #         "other": 0.01,
+#     #     })
+#     # print(score)
 #     # csaf_sbom_urls = ["https://www.free.org/news/python-switch-statement-switch-case-example/", "https://www.test.org"]
 #     # asset_sbom_urls = ["https://www.freecodecamp.org/news/python-switch-statement-switch-case-example/"]
 
