@@ -343,7 +343,8 @@ class Matching:
             weight = None
 
             match field: 
-                case "cpe": weight = {
+                case "cpe": 
+                    weight = {
                         "raw": 0.01,
                         "part": 0.05,
                         "vendor": 0.15,
@@ -357,7 +358,8 @@ class Matching:
                         "target_hw": 0.02,
                         "other": 0.01,
                     }
-                case "purl": weight = {
+                case "purl": 
+                    weight = {
                         "raw": 0.02,
                         "type": 0.15,
                         "namespace": 0.10,
