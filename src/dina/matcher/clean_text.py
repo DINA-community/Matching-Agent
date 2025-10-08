@@ -376,13 +376,16 @@ def parse_version(expr: str):
     return result or {}
 
 def parse_freetext(expr: str):
-    separator = "."
+    # TODO: add separator in a separate file
+    separator = ":"
     expr = expr.lower()
     expr = re.sub(r"[^a-z0-9]+", separator, expr)
     expr = expr.strip(separator)
+    expr = re.sub(r"\%s+" % re.escape(separator), separator, expr)
 
     return expr
 
+# TODO: add cpe_dict in a separate file
 def _base_cpe_dict(raw: str) -> dict:
     return {
         "raw": raw,
@@ -444,6 +447,7 @@ def parse_cpe(cpe: str) -> dict:
 
     return d
 
+# TODO: add purl_dict in a separate file
 def _base_purl_dict(raw: str) -> dict:
     return {
         "raw": raw,
@@ -503,6 +507,7 @@ def parse_purl(purl: str) -> dict:
 
     return d
 
+# TODO: add file_dict in a separate file
 def _base_file_dict(name: str) -> dict:
     return {
         "name": name if name else None,

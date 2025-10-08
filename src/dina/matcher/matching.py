@@ -25,6 +25,8 @@ class Matching:
         csaf_min = self._safe_version(csaf_range.get("min"))
         csaf_max = self._safe_version(csaf_range.get("max"))
 
+        if (asset_min is None and asset_max is None) and (csaf_min is None and csaf_max is None):
+            return True
         if asset_min is None and asset_max is None:
             return False
         if csaf_min is None and csaf_max is None:
@@ -52,16 +54,25 @@ class Matching:
 
         if not isinstance(csaf_version, dict) or not isinstance(asset_version, dict):
             return 0.0
-                
-        subfields = [
-            "package", "release_prefix", "release_number",
-            "release_branch", "build_number", "qualifier",
-            "architecture", "date", "epoch", "min_max_version"
-        ]
         
-        scores = []
+        # TODO: add version-subfields in a separate file
+        subfields = {
+            "raw": 0.05,
+            "package": 0.15, 
+            "release_prefix": 0.05, 
+            "release_number": 0.10,
+            "release_branch": 0.07, 
+            "build_number": 0.05, 
+            "qualifier": 0.02,
+            "architecture": 0.07, 
+            "date": 0.01, 
+            "epoch": 0.03, 
+            "min_max_version": 0.40
+        }
+        
+        scores = 0.0
 
-        for subfield in subfields:
+        for subfield in subfields.keys():
             if subfield == "min_max_version":
                 csaf_ranges = csaf_version.get("min_max_version") or []
                 asset_ranges = asset_version.get("min_max_version") or []
@@ -70,7 +81,7 @@ class Matching:
                 asset_ranges = [r for r in asset_ranges if r.get("min") or r.get("max")]
 
                 if not csaf_ranges or not asset_ranges:
-                    scores.append(0.0)
+                    scores += 0.0
                     continue
 
                 valid = all(
@@ -78,74 +89,77 @@ class Matching:
                     for a_range in asset_ranges
                 )
 
-                scores.append(1.0 if valid else 0.0)
+                scores = round(scores + round(1.0 * subfields[subfield], 2), 2) if valid else scores + 0.0
+                continue
             elif subfield == "qualifier":
                 csaf_qualifier = csaf_version.get("qualifier") or []
                 asset_qualifier = asset_version.get("qualifier") or []
 
+                if not csaf_qualifier and not asset_qualifier:
+                    scores = round(scores + subfields[subfield], 2)
+                    continue
+
                 if not csaf_qualifier or not asset_qualifier:
-                    scores.append(0.0)
+                    scores += 0.0
                     continue
 
                 if len(csaf_qualifier) != len(asset_qualifier):
-                    scores.append(0.0)
+                    scores += 0.0
                     continue  
 
                 part_scores = []
 
                 for c, a in zip(csaf_qualifier, asset_qualifier):
-                    if c is None or a is None:
-                        scores.append(0.0)
-                        continue
                     ft_score = self._compare_freetext_with_order(str(c), str(a))
-                    part_scores.append(ft_score / 100.0)
+                    part_scores.append(round(ft_score * subfields[subfield], 2))
 
                 if part_scores:
-                    scores.append(sum(part_scores) / len(part_scores))
+                    scores = round(scores + round(sum(part_scores) / len(part_scores), 2), 2)
+                    continue
             else:
                 csaf_field = str(csaf_version.get(subfield) or "")
                 asset_field = str(asset_version.get(subfield) or "")
 
-                if not csaf_field or not asset_field:
-                    scores.append(0.0)
-                    continue
-
                 ft_score = self._compare_freetext_with_order(csaf_field, asset_field)
-                scores.append(ft_score / 100.0)
+                scores = round(scores + (round(ft_score * subfields[subfield], 2)), 2)
 
-        return sum(scores) / len(scores) if scores else 0.0
+        return scores
         
     def _compare_freetext_with_order(self, s1: str, s2: str) -> float:
         s1 = (s1 or "").strip().lower()
         s2 = (s2 or "").strip().lower()
 
+        if not s1 and not s2:
+            return 1.0
+
         if not s1 or not s2:
             return 0.0
-
-        tokens1 = [t for t in s1.split(".") if len(t) > 2]
-        tokens2 = [t for t in s2.split(".") if len(t) > 2]
+        
+        # TODO: get separator from a separate file
+        tokens1 = [t for t in s1.split(":") if len(t) >= 2]
+        tokens2 = [t for t in s2.split(":") if len(t) >= 2]
 
         if not tokens1 or not tokens2:
             return 0.0
         
         # TODO: clarify whether token order should matter for matching
-        scores = []
+        best_score = 0.0
         for t1 in tokens1:
-            best_score = 0
             for t2 in tokens2:
+                score = 0.0
                 dist = Levenshtein.distance(t1, t2)
                 if dist <= 2:
                     score = fuzz.ratio(t1, t2) / 100.0
-                else:
-                    score = 0
                 best_score = max(best_score, score)
-            scores.append(best_score)
 
-        return float(sum(scores) / len(scores))
+        return best_score
         
     def _compare_freetext(self, s1: str, s2: str) -> float:
         s1 = (s1 or "").strip().lower()
         s2 = (s2 or "").strip().lower()
+
+        if not s1 and not s2:
+            return 1.0
 
         if not s1 or not s2:
             return 0.0
@@ -215,7 +229,10 @@ class Matching:
                 )
             )
     
-    def compare_fields(self, csaf_field: dict | str | None, asset_field: dict | str | None, weight: dict = None) -> float:        
+    def compare_fields(self, csaf_field: dict | str | None, asset_field: dict | str | None, weight: dict = None) -> float:
+        if not csaf_field and not asset_field:
+            return 1.0
+              
         if not csaf_field or not asset_field:
             return 0.0
 
@@ -342,6 +359,7 @@ class Matching:
 
             weight = None
 
+            # TODO: add weights in a separate file
             match field: 
                 case "cpe": 
                     weight = {
@@ -446,6 +464,11 @@ class Matching:
 #     # asset_product_type = "Undefined"
 
 #     # score = matcher.compare_fields(csaf_product_type, asset_product_type)
+
+#     # csaf_version = {'schema': 'pep-440', 'raw': '1.15.0.0', 'package': None, 'release_prefix': None, 'release_number': '1.15.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': '1.15.0.0', 'max': '1.15.0.0'}]}
+#     # asset_version1 = {'schema': 'pep-440', 'raw': '1.15.0.0', 'package': None, 'release_prefix': None, 'release_number': '1.15.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': '1.15.0.0', 'max': '1.15.0.0'}]}
+#     # asset_version2 = {'schema': 'rpm-package-naming', 'raw': 'rubygem-activemodel-0:5.2.0-1.el7rhgs.src', 'package': 'rubygem-activemodel', 'release_prefix': None, 'release_number': None, 'release_branch': None, 'qualifier': None, 'build_number': '1.el7rhgs', 'architecture': 'src', 'date': None, 'epoch': '0', 'min_max_version': [{'min': '5.2.0', 'max': '5.2.0'}]}
+#     # print(matcher._compare_versions(csaf_version, asset_version1))
 
 # if __name__ == "__main__":
 #     main()
