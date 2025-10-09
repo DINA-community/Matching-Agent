@@ -13,14 +13,15 @@ WIP).
 
 ## Feature Matrix
 
-| Feature               | Status | Notes                                           |
-|-----------------------|--------|:------------------------------------------------|
-| Asset Synchronization | ✅ Done | Basic asset data syncing implemented            |
-| CSAF Synchronization  | ✅ Done | CSAF advisory data syncing implemented          |
-| Asset-CSAF Matching   | ✅ Done | A simple Matcher that matches everything is WIP |
-| REST API              | 🚧 WIP | Groundwork has been done. Need to specify API   |
-| Webhook Notifications | 🚧 WIP | Notification system being developed             |
-| Plugin System         | ✅ Done | Extensible plugin architecture ready            |
+| Feature                | Status | Notes                                                                         |
+|------------------------|--------|:------------------------------------------------------------------------------|
+| Asset Synchronization  | ✅ Done | Basic asset data syncing implemented                                          |
+| CSAF Synchronization   | ✅ Done | CSAF advisory data syncing implemented                                        |
+| Asset-CSAF Matching    | ✅ Done | A simple Matcher that matches everything with maximum score.                  |
+| Sophisticated Matching | 🚧 WIP | A sophisticated matching algorithm that properly assigns match probabilities. | 
+| REST API               | 🚧 WIP | Groundwork has been done. Need to specify API                                 |
+| Webhook Notifications  | 🚧 WIP | Notification system being developed                                           |
+| Plugin System          | ✅ Done | Extensible plugin architecture ready                                          |
 
 ## Project Structure
 
@@ -46,6 +47,8 @@ cd Matching-Agent
 Install [uv](https://docs.astral.sh/uv/), docker and docker compose in any way that suits you.
 
 ### after installation
+
+You can either build the docs with `make docs` and follow the instructions there or proceed with the instructions below.
 
 There are two possible ways to set up a development environment.
 First, you can use externally installed asset or csaf inventories and only set up a local database:
