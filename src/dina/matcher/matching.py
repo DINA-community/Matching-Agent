@@ -40,6 +40,12 @@ class Matching:
 
 
     def _compare_versions(self, csaf_version: dict | list, asset_version: dict | list) -> float:
+        if (csaf_version is None and asset_version is None) or (csaf_version == {} and asset_version == {}):
+            return 1.0
+        
+        if not csaf_version or not asset_version:
+            return 0.0
+        
         if isinstance(csaf_version, list):
             score = 0.0
             if isinstance(asset_version, list):
@@ -185,23 +191,38 @@ class Matching:
         return float(sum(scores) / len(scores))
     
     def _safe_load(self, val):
+        if val == {}:
+            return val
+        
         if not val:
-            return {}
+            return None
+        
         try:
             return json.loads(val)
         except Exception:
-            return {}
+            return None
         
-    def _extract_field(self, data: str, field: str) -> dict | str | None:
-        if not data or not isinstance(data, str):
+    def _extract_field(self, data: str | dict, field: str) -> dict | str | None:
+        if not data:
+            return None
+        
+        if isinstance(data, dict):
+            return data.get(field)
+        
+        if not isinstance(data, str):
             return None
 
         try:
             obj = json.loads(data)
+
+            if obj == {}:
+                return obj
+            
         except json.JSONDecodeError:
             return None
 
         value = obj.get(field)
+
         if not value:
             return None
 
@@ -290,7 +311,7 @@ class Matching:
                         pl.struct([csaf_cpe_norm, asset_norm])
                         .map_elements(
                             lambda row: self._compare_freetext(
-                                self._safe_load(self._extract_field(row[csaf_cpe_norm], "vendor")),
+                                self._extract_field(row[csaf_cpe_norm], "vendor"),
                                 self._safe_load(row[asset_norm]),
                             ),
                             return_dtype=pl.Float64,
@@ -302,7 +323,7 @@ class Matching:
                         pl.struct([csaf_cpe_norm, asset_norm])
                         .map_elements(
                             lambda row: self._compare_freetext(
-                                self._safe_load(self._extract_field(row[csaf_cpe_norm], "product")),
+                                self._extract_field(row[csaf_cpe_norm], "product"),
                                 self._safe_load(row[asset_norm]),
                             ),
                             return_dtype=pl.Float64,
@@ -331,7 +352,7 @@ class Matching:
                         pl.struct([csaf_cpe_norm, asset_norm])
                         .map_elements(
                             lambda row: self._compare_versions(
-                                self._safe_load(self._extract_field(row[csaf_cpe_norm], field)),
+                                self._extract_field(row[csaf_cpe_norm], field),
                                 self._safe_load(row[asset_norm]),
                             ),
                             return_dtype=pl.Float64,
@@ -344,7 +365,7 @@ class Matching:
                         pl.struct([csaf_purl_norm, asset_norm])
                         .map_elements(
                             lambda row: self._compare_versions(
-                                self._safe_load(self._extract_field(row[csaf_purl_norm], field)),
+                                self._extract_field(row[csaf_purl_norm], field),
                                 self._safe_load(row[asset_norm]),
                             ),
                             return_dtype=pl.Float64,
@@ -376,6 +397,19 @@ class Matching:
                         "target_hw": 0.02,
                         "other": 0.01,
                     }
+
+                    df_norm = df_norm.with_columns(
+                        pl.struct([csaf_norm, asset_norm])
+                        .map_elements(
+                            lambda row: self._compare_versions(
+                                self._extract_field(row[csaf_norm], "version"),
+                                self._extract_field(row[asset_norm], "version")
+                            ),
+                            return_dtype=pl.Float64,
+                        )
+                        .alias(f"asset_csaf_cpe_version_match")
+                    )
+                    # print(df_norm.select([csaf_norm, asset_norm,"asset_csaf_cpe_version_match"]))
                 case "purl": 
                     weight = {
                         "raw": 0.02,
@@ -386,6 +420,20 @@ class Matching:
                         "qualifiers": 0.05,
                         "subpath": 0.03,
                     }
+
+                    df_norm = df_norm.with_columns(
+                        pl.struct([csaf_norm, asset_norm])
+                        .map_elements(
+                            lambda row: self._compare_versions(
+                                self._extract_field(row[csaf_norm], "version"),
+                                self._extract_field(row[asset_norm], "version")
+                            ),
+                            return_dtype=pl.Float64,
+                        )
+                        .alias(f"asset_csaf_purl_version_match")
+                    )
+
+                    # print(df_norm.select([csaf_norm, asset_norm, "asset_csaf_purl_version_match"]))
 
             if csaf_norm in df_norm and asset_norm in df_norm:
                 df_norm = df_norm.with_columns(
@@ -436,6 +484,8 @@ class Matching:
 #     #     },
 #     #     "edition": "workstation",
 #     # }
+
+#     # print(matcher._extract_field(csaf_field, "version"))
 
 #     # score = matcher.compare_fields(
 #     #     csaf_field, 
