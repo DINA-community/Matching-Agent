@@ -1,37 +1,89 @@
+import numpy as np
 
 class Score:
-    def __init__(self, freetext_fields: list[str], ordered_fields: list[str], other_fields: list[str]):
-        self.fields = freetext_fields + ordered_fields + other_fields
+    def __init__(self, freetext_fields: dict, ordered_fields: dict, other_fields: dict):
+        self.fields = {**freetext_fields, **ordered_fields, **other_fields}
 
     def calculate_overall_score(self, df_norm):
+        # TODO: add csaf_cpe_norm and csaf_purl_norm in a separate file
+        csaf_cpe_norm = "csaf_cpe_norm"
+        csaf_purl_norm = "csaf_purl_norm"
         vendor_score = product_name_score = product_family_score = version_score = keyword_score = 0.0
-        vendor_threshold = 0
+        vendor_threshold = 40
         product_family_threshold = 0
-        product_name_threshold = 20
+        product_name_threshold = 60
         keyword_threshold = 0
-        version_threshold = 20
+        version_threshold = 60
 
         keyword_scores = []
 
-        for field in self.fields:
-            val = df_norm.select([f"{field}_match"]).to_series()
+        score_percent_list = np.array([], dtype=float)
 
-            if not val.is_empty():
+        if self.fields and self.fields.items():
+            for field, weight in self.fields.items():
+                val = df_norm.select([f"{field}_match"]).to_series()
+
+                if val.is_empty():
+                    continue
+
+                v = val.item()                
+                v_w = v * weight
+
+                score_percent_list = np.append(score_percent_list, v_w)
+                
+                field_csaf_cpe_norm_match = f"{field}_{csaf_cpe_norm}_match"
+
                 match field:
                     case "manufacturer_name":
-                        vendor_score = val.item() * 100
+                        vendor_score = max(v, vendor_score)
+
+                        if "cpe" in self.fields:
+                            if field_csaf_cpe_norm_match in df_norm.columns:
+                                cpe_asset = df_norm.select([field_csaf_cpe_norm_match]).to_series()
+                                vendor_score = max(cpe_asset.item(), vendor_score)
+
+                        vendor_score = vendor_score * 100
                     case "name":
-                        product_name_score = val.item() * 100
+                        product_name_score = max(v, product_name_score)
+
+                        if "cpe" in self.fields:
+                            if field_csaf_cpe_norm_match in df_norm.columns:
+                                cpe_asset = df_norm.select([field_csaf_cpe_norm_match]).to_series()
+                                product_name_score = max(cpe_asset.item(), product_name_score)
+
+                        product_name_score = product_name_score * 100
                     case "device_family":
-                        product_family_score = val.item() * 100
+                        product_family_score = v * 100
                     case "version":
-                        version_score = val.item() * 100
+                        version_score = max(v, version_score)
+
+                        if "cpe" in self.fields:
+                            asset_csaf_cpe_norm_match = f"asset_{csaf_cpe_norm}_match"
+
+                            if asset_csaf_cpe_norm_match in df_norm.columns:
+                                cpe_asset = df_norm.select([asset_csaf_cpe_norm_match]).to_series()
+                                version_score = max(cpe_asset.item(), version_score)
+                            if field_csaf_cpe_norm_match in df_norm.columns:
+                                cpe_version = df_norm.select([field_csaf_cpe_norm_match]).to_series()
+                                version_score = max(cpe_version.item(), version_score)
+                        if "purl" in self.fields:
+                            asset_csaf_purl_norm_match = f"asset_{csaf_purl_norm}_match"
+                            version_csaf_purl_norm_match = f"{field}_{csaf_purl_norm}_match"
+
+                            if asset_csaf_purl_norm_match in df_norm.columns:
+                                purl_asset = df_norm.select([asset_csaf_purl_norm_match]).to_series()
+                                version_score = max(purl_asset.item(), version_score)
+                            if version_csaf_purl_norm_match in df_norm.columns:
+                                purl_version = df_norm.select([version_csaf_purl_norm_match]).to_series()
+                                version_score = max(purl_version.item(), version_score)
+
+                        version_score = version_score * 100
                     case _:
-                        keyword_scores.append(val.item() * 100)
+                        keyword_scores.append(v * 100)
 
         keyword_score = sum(keyword_scores) / len(keyword_scores) if keyword_scores else 0.0
 
-        score_percent = (vendor_score + product_name_score + product_family_score + version_score + keyword_score) / 5
+        score_percent = round(np.sum(score_percent_list) * 100, 4)
 
         if score_percent > 100:
             print(score_percent)

@@ -297,13 +297,28 @@ def match_pairs(matches: queue.Queue, pairs: list[tuple[CsafProduct, Asset]]):
 
         df = pl.DataFrame([{**csaf_dict, **asset_dict}])
 
-        freetext_fields = ["name", "hardware_name", "manufacturer_name", "device_family"]
+        freetext_fields = {
+            "name": 0.20, 
+            "hardware_name": 0.18, 
+            "manufacturer_name": 0.08, 
+            "device_family": 0.01
+        }
+        
+        ordered_fields = {
+            "version": 0.10, 
+            "model": 0.05, 
+            "model_numbers": 0.04, 
+            "part_numbers": 0.03
+        }
 
-        ordered_fields = ["version", "model", "model_numbers", "part_numbers"]
+        other_fields = {
+            "cpe": 0.15, 
+            "purl": 0.13, 
+            "product_type": 0.02, 
+            "sbom_urls": 0.01
+        }
 
-        other_fields = ["cpe", "purl", "product_type", "sbom_urls"]
-
-        pl.Config.set_fmt_str_lengths(2000)
+        # pl.Config.set_fmt_str_lengths(2000)
 
         normalizer = Normalizer(freetext_fields, ordered_fields, other_fields)
         df_norm = normalizer.apply(df)

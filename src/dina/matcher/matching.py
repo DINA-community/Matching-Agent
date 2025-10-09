@@ -6,7 +6,7 @@ from rapidfuzz import fuzz
 from packaging.version import Version, InvalidVersion
 
 class Matching:
-    def __init__(self, freetext_fields: list[str], ordered_fields: list[str], other_fields: list[str]):
+    def __init__(self, freetext_fields: dict, ordered_fields: dict, other_fields: dict):
         self.freetext_fields = freetext_fields
         self.ordered_fields = ordered_fields
         self.other_fields = other_fields
@@ -40,8 +40,8 @@ class Matching:
 
 
     def _compare_versions(self, csaf_version: dict | list, asset_version: dict | list) -> float:
-        if (csaf_version is None and asset_version is None) or (csaf_version == {} and asset_version == {}):
-            return 1.0
+        # if (csaf_version is None and asset_version is None) or (csaf_version == {} and asset_version == {}):
+        #     return 1.0
         
         if not csaf_version or not asset_version:
             return 0.0
@@ -135,8 +135,8 @@ class Matching:
         s1 = (s1 or "").strip().lower()
         s2 = (s2 or "").strip().lower()
 
-        if not s1 and not s2:
-            return 1.0
+        # if not s1 and not s2:
+        #     return 1.0
 
         if not s1 or not s2:
             return 0.0
@@ -164,8 +164,8 @@ class Matching:
         s1 = (s1 or "").strip().lower()
         s2 = (s2 or "").strip().lower()
 
-        if not s1 and not s2:
-            return 1.0
+        # if not s1 and not s2:
+        #     return 1.0
 
         if not s1 or not s2:
             return 0.0
@@ -251,8 +251,8 @@ class Matching:
             )
     
     def compare_fields(self, csaf_field: dict | str | None, asset_field: dict | str | None, weight: dict = None) -> float:
-        if not csaf_field and not asset_field:
-            return 1.0
+        # if not csaf_field and not asset_field:
+        #     return 1.0
               
         if not csaf_field or not asset_field:
             return 0.0
@@ -288,168 +288,172 @@ class Matching:
         return 0.0
 
     def df_matching(self, df_norm: pl.DataFrame) -> pl.DataFrame:
+        # TODO: add csaf_cpe_norm and csaf_purl_norm in a separate file
         csaf_cpe_norm = "csaf_cpe_norm"
         csaf_purl_norm = "csaf_purl_norm"
 
         df_norm_csaf_purl_cpe = df_norm.select([csaf_cpe_norm, csaf_purl_norm])
 
-        for field in self.freetext_fields:
-            csaf_norm, asset_norm = f"csaf_{field}_norm", f"asset_{field}_norm"
+        if self.freetext_fields and self.freetext_fields.keys():
+            for field in self.freetext_fields:
+                csaf_norm, asset_norm = f"csaf_{field}_norm", f"asset_{field}_norm"
 
-            if csaf_norm in df_norm and asset_norm in df_norm:
-                df_norm = df_norm.with_columns(
-                    pl.struct([csaf_norm, asset_norm])
-                    .map_elements(
-                        lambda row: self._compare_freetext(row[csaf_norm], row[asset_norm]),
-                        return_dtype=pl.Float64,
-                    )
-                    .alias(f"{field}_match")
-                )
-                
-                if field == "manufacturer_name" and self._has_valid_json(df_norm_csaf_purl_cpe, csaf_cpe_norm):
+                if csaf_norm in df_norm and asset_norm in df_norm:
                     df_norm = df_norm.with_columns(
-                        pl.struct([csaf_cpe_norm, asset_norm])
+                        pl.struct([csaf_norm, asset_norm])
                         .map_elements(
-                            lambda row: self._compare_freetext(
-                                self._extract_field(row[csaf_cpe_norm], "vendor"),
-                                self._safe_load(row[asset_norm]),
-                            ),
+                            lambda row: self._compare_freetext(row[csaf_norm], row[asset_norm]),
                             return_dtype=pl.Float64,
                         )
-                        .alias(f"{field}_{csaf_cpe_norm}_match")
+                        .alias(f"{field}_match")
                     )
-                if field == "name" and self._has_valid_json(df_norm_csaf_purl_cpe, csaf_cpe_norm):
-                    df_norm = df_norm.with_columns(
-                        pl.struct([csaf_cpe_norm, asset_norm])
-                        .map_elements(
-                            lambda row: self._compare_freetext(
-                                self._extract_field(row[csaf_cpe_norm], "product"),
-                                self._safe_load(row[asset_norm]),
-                            ),
-                            return_dtype=pl.Float64,
+                    
+                    if field == "manufacturer_name" and self._has_valid_json(df_norm_csaf_purl_cpe, csaf_cpe_norm):
+                        df_norm = df_norm.with_columns(
+                            pl.struct([csaf_cpe_norm, asset_norm])
+                            .map_elements(
+                                lambda row: self._compare_freetext(
+                                    self._extract_field(row[csaf_cpe_norm], "vendor"),
+                                    self._safe_load(row[asset_norm]),
+                                ),
+                                return_dtype=pl.Float64,
+                            )
+                            .alias(f"{field}_{csaf_cpe_norm}_match")
                         )
-                        .alias(f"{field}_{csaf_cpe_norm}_match")
-                    )
-
-        for field in self.ordered_fields:
-            csaf_norm, asset_norm = f"csaf_{field}_norm", f"asset_{field}_norm"
-
-            if csaf_norm in df_norm and asset_norm in df_norm:
-                df_norm = df_norm.with_columns(
-                    pl.struct([csaf_norm, asset_norm])
-                    .map_elements(
-                        lambda row: self._compare_versions(
-                            self._safe_load(row[csaf_norm]),
-                            self._safe_load(row[asset_norm]),
-                        ),
-                        return_dtype=pl.Float64,
-                    )
-                    .alias(f"{field}_match")
-                )
-
-                if field == "version" and self._has_valid_json(df_norm_csaf_purl_cpe, csaf_cpe_norm):
-                    df_norm = df_norm.with_columns(
-                        pl.struct([csaf_cpe_norm, asset_norm])
-                        .map_elements(
-                            lambda row: self._compare_versions(
-                                self._extract_field(row[csaf_cpe_norm], field),
-                                self._safe_load(row[asset_norm]),
-                            ),
-                            return_dtype=pl.Float64,
+                    if field == "name" and self._has_valid_json(df_norm_csaf_purl_cpe, csaf_cpe_norm):
+                        df_norm = df_norm.with_columns(
+                            pl.struct([csaf_cpe_norm, asset_norm])
+                            .map_elements(
+                                lambda row: self._compare_freetext(
+                                    self._extract_field(row[csaf_cpe_norm], "product"),
+                                    self._safe_load(row[asset_norm]),
+                                ),
+                                return_dtype=pl.Float64,
+                            )
+                            .alias(f"{field}_{csaf_cpe_norm}_match")
                         )
-                        .alias(f"{field}_{csaf_cpe_norm}_match")
-                    )
 
-                if field == "version" and self._has_valid_json(df_norm_csaf_purl_cpe, csaf_purl_norm):
-                    df_norm = df_norm.with_columns(
-                        pl.struct([csaf_purl_norm, asset_norm])
-                        .map_elements(
-                            lambda row: self._compare_versions(
-                                self._extract_field(row[csaf_purl_norm], field),
-                                self._safe_load(row[asset_norm]),
-                            ),
-                            return_dtype=pl.Float64,
-                        )
-                        .alias(f"{field}_{csaf_purl_norm}_match")
-                    )
+        if self.ordered_fields and self.ordered_fields.keys():
+            for field in self.ordered_fields:
+                csaf_norm, asset_norm = f"csaf_{field}_norm", f"asset_{field}_norm"
 
-                    # print(df_norm.select([csaf_purl_norm, asset_norm, f"{field}_{csaf_purl_norm}_match"]))
-
-        for field in self.other_fields:
-            csaf_norm, asset_norm = f"csaf_{field}_norm", f"asset_{field}_norm"
-
-            weight = None
-
-            # TODO: add weights in a separate file
-            match field: 
-                case "cpe": 
-                    weight = {
-                        "raw": 0.01,
-                        "part": 0.05,
-                        "vendor": 0.15,
-                        "product": 0.35,
-                        "version": 0.30,
-                        "update": 0.05,
-                        "edition": 0.02,
-                        "language": 0.00,
-                        "sw_edition": 0.02,
-                        "target_sw": 0.02,
-                        "target_hw": 0.02,
-                        "other": 0.01,
-                    }
-
+                if csaf_norm in df_norm and asset_norm in df_norm:
                     df_norm = df_norm.with_columns(
                         pl.struct([csaf_norm, asset_norm])
                         .map_elements(
                             lambda row: self._compare_versions(
-                                self._extract_field(row[csaf_norm], "version"),
-                                self._extract_field(row[asset_norm], "version")
+                                self._safe_load(row[csaf_norm]),
+                                self._safe_load(row[asset_norm]),
                             ),
                             return_dtype=pl.Float64,
                         )
-                        .alias("asset_csaf_cpe_version_match")
+                        .alias(f"{field}_match")
                     )
-                    # print(df_norm.select([csaf_norm, asset_norm,"asset_csaf_cpe_version_match"]))
-                case "purl": 
-                    weight = {
-                        "raw": 0.02,
-                        "type": 0.15,
-                        "namespace": 0.10,
-                        "name": 0.35,
-                        "version": 0.30,
-                        "qualifiers": 0.05,
-                        "subpath": 0.03,
-                    }
 
+                    if field == "version" and self._has_valid_json(df_norm_csaf_purl_cpe, csaf_cpe_norm):
+                        df_norm = df_norm.with_columns(
+                            pl.struct([csaf_cpe_norm, asset_norm])
+                            .map_elements(
+                                lambda row: self._compare_versions(
+                                    self._extract_field(row[csaf_cpe_norm], field),
+                                    self._safe_load(row[asset_norm]),
+                                ),
+                                return_dtype=pl.Float64,
+                            )
+                            .alias(f"{field}_{csaf_cpe_norm}_match")
+                        )
+
+                    if field == "version" and self._has_valid_json(df_norm_csaf_purl_cpe, csaf_purl_norm):
+                        df_norm = df_norm.with_columns(
+                            pl.struct([csaf_purl_norm, asset_norm])
+                            .map_elements(
+                                lambda row: self._compare_versions(
+                                    self._extract_field(row[csaf_purl_norm], field),
+                                    self._safe_load(row[asset_norm]),
+                                ),
+                                return_dtype=pl.Float64,
+                            )
+                            .alias(f"{field}_{csaf_purl_norm}_match")
+                        )
+
+                        # print(df_norm.select([csaf_purl_norm, asset_norm, f"{field}_{csaf_purl_norm}_match"]))
+
+        if self.other_fields and self.other_fields.keys():
+            for field in self.other_fields.keys():
+                csaf_norm, asset_norm = f"csaf_{field}_norm", f"asset_{field}_norm"
+
+                weight = None
+
+                # TODO: add weights in a separate file
+                match field: 
+                    case "cpe": 
+                        weight = {
+                            "raw": 0.01,
+                            "part": 0.05,
+                            "vendor": 0.15,
+                            "product": 0.35,
+                            "version": 0.30,
+                            "update": 0.05,
+                            "edition": 0.02,
+                            "language": 0.00,
+                            "sw_edition": 0.02,
+                            "target_sw": 0.02,
+                            "target_hw": 0.02,
+                            "other": 0.01,
+                        }
+
+                        df_norm = df_norm.with_columns(
+                            pl.struct([csaf_norm, asset_norm])
+                            .map_elements(
+                                lambda row: self._compare_versions(
+                                    self._extract_field(row[csaf_norm], "version"),
+                                    self._extract_field(row[asset_norm], "version")
+                                ),
+                                return_dtype=pl.Float64,
+                            )
+                            .alias(f"asset_{csaf_cpe_norm}_match")
+                        )
+                        # print(df_norm.select([csaf_norm, asset_norm,f"asset_{csaf_cpe_norm}_match"]))
+                    case "purl": 
+                        weight = {
+                            "raw": 0.02,
+                            "type": 0.15,
+                            "namespace": 0.10,
+                            "name": 0.35,
+                            "version": 0.30,
+                            "qualifiers": 0.05,
+                            "subpath": 0.03,
+                        }
+
+                        df_norm = df_norm.with_columns(
+                            pl.struct([csaf_norm, asset_norm])
+                            .map_elements(
+                                lambda row: self._compare_versions(
+                                    self._extract_field(row[csaf_norm], "version"),
+                                    self._extract_field(row[asset_norm], "version")
+                                ),
+                                return_dtype=pl.Float64,
+                            )
+                            .alias(f"asset_{csaf_purl_norm}_match")
+                        )
+
+                        # print(df_norm.select([csaf_norm, asset_norm, f"asset_{csaf_purl_norm}_match"]))
+
+                if csaf_norm in df_norm and asset_norm in df_norm:
                     df_norm = df_norm.with_columns(
                         pl.struct([csaf_norm, asset_norm])
                         .map_elements(
-                            lambda row: self._compare_versions(
-                                self._extract_field(row[csaf_norm], "version"),
-                                self._extract_field(row[asset_norm], "version")
+                            lambda row: self.compare_fields(
+                                self._safe_load(row[csaf_norm]),
+                                self._safe_load(row[asset_norm]),
+                                weight
                             ),
                             return_dtype=pl.Float64,
                         )
-                        .alias("asset_csaf_purl_version_match")
+                        .alias(f"{field}_match")
                     )
 
-                    # print(df_norm.select([csaf_norm, asset_norm, "asset_csaf_purl_version_match"]))
-
-            if csaf_norm in df_norm and asset_norm in df_norm:
-                df_norm = df_norm.with_columns(
-                    pl.struct([csaf_norm, asset_norm])
-                    .map_elements(
-                        lambda row: self.compare_fields(
-                            self._safe_load(row[csaf_norm]),
-                            self._safe_load(row[asset_norm]),
-                            weight
-                        ),
-                        return_dtype=pl.Float64,
-                    )
-                    .alias(f"{field}_match")
-                )
-
-                # print(df_norm.select([f"csaf_{field}_norm", f"asset_{field}_norm", f"{field}_match"]))
+                    # print(df_norm.select([f"csaf_{field}_norm", f"asset_{field}_norm", f"{field}_match"]))
 
         return df_norm
     

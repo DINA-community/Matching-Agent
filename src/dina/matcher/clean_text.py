@@ -535,7 +535,7 @@ def parse_files(files: list[dict]) -> list[dict]:
     return results
 
 class Normalizer:
-    def __init__(self, freetext_fields: list[str], ordered_fields: list[str], other_fields: list[str]):
+    def __init__(self, freetext_fields: dict, ordered_fields: dict, other_fields: dict):
         self.freetext_fields = freetext_fields
         self.ordered_fields = ordered_fields
         self.other_fields = other_fields
@@ -543,49 +543,52 @@ class Normalizer:
     def apply(self, df: pl.DataFrame) -> pl.DataFrame:
         updates = []
 
-        for col in self.freetext_fields:
-            for prefix in ("csaf_", "asset_"):
-                full_col = f"{prefix}{col}"
+        if self.freetext_fields and self.freetext_fields.keys():
+            for col in self.freetext_fields.keys():
+                for prefix in ("csaf_", "asset_"):
+                    full_col = f"{prefix}{col}"
 
-                if full_col in df.columns:
-                    expr = pl.col(full_col)
-                    expr = expr.map_elements(lambda x: json.dumps(parse_freetext(x)), return_dtype=pl.Utf8)
-                    expr = expr.alias(f"{full_col}_norm")
-                    updates.append(expr)
+                    if full_col in df.columns:
+                        expr = pl.col(full_col)
+                        expr = expr.map_elements(lambda x: json.dumps(parse_freetext(x)), return_dtype=pl.Utf8)
+                        expr = expr.alias(f"{full_col}_norm")
+                        updates.append(expr)
 
-        for col in self.ordered_fields:
-            for prefix in ("csaf_", "asset_"):
-                full_col = f"{prefix}{col}"
+        if self.ordered_fields and self.ordered_fields.keys():
+            for col in self.ordered_fields.keys():
+                for prefix in ("csaf_", "asset_"):
+                    full_col = f"{prefix}{col}"
 
-                if full_col in df.columns:
-                    expr = pl.col(full_col).map_elements(lambda x: json.dumps(parse_version(x)), return_dtype=pl.Utf8)
-                    expr = expr.alias(f"{full_col}_norm")
-                    updates.append(expr)
+                    if full_col in df.columns:
+                        expr = pl.col(full_col).map_elements(lambda x: json.dumps(parse_version(x)), return_dtype=pl.Utf8)
+                        expr = expr.alias(f"{full_col}_norm")
+                        updates.append(expr)
 
-        for col in self.other_fields:
-            for prefix in ("csaf_", "asset_"):
-                full_col = f"{prefix}{col}"
+        if self.other_fields and self.other_fields.keys():
+            for col in self.other_fields.keys():
+                for prefix in ("csaf_", "asset_"):
+                    full_col = f"{prefix}{col}"
 
-                if full_col in df.columns:
-                    parsers = {
-                        "cpe": parse_cpe,
-                        "purl": parse_purl,
-                        "files": parse_files,
-                    }
+                    if full_col in df.columns:
+                        parsers = {
+                            "cpe": parse_cpe,
+                            "purl": parse_purl,
+                            "files": parse_files,
+                        }
 
-                    if col in parsers:
-                        parser = parsers[col]
+                        if col in parsers:
+                            parser = parsers[col]
 
-                        if parser:
-                            expr = (
-                                pl.col(full_col)
-                                .map_elements(lambda x, parser=parser: json.dumps(parser(x)), return_dtype=pl.Utf8)
-                                .alias(f"{full_col}_norm")
-                            )
-                    else: 
-                        expr = pl.col(full_col).alias(f"{full_col}_norm")
+                            if parser:
+                                expr = (
+                                    pl.col(full_col)
+                                    .map_elements(lambda x, parser=parser: json.dumps(parser(x)), return_dtype=pl.Utf8)
+                                    .alias(f"{full_col}_norm")
+                                )
+                        else: 
+                            expr = pl.col(full_col).alias(f"{full_col}_norm")
 
-                    updates.append(expr)
+                        updates.append(expr)
 
 
         # ---- for tests   
