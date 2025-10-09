@@ -27,7 +27,8 @@ dependencies = [
     "psycopg[binary]>=3.2.9",
     "polars>=0.20.30",
     "rapidfuzz>=3.9.7",
-    "packaging>=24.1"
+    "packaging>=24.1",
+    "numpy>=1.26.0",
 ]
 
 [project.optional-dependencies]
