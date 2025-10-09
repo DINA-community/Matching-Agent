@@ -214,7 +214,6 @@ class BaseSynchronizer(ABC):
                     await fetcher_view.set_last_run(datetime.datetime.now())
                 except Exception as e:
                     logger.error(f"Error fetching data from {source.debug_info()}: {e}")
-                    raise e
 
                 self.__last_synchronization = time.time()
             else:
