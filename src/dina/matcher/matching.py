@@ -407,7 +407,7 @@ class Matching:
                             ),
                             return_dtype=pl.Float64,
                         )
-                        .alias(f"asset_csaf_cpe_version_match")
+                        .alias("asset_csaf_cpe_version_match")
                     )
                     # print(df_norm.select([csaf_norm, asset_norm,"asset_csaf_cpe_version_match"]))
                 case "purl": 
@@ -430,7 +430,7 @@ class Matching:
                             ),
                             return_dtype=pl.Float64,
                         )
-                        .alias(f"asset_csaf_purl_version_match")
+                        .alias("asset_csaf_purl_version_match")
                     )
 
                     # print(df_norm.select([csaf_norm, asset_norm, "asset_csaf_purl_version_match"]))
