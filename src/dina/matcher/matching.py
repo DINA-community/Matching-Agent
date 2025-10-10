@@ -168,7 +168,11 @@ class Matching:
         if not val:
             return {}
         try:
-            return json.loads(val)
+            val = json.loads(val)
+            if val:
+                return val
+            else:
+                return {}
         except Exception:
             return {}
 
