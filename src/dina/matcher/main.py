@@ -71,6 +71,7 @@ class ApiConfig(BaseModel):
 
 class MatcherConfig(BaseModel):
     sync_interval: int
+    match_threshold: float
     Api: ApiConfig
     Cachedb: CacheDB.Config
     asset_plugins_path: Path
@@ -133,6 +134,7 @@ class Matcher:
                                     match_pairs,
                                     self.__matches,
                                     batch,
+                                    self.__config.Matcher.match_threshold,
                                 )
                             )
                             if len(parallel_tasks) >= num_processes:
@@ -237,9 +239,9 @@ class Matcher:
         async def status():
             return {"status": "running"}
 
-        @task_route.post("/stop")
-        async def stop():
-            logger.info("Stopping matching task")
+        # @task_route.post("/stop")
+        # async def stop():
+        #     logger.info("Stopping matching task")
 
         @sub_route.post("/new_match")
         async def subscribe(body: MatchSubscription) -> None:
@@ -284,7 +286,9 @@ class Matcher:
         return HttpUrl(origin_uri)
 
 
-def match_pairs(matches: queue.Queue, pairs: list[tuple[CsafProduct, Asset]]):
+def match_pairs(
+    matches: queue.Queue, pairs: list[tuple[CsafProduct, Asset]], threshold: float
+):
     logger.debug(f"Matching batch with {len(pairs)} pairs")
     batch = []
     for csaf, asset in pairs:
@@ -329,6 +333,9 @@ def match_pairs(matches: queue.Queue, pairs: list[tuple[CsafProduct, Asset]]):
 
         # for field in ordered_fields:
         #     print(df_norm_matches.select([f"{field}_match"]))
+
+        if score_procent < threshold:
+            continue
 
         match = Match()
         match.asset_id = asset.id
