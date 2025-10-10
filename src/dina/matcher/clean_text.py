@@ -315,9 +315,10 @@ def parse_pep440(expr: str):
     return d
 
 def parse_version_freetext(expr: str):
-    separator = "."
+    # TODO: add separator to the separate file
+    separator = ":"
     expr = expr.lower()
-    expr = re.sub(r"[^a-z0-9]+", separator, expr)
+    expr = re.sub(r"[^a-z0-9.]+", separator, expr)
     expr = expr.strip(separator)
 
     d = _base_dict(Standards.FREETEXT.value, expr)
@@ -640,6 +641,8 @@ class Normalizer:
 #         # "+.1",
 #         # "2.31.1-1",
 #         # "random-string",
+#         # "7 SP2",
+#         # "All versions < V5.7 SP1 HF1"
 #     ]
 
 #     for ex in examples:
@@ -688,7 +691,7 @@ class Normalizer:
 
 #     # print(parse_files(files))
 
-#     print(parse_version(examples))
+#     # print(parse_version(examples))
 
 # if __name__ == "__main__":
 #     main()
