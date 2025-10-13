@@ -9,7 +9,7 @@ from sqlalchemy import String, and_, cast
 
 from dina.cachedb.database import MappedRelationship
 from dina.cachedb.fetcher_view import FetcherView
-from dina.cachedb.model import Asset, CsafProduct
+from dina.cachedb.model import Asset, CsafProduct, Match
 from dina.common import logging
 from dina.plugins.datasource.isduba.connector import (
     get_csaf_product_tree,
@@ -160,6 +160,7 @@ class IsdubaDataSource(DataSourcePlugin):
                         else:
                             existing.product = prod.product
                         products[i] = existing
+                    products[i].uri = self.build_resource_uri(products[i].origin_info)
 
                 self.__offset += self.__limit
                 if products:
@@ -291,6 +292,10 @@ class IsdubaDataSource(DataSourcePlugin):
             for rel in relations
         ]
 
+    async def notify_new_matches(self, new_matches: List[Match]):
+        # There is no notification mechanism for isduba.
+        pass
+
     async def cleanup_products(
         self, data_to_check: List[Asset | CsafProduct]
     ) -> List[CleanUpDecision]:
@@ -338,15 +343,15 @@ class IsdubaDataSource(DataSourcePlugin):
                 return await new_instance.documents_id_get(doc_id)
 
     async def cleanup_relationships(
-        self, relationships_to_check: List[Relationship]
-    ) -> List[Relationship]:
+        self, relationships_to_check: List[MappedRelationship]
+    ) -> List[MappedRelationship]:
         return relationships_to_check
 
     @property
     def origin_uri(self):
         return self.config.DataSource.Plugin.url.unicode_string()
 
-    def build_resource_path(self, origin_info: dict[str, object]) -> str:
+    def build_resource_path(self, origin_info: dict[str, Any]) -> str:
         path = origin_info.get("path")
         return str(path) if path else ""
 

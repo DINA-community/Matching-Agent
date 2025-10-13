@@ -1,11 +1,13 @@
 import asyncio
 import concurrent.futures
 import datetime
+import itertools
 import multiprocessing
 import queue
 import time
 import tomllib
 import traceback
+from collections import defaultdict
 from pathlib import Path
 from queue import Empty, Queue
 from typing import Any
@@ -93,6 +95,7 @@ class Matcher:
         self.__matches: Queue[list[Match]] = self.__manager.Queue()
         self.__cache_db = CacheDB()
         self.__last_matching: float | None = None
+        self.__last_publish: float | None = None
         self.__data_source_plugins = load_datasource_plugins(
             Path(self.__config.Matcher.asset_plugins_path)
         )
@@ -161,7 +164,21 @@ class Matcher:
                 except Empty:
                     pass
             if tasks:
-                await asyncio.gather(*tasks)
+                match_ids = await asyncio.gather(*tasks)
+                match_ids = itertools.chain.from_iterable(match_ids)
+                matches = await self.__cache_db.get_matches(ids=match_ids)
+                # Categorize by asset origin
+                categorized_matches = defaultdict(list)
+                for match in matches:
+                    categorized_matches[match.asset.origin_uri].append(match)
+                # Let asset plugins notify subscribers of new matches
+                for origin, matches in categorized_matches.items():
+                    if self.__data_source_plugins[
+                        origin
+                    ].config.DataSource.publish_matches:
+                        await self.__data_source_plugins[origin].notify_new_matches(
+                            matches
+                        )
             await asyncio.sleep(0.1)
 
     async def __serve_api(self):

@@ -1,7 +1,7 @@
 import asyncio
 import time
 from datetime import timezone
-from typing import List
+from typing import List, Any
 
 from pydantic import BaseModel
 from sqlalchemy import Integer
@@ -12,6 +12,7 @@ from dina.cachedb.model import (
     CsafProduct,
     Product,
     ProductType,
+    Match,
 )
 from dina.common import logging
 from dina.plugins.datasource.netbox.generated.api_client import AuthenticatedClient
@@ -23,11 +24,14 @@ from dina.plugins.datasource.netbox.generated.api_client.api.dcim import (
 from dina.plugins.datasource.netbox.generated.api_client.api.plugins import (
     plugins_d3c_productrelationship_list_list,
     plugins_d3c_software_list_list,
+    plugins_csaf_csafmatch_list_create,
 )
 from dina.plugins.datasource.netbox.generated.api_client.errors import UnexpectedStatus
 from dina.plugins.datasource.netbox.generated.api_client.models import (
     DeviceTypeCustomFields,
+    CsafMatchRequest,
 )
+from dina.plugins.datasource.netbox.generated.api_client.types import UNSET
 from dina.synchronizer.plugin_base.data_source import (
     CleanUpDecision,
     DataSourcePlugin,
@@ -247,12 +251,14 @@ class NetboxDataSource(DataSourcePlugin):
             if asset := existing_device_assets.get(device.id, None):
                 asset.last_update = current_time
                 asset.origin_info = origin_info
+                asset.uri = self.build_resource_uri(origin_info)
             else:
                 asset = Asset(
                     product=Product(),
                     last_update=current_time,
                     origin_uri=self.origin_uri,
                     origin_info=origin_info,
+                    uri=self.build_resource_uri(origin_info),
                 )
 
             asset.product.product_type = ProductType.Device
@@ -295,12 +301,14 @@ class NetboxDataSource(DataSourcePlugin):
             if asset := existing_software_assets.get(sw.id, None):
                 asset.last_update = current_time
                 asset.origin_info = origin_info
+                asset.uri = self.build_resource_uri(origin_info)
             else:
                 asset = Asset(
                     product=Product(),
                     last_update=current_time,
                     origin_uri=self.origin_uri,
                     origin_info=origin_info,
+                    uri=self.build_resource_uri(origin_info),
                 )
 
             asset.product.product_type = ProductType.Software
@@ -519,6 +527,21 @@ class NetboxDataSource(DataSourcePlugin):
 
         return result
 
+    async def notify_new_matches(self, new_matches: List[Match]):
+        requests = [
+            plugins_csaf_csafmatch_list_create.asyncio(
+                client=self.client,
+                body=CsafMatchRequest(
+                    csaf_document=match.csaf_product.uri,  # type: ignore
+                    device=match.asset.origin_info.get("device_id", UNSET),
+                    software=match.asset.origin_info.get("software_id", UNSET),
+                ),
+            )
+            for match in new_matches
+        ]
+
+        await asyncio.gather(*requests)
+
     @property
     def origin_uri(self):
         return self.config.DataSource.Plugin.api_url
@@ -526,7 +549,7 @@ class NetboxDataSource(DataSourcePlugin):
     def endpoint_info(self) -> str:
         return f"{self.config.DataSource.Plugin.api_url}"
 
-    def build_resource_path(self, origin_info: dict[str, object]) -> str:
+    def build_resource_path(self, origin_info: dict[str, Any]) -> str:
         try:
             if "device_id" in origin_info:
                 return f"/api/dcim/devices/{int(origin_info['device_id'])}/"
