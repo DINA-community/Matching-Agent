@@ -147,7 +147,10 @@ class Matching:
                         scores = np.append(scores, np.nan)
                     else: 
                         scores = np.append(scores, sum(part_scores) / len(part_scores))
+
                     continue
+
+                scores = np.append(scores, np.nan)
             else:
                 csaf_field = str(csaf_version.get(subfield) or "")
                 asset_field = str(asset_version.get(subfield) or "")
@@ -219,8 +222,8 @@ class Matching:
         ignore_order=True,
         max_distance=2
     ):
-        s1 = (s1 or "").strip().lower()
-        s2 = (s2 or "").strip().lower()
+        s1 = (s1 or "").strip().lower().replace("none", "")
+        s2 = (s2 or "").strip().lower().replace("none", "")
 
         if not s1 and not s2:
             return None
