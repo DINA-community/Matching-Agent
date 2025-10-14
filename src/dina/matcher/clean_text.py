@@ -322,7 +322,6 @@ def parse_version_freetext(expr: str):
     expr = expr.strip(separator)
 
     d = _base_dict(Standards.FREETEXT.value, expr)
-    d["min_max_version"] = [{"min": expr, "max": expr}]
 
     return d
 
@@ -643,6 +642,11 @@ class Normalizer:
 #         # "random-string",
 #         # "7 SP2",
 #         # "All versions < V5.7 SP1 HF1"
+#         # "13",
+#         # "<V3.0"
+#         # "14 Sp1",
+#         # "All versions < V5.7 SP1 HF1"
+#         "21.0.0.0"
 #     ]
 
 #     for ex in examples:
@@ -692,6 +696,12 @@ class Normalizer:
 #     # print(parse_files(files))
 
 #     # print(parse_version(examples))
+
+#     # textc = "Oracle Database 21c Express Edition"
+#     # texta = "Oracle Database 21c Express Edition"
+
+#     # print(parse_freetext(texta))
+
 
 # if __name__ == "__main__":
 #     main()

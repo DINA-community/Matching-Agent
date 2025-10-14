@@ -1,9 +1,7 @@
 import json
-import re
 import numpy as np
 from rapidfuzz.distance import Levenshtein
 import polars as pl
-from rapidfuzz import fuzz
 from packaging.version import Version, InvalidVersion
 
 class Matching:
@@ -28,17 +26,28 @@ class Matching:
 
         if (asset_min is None and asset_max is None) and (csaf_min is None and csaf_max is None):
             return True
-        if asset_min is None and asset_max is None:
-            return False
+
         if csaf_min is None and csaf_max is None:
             return False
 
-        if asset_min and csaf_min and asset_min < csaf_min:
+        if asset_min is None and asset_max is None:
             return False
-        if asset_max and csaf_max and asset_max > csaf_max:
-            return False
-        return True
 
+        if asset_min is not None and csaf_min is not None and asset_min < csaf_min:
+            return False
+
+        if asset_max is not None and csaf_max is not None and asset_max > csaf_max:
+            return False
+
+        if asset_min is None and csaf_min is not None:
+            if csaf_min > asset_max:
+                return False
+
+        if asset_max is None and csaf_max is not None:
+            if csaf_max < asset_min:
+                return False
+
+        return True
 
     def _compare_versions(self, csaf_version: dict | list, asset_version: dict | list) -> float:
         if (csaf_version is None and asset_version is None) or (csaf_version == {} and asset_version == {}):
@@ -60,7 +69,7 @@ class Matching:
 
             valid_scores = [s for s in scores if isinstance(s, (int, float)) and s is not None]
 
-            return max(valid_scores) if valid_scores else None
+            return round(max(valid_scores), 4) if valid_scores else None
 
         if not isinstance(csaf_version, dict) or not isinstance(asset_version, dict):
             return 0.0
@@ -129,7 +138,7 @@ class Matching:
                 part_scores = []
 
                 for c, a in zip(csaf_qualifier, asset_qualifier):
-                    ft_score = self._compare_freetext_with_order(str(c), str(a))
+                    ft_score = self._compare_freetext(str(c), str(a), ignore_order=False)
                     if ft_score is not None: 
                         part_scores.append(ft_score)
 
@@ -143,103 +152,140 @@ class Matching:
                 csaf_field = str(csaf_version.get(subfield) or "")
                 asset_field = str(asset_version.get(subfield) or "")
 
-                ft_score = self._compare_freetext_with_order(csaf_field, asset_field) 
+                ft_score = self._compare_freetext(csaf_field, asset_field, ignore_order=False) 
 
                 if ft_score is None: 
                     scores = np.append(scores, np.nan)
                 else:
                     scores = np.append(scores, ft_score)
 
+        valid_scores = scores[~np.isnan(scores)]
+
+        if valid_scores.size < 2:
+            return 0.0
+
         weighted_sum = np.nansum(scores * scores_weights)
         weight_sum   = np.nansum(scores_weights[~np.isnan(scores)])
         normalized_score = weighted_sum / weight_sum if weight_sum > 0 else None
 
-        return normalized_score
-        
-    def _compare_freetext_with_order(self, s1: str, s2: str) -> float:
+        return round(normalized_score, 4)
+
+    def _ngrams_from_tokens(self, tokens, n, ignore_order=True):
+        clean_tokens = [
+            str(t).strip()
+            for t in tokens
+            if t not in (None, "", "none", "null", "nan")
+            and str(t).strip().lower() not in ("none", "null", "nan")
+        ]
+
+        if not clean_tokens:
+            return []
+
+        if len(clean_tokens) < n:
+            return [":".join(clean_tokens)]
+
+        ngrams = [
+            ":".join(clean_tokens[i:i + n])
+            for i in range(len(clean_tokens) - n + 1)
+        ]
+
+        return sorted(ngrams) if ignore_order else ngrams
+
+
+    def _ngram_similarity(self, tokens1, tokens2, max_distance=2):        
+        if not tokens1 or not tokens2:
+            return 0.0
+
+        scores = []
+
+        for t1 in tokens1:
+            best = 0.0
+            for t2 in tokens2:
+                dist = Levenshtein.distance(t1, t2)
+                if dist > max_distance:
+                    continue 
+                score = 1 - (dist / max(len(t1), len(t2)))
+                best = max(best, score)
+            scores.append(best)
+        return np.mean(scores) if scores else 0.0
+
+
+    def _compare_freetext(
+        self, 
+        s1,
+        s2,
+        weights={1: 0.2, 2: 0.3, 3: 0.5},
+        global_weights={"token": 0.5, "ngram": 0.3, "overlap": 0.2},
+        ignore_order=True,
+        max_distance=2
+    ):
         s1 = (s1 or "").strip().lower()
         s2 = (s2 or "").strip().lower()
 
         if not s1 and not s2:
             return None
-
+        
         if not s1 or not s2:
             return 0.0
-        
-        # TODO: get separator from a separate file
-        tokens1 = [t for t in s1.split(":")]
-        tokens2 = [t for t in s2.split(":")]
+
+        tokens1 = [t for t in s1.split(":") if t]
+        tokens2 = [t for t in s2.split(":") if t]
+
+        if ignore_order:
+            tokens1.sort()
+            tokens2.sort()
 
         if not tokens1 or not tokens2:
             return 0.0
 
-        shorter, longer = (tokens1, tokens2) if len(tokens1) <= len(tokens2) else (tokens2, tokens1)
-        matched_scores = []
+        token_scores = []
+        similar_pairs = 0
 
-        for token in shorter:
+        for t1 in tokens1:
             best = 0.0
-            max_dist = 0
+            for t2 in tokens2:
+                dist = Levenshtein.distance(t1, t2)
+                if dist <= max_distance:
+                    similar_pairs += 1
+                    score = 1 - (dist / max(len(t1), len(t2)))
+                    best = max(best, score)
+            token_scores.append(best)
 
-            if len(token) > 3:
-                max_dist = max(1, len(token) // 3)
-            
-            for candidate in longer:
-                dist = Levenshtein.distance(token, candidate)
-                
-                if dist <= max_dist:
-                    score = fuzz.ratio(token, candidate) / 100.0
-                    if score > best:
-                        best = score
-                    if best == 1.0:
-                        break
-            matched_scores.append(best)
-
-        if not matched_scores:
+        if similar_pairs == 0:
             return 0.0
 
-        return round(sum(matched_scores) / len(shorter), 4)
+        token_similarity = np.mean(token_scores) if token_scores else 0.0
+
+        ngram_total = np.array([], dtype=float)
+        total_w = np.array([], dtype=float)
+        for n, w in weights.items():
+            ngram1 = self._ngrams_from_tokens(tokens1, n, ignore_order=ignore_order)
+            ngram2 = self._ngrams_from_tokens(tokens2, n, ignore_order=ignore_order)
+
+            sim = self._ngram_similarity(
+                ngram1,
+                ngram2,
+                max_distance=max_distance
+            )
+            if sim is None: 
+                ngram_total = np.append(ngram_total, np.nan)
+            else:
+                ngram_total = np.append(ngram_total, sim)
+            total_w = np.append(total_w, w)
         
-    def _compare_freetext(self, s1: str, s2: str) -> float:
-        s1 = (s1 or "").strip().lower()
-        s2 = (s2 or "").strip().lower()
+        ngram_weighted_sum = np.nansum(ngram_total * total_w)
+        ngram_weight_sum   = np.nansum(total_w[~np.isnan(ngram_total)])
+        ngram_normalized_score = ngram_weighted_sum / ngram_weight_sum if ngram_weight_sum > 0 else None
 
-        if not s1 and not s2:
-            return None
+        overlap = len(set(tokens1) & set(tokens2)) / max(len(tokens1), len(tokens2))
 
-        if not s1 or not s2:
-            return 0.0
+        final_score = (
+            global_weights["token"] * token_similarity +
+            global_weights["ngram"] * ngram_normalized_score +
+            global_weights["overlap"] * overlap
+        )
 
-        tokens1 = [t for t in re.findall(r"\w+", s1)]
-        tokens2 = [t for t in re.findall(r"\w+", s2)]
-
-        if not tokens1 or not tokens2:
-            return 0.0
-
-        shorter, longer = (tokens1, tokens2) if len(tokens1) <= len(tokens2) else (tokens2, tokens1)
-        matched_scores = []
-
-        for token in shorter:
-            best = 0.0
-            max_dist = 0
-
-            if len(token) > 3:
-                max_dist = max(1, len(token) // 3)
-            
-            for candidate in longer:
-                dist = Levenshtein.distance(token, candidate)
-                
-                if dist <= max_dist:
-                    score = fuzz.ratio(token, candidate) / 100.0
-                    if score > best:
-                        best = score
-                    if best == 1.0:
-                        break
-            matched_scores.append(best)
-
-        if not matched_scores:
-            return 0.0
-
-        return round(sum(matched_scores) / len(shorter), 4)
+        return round(final_score, 4)
     
     def _safe_load(self, val):
         if val == {}:
@@ -309,7 +355,7 @@ class Matching:
             return 0.0
 
         if isinstance(csaf_field, str) and isinstance(asset_field, str):
-            return self._compare_freetext_with_order(csaf_field, asset_field)
+            return self._compare_freetext(csaf_field, asset_field, ignore_order=False)
         
         if isinstance(csaf_field, list) and isinstance(asset_field, list):            
             for a_field in asset_field:
@@ -327,14 +373,14 @@ class Matching:
                 val2 = asset_field[key]
                 cpe_weight = weight.get(key, 0.0)
 
-                scores_weights = np.append(scores_weights, csaf_field[key])
-
                 if val1 is None and val2 is None:
+                    scores_weights = np.append(scores_weights, cpe_weight)
                     scores = np.append(scores, np.nan)
                     continue
 
                 if key == "version" and isinstance(val1, dict) and isinstance(val2, dict):
-                    similarity = self._compare_versions(val1, val2) * cpe_weight
+                    scores_weights = np.append(scores_weights, cpe_weight)
+                    similarity = self._compare_versions(val1, val2)
 
                     if similarity is None: 
                         scores = np.append(scores, np.nan)
@@ -343,18 +389,24 @@ class Matching:
                     continue
 
                 if isinstance(val1, (str, dict)) and isinstance(val2, (str, dict)):
-                    similarity = self._compare_freetext_with_order(val1, val2) * cpe_weight
+                    scores_weights = np.append(scores_weights, cpe_weight)
+                    similarity = self._compare_freetext(val1, val2, ignore_order=False)
 
                     if similarity is None: 
                         scores = np.append(scores, np.nan)
                     else:
                         scores = np.append(scores, similarity)
+            
+            valid_scores = scores[~np.isnan(scores)]
+
+            if valid_scores.size < 2:
+                return 0.0
 
             weighted_sum = np.nansum(scores * scores_weights)
             weight_sum   = np.nansum(scores_weights[~np.isnan(scores)])
             normalized_score = weighted_sum / weight_sum if weight_sum > 0 else None
             
-            return normalized_score
+            return round(normalized_score, 4)
                         
         return 0.0
 
@@ -532,36 +584,12 @@ class Matching:
 # def main():
 #     matcher = Matching([], [], [])
 
-#     # csaf_field = {
-#     #     "raw": "cpe:2.3:o:redhat:enterprise_linux:7:*:computenode:*:*:*:*:*:*",
-#     #     "part": "o",
-#     #     "vendor": "redhat",
-#     #     "product": "enterprise_linux",
-#     #     "version": {
-#     #         "schema": "pep-440",
-#     #         "raw": "7",
-#     #         "release_number": "7",
-#     #         "min_max_version": [{"min": "7", "max": "7"}],
-#     #     },
-#     #     "edition": "computenode",
-#     # }
+#     # asset_field = {'schema': 'pep-440', 'raw': '21.0.0.0', 'package': None, 'release_prefix': None, 'release_number': '21.0.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': '21.0.0.0', 'max': '21.0.0.0'}]}
 
-#     # asset_field = {
-#     #     "raw": "cpe:2.3:o:redhat:enterprise_linux:6:*:workstation:*:*:*:*:*:*",
-#     #     "part": "o",
-#     #     "vendor": "redhat",
-#     #     "product": "enterprise_linux",
-#     #     "version": {
-#     #         "schema": "pep-440",
-#     #         "raw": "6",
-#     #         "release_number": "6",
-#     #         "min_max_version": [{"min": "6", "max": "6"}],
-#     #     },
-#     #     "edition": "workstation",
-#     # }
-
-#     # # print(matcher._extract_field(csaf_field, "version"))
-
+#     # csaf_field = {'schema': 'pep-440', 'raw': '21.0.0.0', 'package': None, 'release_prefix': None, 'release_number': '21.0.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': '21.0.0.0', 'max': '21.0.0.0'}]}
+#     # print(matcher._extract_field(csaf_field, "version"))
+    
+#     # score = matcher._compare_versions(csaf_field, asset_field)
 #     # score = matcher.compare_fields(
 #     #     csaf_field, 
 #     #     asset_field, 
@@ -578,26 +606,32 @@ class Matching:
 #     #         "target_sw": 0.02,
 #     #         "target_hw": 0.02,
 #     #         "other": 0.01,
-#     #     })
+#     #     }
+#     #     )
 #     # print(score)
 #     # csaf_sbom_urls = ["https://www.free.org/news/python-switch-statement-switch-case-example/", "https://www.test.org"]
 #     # asset_sbom_urls = ["https://www.freecodecamp.org/news/python-switch-statement-switch-case-example/"]
 
-#     # score = matcher.compare_fields(csaf_sbom_urls, asset_sbom_urls)
+#     # print(matcher.compare_fields(csaf_sbom_urls, asset_sbom_urls))
 
 #     # csaf_product_type = "Device"
 #     # asset_product_type = "Undefined"
 
-#     # score = matcher.compare_fields(csaf_product_type, asset_product_type)
+#     # print(matcher.compare_fields(csaf_product_type, asset_product_type))
 
 #     # csaf_version = {'schema': 'pep-440', 'raw': '1.15.0.0', 'package': None, 'release_prefix': None, 'release_number': '1.15.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': '1.15.0.0', 'max': '1.15.0.0'}]}
 #     # asset_version1 = {'schema': 'pep-440', 'raw': '1.15.0.0', 'package': None, 'release_prefix': None, 'release_number': '1.15.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': '1.15.0.0', 'max': '1.15.0.0'}]}
 #     # asset_version2 = {'schema': 'rpm-package-naming', 'raw': 'rubygem-activemodel-0:5.2.0-1.el7rhgs.src', 'package': 'rubygem-activemodel', 'release_prefix': None, 'release_number': None, 'release_branch': None, 'qualifier': None, 'build_number': '1.el7rhgs', 'architecture': 'src', 'date': None, 'epoch': '0', 'min_max_version': [{'min': '5.2.0', 'max': '5.2.0'}]}
 #     # print(matcher._compare_versions(csaf_version, asset_version1))
 
-#     # a = {'schema': 'freetext', 'raw': '7:sp2', 'package': None, 'release_prefix': None, 'release_number': None, 'release_branch': None, 'qualifier': None, 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': '7:sp2', 'max': '7:sp2'}]}
-#     # c = {'schema': 'freetext', 'raw': 'all:versions:v5.7:sp1:hf1', 'package': None, 'release_prefix': None, 'release_number': None, 'release_branch': None, 'qualifier': None, 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': 'all:versions:v5:7:sp1:hf1', 'max': 'all:versions:v5:7:sp1:hf1'}]}
+#     # a = {'schema': 'windows-sap-schema', 'raw': 'v17 upd1', 'package': None, 'release_prefix': 'v', 'release_number': 17, 'release_branch': 0, 'qualifier': [None, None], 'build_number': 'upd1', 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': '17.0.0.1', 'max': '17.0.0.1'}]}
+#     # c = {'schema': 'csaf-constraint-vls', 'raw': '<v5.7', 'package': None, 'release_prefix': None, 'release_number': None, 'release_branch': None, 'qualifier': None, 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': None, 'max': '5.7'}]}
 #     # print(matcher._compare_versions(c, a))
+    
+#     # textc = "21.0.0.0".lower()
+#     # texta = "21.0.0.0".lower()
+
+#     # print(matcher._compare_freetext(textc, texta))
 
 # if __name__ == "__main__":
 #     main()

@@ -102,11 +102,14 @@ class Score:
 
         keyword_score = sum(keyword_scores) / len(keyword_scores) if keyword_scores else 0.0
 
-        weighted_sum = np.nansum(scores * scores_weights)
-        weight_sum   = np.nansum(scores_weights[~np.isnan(scores)])
-        normalized_score = weighted_sum / weight_sum if weight_sum > 0 else None
+        valid_scores = scores[~np.isnan(scores)]
+        score_percent = 0.0
 
-        score_percent = normalized_score * 100
+        if valid_scores.size >= 2:
+            weighted_sum = np.nansum(scores * scores_weights)
+            weight_sum   = np.nansum(scores_weights[~np.isnan(scores)])
+            normalized_score = weighted_sum / weight_sum if weight_sum > 0 else None
+            score_percent = normalized_score * 100
         
         # Check if vendor score is missing
         if vendor_score is None:
