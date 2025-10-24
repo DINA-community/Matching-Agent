@@ -34,7 +34,8 @@ dependencies = [
 netbox_fetcher = ["dina.plugins.datasource.netbox_fetcher"]
 isduba_fetcher = ["dina.plugins.datasource.isduba_fetcher"]
 sample = ["dina.plugins.datasource.sample"]
-preprocessor-identity = ["dina.plugins.preprocessing-identity"]
+preprocessing-identity = ["dina.plugins.preprocessing.identity"]
+preprocessing-default = ["dina.plugins.preprocessing.default"]
 
 [project.scripts]
 assetsync = "dina.assetsync.main:main"
@@ -54,7 +55,8 @@ members = [
     "plugins/asset_source/isduba",
     "plugins/asset_source/netbox",
     "plugins/asset_source/sample",
-    "plugins/preprocessing/identity"
+    "plugins/preprocessing/identity",
+    "plugins/preprocessing/default"
 ]
 
 [tool.uv.sources]
@@ -62,7 +64,7 @@ members = [
 "dina.plugins.datasource.isduba_fetcher" = { workspace = true }
 dina-plugins-datasource-sample = { workspace = true }
 dina-plugins-preprocessing-identity = { workspace = true }
-dina-plugins-preprocessing-netbox = { workspace = true }
+dina-plugins-preprocessing-default = { workspace = true }
 
 [tool.ruff]
 exclude = [
