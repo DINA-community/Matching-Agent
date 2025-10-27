@@ -2,7 +2,7 @@ import datetime
 import logging
 from typing import List, Optional, Type, Union, AsyncGenerator
 
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 from sqlalchemy import (
     and_,
     delete,
@@ -30,6 +30,7 @@ from dina.cachedb.model import (
     csaf_product_relationship,
     product_relationship,
     Match,
+    SynchronizerMetadata,
 )
 from dina.synchronizer.plugin_base.data_source import (
     DataSourcePlugin,
@@ -59,7 +60,7 @@ class CacheDB:
             await conn.execute(CreateSchema("cacheDB", if_not_exists=True))
             await conn.run_sync(Base.metadata.create_all)
 
-    def fetcher_view(self, origin: str) -> FetcherView:
+    def fetcher_view(self, origin: HttpUrl) -> FetcherView:
         if self.engine is not None:
             return FetcherView(origin, self.engine)
         else:
@@ -146,7 +147,7 @@ class CacheDB:
                 {
                     "parent_id": d.parent,
                     "child_id": d.child,
-                    "origin_uri": d.origin_uri,
+                    "origin_uri": str(d.origin_uri),
                     "origin_info": d.origin_info,
                     "last_update": current_time,
                 }
@@ -211,7 +212,7 @@ class CacheDB:
                     select(Asset)
                     .where(Asset.last_update < stale_timestamp)
                     .options(joinedload(Asset.product))
-                    .filter(Asset.origin_uri == source.origin_uri)
+                    .filter(Asset.origin_uri == str(source.origin_uri))
                 )
                 data.extend((await session.execute(stmt)).scalars().all())
 
@@ -219,7 +220,7 @@ class CacheDB:
                     select(CsafProduct)
                     .where(CsafProduct.last_update < stale_timestamp)
                     .options(joinedload(CsafProduct.product))
-                    .filter(CsafProduct.origin_uri == source.origin_uri)
+                    .filter(CsafProduct.origin_uri == str(source.origin_uri))
                 )
                 data.extend((await session.execute(csaf_stmt)).scalars().all())
 
@@ -285,7 +286,7 @@ class CacheDB:
         relation_stmt = (
             select(*product_relationship.c)
             .where(product_relationship.c.last_update < stale_timestamp)
-            .filter(product_relationship.c.origin_uri == source.origin_uri)
+            .filter(product_relationship.c.origin_uri == str(source.origin_uri))
         )
         relations_to_clean.extend(
             [
@@ -303,7 +304,7 @@ class CacheDB:
         csaf_relation_stmt = (
             select(*csaf_product_relationship.c)
             .where(csaf_product_relationship.c.last_update < stale_timestamp)
-            .filter(csaf_product_relationship.c.origin_uri == source.origin_uri)
+            .filter(csaf_product_relationship.c.origin_uri == str(source.origin_uri))
         )
         relations_to_clean.extend(
             [
@@ -503,9 +504,10 @@ class CacheDB:
         self,
         limit: int | None = 100,
         offset: int = 0,
-        origin_uri: str | None = None,
+        origin_uri: HttpUrl | None = None,
         ids: list[int] | None = None,
     ) -> list[Match]:
+        origin_uri = str(origin_uri) if origin_uri else None  # type: ignore
         async with AsyncSession(self.engine) as session:
             stmt = (
                 select(Match)
@@ -541,6 +543,54 @@ class CacheDB:
             if result := (await session.execute(stmt)).scalars().first():
                 return result
         return None
+
+    async def clear_matches(self) -> None:
+        async with AsyncSession(self.engine) as session:
+            async with session.begin():
+                stmt = delete(Match)
+                await session.execute(stmt)
+
+    async def clear_assets(self, origin: HttpUrl) -> None:
+        origin = str(origin)  # type: ignore
+        async with AsyncSession(self.engine) as session:
+            async with session.begin():
+                stmt = delete(Asset).where(Asset.origin_uri == origin)
+                await session.execute(stmt)
+                stmt = (
+                    update(SynchronizerMetadata)
+                    .where(SynchronizerMetadata.origin_uri == origin)
+                    .values(last_run=datetime.datetime.fromtimestamp(0))
+                )
+                await session.execute(stmt)
+
+    async def clear_csaf_products(self, origin: HttpUrl) -> None:
+        origin = str(origin)
+        async with AsyncSession(self.engine) as session:
+            async with session.begin():
+                stmt = delete(CsafProduct).where(CsafProduct.origin_uri == origin)
+                await session.execute(stmt)
+                stmt = (
+                    update(SynchronizerMetadata)
+                    .where(SynchronizerMetadata.origin_uri == origin)
+                    .values(last_run=datetime.datetime.fromtimestamp(0))
+                )
+                await session.execute(stmt)
+
+    async def clear(self) -> None:
+        async with AsyncSession(self.engine) as session:
+            async with session.begin():
+                stmt = delete(CsafProduct)
+                await session.execute(stmt)
+                stmt = delete(Asset)
+                await session.execute(stmt)
+                await self.__set_all_epoch_last_run(session)
+
+    async def __set_all_epoch_last_run(self, session: AsyncSession) -> None:
+        """Sets the last run time to epoch for all synchronizer metadata entries."""
+        stmt = update(SynchronizerMetadata).values(
+            last_run=datetime.datetime.fromtimestamp(0)
+        )
+        await session.execute(stmt)
 
     async def disconnect(self) -> None:
         if self.engine is not None:

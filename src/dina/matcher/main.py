@@ -187,6 +187,7 @@ class Matcher:
         sub_route = APIRouter(prefix="/subscribe")
         task_route = APIRouter(prefix="/task")
         matches_route = APIRouter(prefix="/matches")
+        clear_route = APIRouter(prefix="/clear")
 
         @matches_route.get("/")
         async def get_matches(
@@ -260,6 +261,26 @@ class Matcher:
         # async def stop():
         #     logger.info("Stopping matching task")
 
+        @clear_route.post("/all")
+        async def clean_all():
+            logger.info("Cleaning entire matcher cache")
+            await self.__cache_db.clear()
+
+        @clear_route.post("/matches")
+        async def clean_matches():
+            logger.info("Cleaning matcher matches cache")
+            await self.__cache_db.clear_matches()
+
+        @clear_route.post("/assets")
+        async def clean_assets(origin_uri: HttpUrl):
+            logger.info("Cleaning matcher assets cache")
+            await self.__cache_db.clear_assets(str(origin_uri))
+
+        @clear_route.post("/csaf")
+        async def clean_csaf(origin_uri: HttpUrl):
+            logger.info("Cleaning matcher csaf cache")
+            await self.__cache_db.clear_csaf_products(str(origin_uri))
+
         @sub_route.post("/new_match")
         async def subscribe(body: MatchSubscription) -> None:
             logger.info(f"Subscribed to match updates from {body.origin_filter}")
@@ -274,6 +295,7 @@ class Matcher:
         api.include_router(task_route)
         api.include_router(matches_route)
         api.include_router(sub_route)
+        api.include_router(clear_route)
 
         config = uvicorn.Config(
             app=api,

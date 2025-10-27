@@ -348,8 +348,8 @@ class IsdubaDataSource(DataSourcePlugin):
         return relationships_to_check
 
     @property
-    def origin_uri(self):
-        return self.config.DataSource.Plugin.url.unicode_string()
+    def origin_uri(self) -> HttpUrl:
+        return self.config.DataSource.Plugin.url
 
     def build_resource_path(self, origin_info: dict[str, Any]) -> str:
         path = origin_info.get("path")

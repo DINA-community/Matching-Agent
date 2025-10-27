@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, List, Type
 
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 
 from dina.cachedb.fetcher_view import FetcherView
 from dina.cachedb.model import Asset, CsafProduct, ProductType, Match
@@ -104,10 +104,8 @@ class DataSourcePlugin(ABC):
 
     def build_resource_uri(self, origin_info: dict[str, Any]) -> str:
         """Return a plugin-specific URI for a given origin_info."""
-        path = self.build_resource_path(origin_info)
-        if self.origin_uri.endswith("/") and path.startswith("/"):
-            return self.origin_uri[:-1] + path
-        return self.origin_uri + path
+        path = self.build_resource_path(origin_info).lstrip("/")
+        return str(self.origin_uri) + path
 
     @abstractmethod
     async def fetch_products(self, fetcher_view: FetcherView) -> FetchProductsResult:
@@ -176,7 +174,7 @@ class DataSourcePlugin(ABC):
 
     @property
     @abstractmethod
-    def origin_uri(self):
+    def origin_uri(self) -> HttpUrl:
         """The URI of the data source.
 
         Returns:
