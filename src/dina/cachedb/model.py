@@ -235,6 +235,7 @@ class CsafProduct(Base, MetaInfo):
             "origin_uri": self.origin_uri,
             "origin_info": self.origin_info,
             "last_update": self.last_update,
+            "uri": self.uri,
         }
         if self.id is not None:
             result["id"] = self.id

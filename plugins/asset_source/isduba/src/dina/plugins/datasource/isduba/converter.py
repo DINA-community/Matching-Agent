@@ -47,6 +47,7 @@ def convert_into_database_format(
                     "publisher": getattr(document, "publisher", None),
                     "lang": getattr(document, "lang", None),
                 },
+                uri=f"{document.host}{getattr(document, 'path', '')}",
             )
 
             csaf_product.product = Product(
@@ -61,8 +62,8 @@ def convert_into_database_format(
                 sbom_urls=list(getattr(helper, "sbom_urls", []) or []),
                 serial_numbers=list(getattr(helper, "serial_numbers", []) or []),
                 files=getattr(helper, "files", None),
-                model_numbers=list(getattr(helper, "model_numbers", [])or []),
-                part_numbers=list(getattr(helper, "skus", [])or []),
+                model_numbers=list(getattr(helper, "model_numbers", []) or []),
+                part_numbers=list(getattr(helper, "skus", []) or []),
                 device_family=product.product_family or None,
                 manufacturer_name=product.manufacturer or None,
             )
