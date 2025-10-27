@@ -1,11 +1,13 @@
 import asyncio
 import concurrent.futures
 import datetime
+import itertools
 import multiprocessing
 import queue
 import time
 import tomllib
 import traceback
+from collections import defaultdict
 from pathlib import Path
 from queue import Empty, Queue
 from typing import Any
@@ -71,6 +73,7 @@ class ApiConfig(BaseModel):
 
 class MatcherConfig(BaseModel):
     sync_interval: int
+    match_threshold: float
     Api: ApiConfig
     Cachedb: CacheDB.Config
     asset_plugins_path: Path
@@ -92,6 +95,7 @@ class Matcher:
         self.__matches: Queue[list[Match]] = self.__manager.Queue()
         self.__cache_db = CacheDB()
         self.__last_matching: float | None = None
+        self.__last_publish: float | None = None
         self.__data_source_plugins = load_datasource_plugins(
             Path(self.__config.Matcher.asset_plugins_path)
         )
@@ -133,6 +137,7 @@ class Matcher:
                                     match_pairs,
                                     self.__matches,
                                     batch,
+                                    self.__config.Matcher.match_threshold,
                                 )
                             )
                             if len(parallel_tasks) >= num_processes:
@@ -159,7 +164,21 @@ class Matcher:
                 except Empty:
                     pass
             if tasks:
-                await asyncio.gather(*tasks)
+                match_ids = await asyncio.gather(*tasks)
+                match_ids = itertools.chain.from_iterable(match_ids)
+                matches = await self.__cache_db.get_matches(ids=match_ids)
+                # Categorize by asset origin
+                categorized_matches = defaultdict(list)
+                for match in matches:
+                    categorized_matches[match.asset.origin_uri].append(match)
+                # Let asset plugins notify subscribers of new matches
+                for origin, matches in categorized_matches.items():
+                    if self.__data_source_plugins[
+                        origin
+                    ].config.DataSource.publish_matches:
+                        await self.__data_source_plugins[origin].notify_new_matches(
+                            matches
+                        )
             await asyncio.sleep(0.1)
 
     async def __serve_api(self):
@@ -237,9 +256,9 @@ class Matcher:
         async def status():
             return {"status": "running"}
 
-        @task_route.post("/stop")
-        async def stop():
-            logger.info("Stopping matching task")
+        # @task_route.post("/stop")
+        # async def stop():
+        #     logger.info("Stopping matching task")
 
         @sub_route.post("/new_match")
         async def subscribe(body: MatchSubscription) -> None:
@@ -284,7 +303,9 @@ class Matcher:
         return HttpUrl(origin_uri)
 
 
-def match_pairs(matches: queue.Queue, pairs: list[tuple[CsafProduct, Asset]]):
+def match_pairs(
+    matches: queue.Queue, pairs: list[tuple[CsafProduct, Asset]], threshold: float
+):
     logger.debug(f"Matching batch with {len(pairs)} pairs")
     batch = []
     for csaf, asset in pairs:
@@ -298,24 +319,24 @@ def match_pairs(matches: queue.Queue, pairs: list[tuple[CsafProduct, Asset]]):
         df = pl.DataFrame([{**csaf_dict, **asset_dict}])
 
         freetext_fields = {
-            "name": 0.20, 
-            "hardware_name": 0.18, 
-            "manufacturer_name": 0.08, 
-            "device_family": 0.01
+            "name": 0.20,
+            "hardware_name": 0.18,
+            "manufacturer_name": 0.08,
+            "device_family": 0.01,
         }
-        
+
         ordered_fields = {
-            "version": 0.10, 
-            "model": 0.05, 
-            "model_numbers": 0.04, 
-            "part_numbers": 0.03
+            "version": 0.10,
+            "model": 0.05,
+            "model_numbers": 0.04,
+            "part_numbers": 0.03,
         }
 
         other_fields = {
-            "cpe": 0.15, 
-            "purl": 0.13, 
-            "product_type": 0.02, 
-            "sbom_urls": 0.01
+            "cpe": 0.15,
+            "purl": 0.13,
+            "product_type": 0.02,
+            "sbom_urls": 0.01,
         }
 
         # pl.Config.set_fmt_str_lengths(2000)
@@ -342,6 +363,9 @@ def match_pairs(matches: queue.Queue, pairs: list[tuple[CsafProduct, Asset]]):
 
         # for field in ordered_fields:
         #     print(df_norm_matches.select([f"{field}_match"]))
+
+        if score_percent < threshold:
+            continue
 
         match = Match()
         match.asset_id = asset.id

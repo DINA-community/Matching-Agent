@@ -5,13 +5,12 @@ from typing import Any, List, Type
 from pydantic import BaseModel
 
 from dina.cachedb.fetcher_view import FetcherView
-from dina.cachedb.model import Asset, CsafProduct, ProductType
+from dina.cachedb.model import Asset, CsafProduct, ProductType, Match
 
 
 class DataSourceConfig(BaseModel):
     plugin_name: str
-    timeout_seconds: int
-    update_interval: int
+    publish_matches: bool = False
     Plugin: Any = object()
 
 
@@ -80,6 +79,8 @@ class FetchProductsResult:
 
 class DataSourcePlugin(ABC):
     """Base class for data source plugins that fetch and manage data from external sources.
+    In addition, the plugin also provides a channel to notify the data source of any new matches
+    the matcher found during the matching phase.
 
     This abstract class defines the interface that all data source plugins must implement
     to interact with the synchronization system. It provides methods for fetching data,
@@ -92,6 +93,7 @@ class DataSourcePlugin(ABC):
     def __init__(self, config: Config):
         self.config = config
 
+    @abstractmethod
     def build_resource_path(self, origin_info: dict[str, Any]) -> str:
         """Return a plugin-specific path component for a given origin_info.
 
@@ -99,7 +101,13 @@ class DataSourcePlugin(ABC):
         concatenated to the plugin's origin_uri. If the plugin cannot determine
         a stable path from the provided origin_info, it should return an empty string.
         """
-        return ""
+
+    def build_resource_uri(self, origin_info: dict[str, Any]) -> str:
+        """Return a plugin-specific URI for a given origin_info."""
+        path = self.build_resource_path(origin_info)
+        if self.origin_uri.endswith("/") and path.startswith("/"):
+            return self.origin_uri[:-1] + path
+        return self.origin_uri + path
 
     @abstractmethod
     async def fetch_products(self, fetcher_view: FetcherView) -> FetchProductsResult:
@@ -155,6 +163,11 @@ class DataSourcePlugin(ABC):
         self, relationships_to_check: List[MappedRelationship]
     ) -> List[MappedRelationship]:
         """Determine which stale relationships should be deleted."""
+        ...
+
+    @abstractmethod
+    async def notify_new_matches(self, new_matches: List[Match]):
+        """Notify the data source that new matches were found during the matching phase."""
         ...
 
     def debug_info(self) -> str:

@@ -208,10 +208,11 @@ class BaseSynchronizer(ABC):
                 < time.time()
             ):
                 try:
+                    start_time = datetime.datetime.now()
                     fetcher_view = self.cache_db.fetcher_view(source.origin_uri)
                     await self.fetch_products(fetcher_view, source)
                     await self.fetch_relationships(fetcher_view, source)
-                    await fetcher_view.set_last_run(datetime.datetime.now())
+                    await fetcher_view.set_last_run(start_time)
                 except Exception as e:
                     logger.error(f"Error fetching data from {source.debug_info()}: {e}")
 

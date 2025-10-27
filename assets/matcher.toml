@@ -1,9 +1,10 @@
 [Matcher]
 sync_interval = 60
+match_threshold = 0
 # Path to asset data source plugin configs used for the assetsync
 asset_plugins_path = "./assets/plugin_configs/data_source/asset"
 # Path to CSAF data source plugin configs used for the csafsync
-csaf_plugins_path = "./assets/plugin_configs/data_source/csaf/active"
+csaf_plugins_path = "./assets/plugin_configs/data_source/csaf"
 
 [Matcher.Api]
 host = "0.0.0.0"

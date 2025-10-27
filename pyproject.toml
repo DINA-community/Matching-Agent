@@ -32,14 +32,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-datasource-netbox = ["dina.plugins.datasource.netbox_fetcher"]
-datasource-isduba = ["dina.plugins.datasource.isduba_fetcher"]
-datasource-sample = [
-    "dina-plugins-datasource-sample",
-]
-preprocessor-identity = [
-    "dina-plugins-preprocessing-identity",
-]
+netbox_fetcher = ["dina.plugins.datasource.netbox_fetcher"]
+isduba_fetcher = ["dina.plugins.datasource.isduba_fetcher"]
+sample = ["dina.plugins.datasource.sample"]
+preprocessor-identity = ["dina.plugins.preprocessing-identity"]
 
 [project.scripts]
 assetsync = "dina.assetsync.main:main"
@@ -70,7 +66,10 @@ dina-plugins-preprocessing-identity = { workspace = true }
 dina-plugins-preprocessing-netbox = { workspace = true }
 
 [tool.ruff]
-exclude = ["plugins/asset_source/netbox/src/dina/plugins/datasource/netbox/api_client"]
+exclude = [
+    "plugins/asset_source/netbox/src/dina/plugins/datasource/netbox/api_client",
+    "dev"
+]
 respect-gitignore = true
 
 [tool.pytest.ini_options]
@@ -93,4 +92,6 @@ dev = [
     "mypy>=1.16.0",
     "pytest>=8.4.1",
     "pytest-cov>=6.2.1",
+    "sphinx>=7.3.7",
+    "furo>=2024.8.6",
 ]

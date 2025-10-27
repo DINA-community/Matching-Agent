@@ -42,6 +42,8 @@ class MetaInfo:
     :ivar origin_info: Additional JSON-formatted information
         about the origin of the resource, if provided.
     :type origin_info: Optional[dict]
+    :ivar uri: The URI of the resource.
+    :type uri: str
     :ivar last_update: The timestamp (Unix epoch) of the last
         update for the resource.
     :type last_update: float
@@ -49,6 +51,7 @@ class MetaInfo:
 
     origin_uri: Mapped[str] = mapped_column(Text)
     origin_info: Mapped[dict[str, Any]] = mapped_column(JSONB, default={})
+    uri: Mapped[str] = mapped_column(Text)
     last_update: Mapped[float] = mapped_column(Float)
 
 
@@ -322,3 +325,15 @@ class Match(Base):
 
     csaf_product: Mapped["CsafProduct"] = relationship(back_populates="matches")
     asset: Mapped["Asset"] = relationship(back_populates="matches")
+
+    def to_dict(self) -> Dict[str, Any]:
+        result = {
+            "score": self.score,
+            "status": self.status,
+            "timestamp": self.timestamp,
+            "csaf_product_id": self.csaf_product_id,
+            "asset_id": self.asset_id,
+        }
+        if self.id is not None:
+            result["id"] = self.id
+        return result

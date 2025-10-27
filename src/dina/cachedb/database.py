@@ -487,18 +487,27 @@ class CacheDB:
 
             return
 
-    async def store_matches(self, matches: list[Match]):
+    async def store_matches(self, matches: list[Match]) -> list[int]:
         if not matches:
-            return
+            return []
         async with AsyncSession(self.engine) as session:
             async with session.begin():
-                session.add_all(matches)
+                stmt = (
+                    insert(Match)
+                    .returning(Match.id)
+                    .values([match.to_dict() for match in matches])
+                )
+                return (await session.execute(stmt)).scalars().all()
 
     async def get_matches(
-        self, limit: int = 100, offset: int = 0, origin_uri: str | None = None
+        self,
+        limit: int | None = 100,
+        offset: int = 0,
+        origin_uri: str | None = None,
+        ids: list[int] | None = None,
     ) -> list[Match]:
         async with AsyncSession(self.engine) as session:
-            sel = (
+            stmt = (
                 select(Match)
                 .join(Match.asset)
                 .join(Match.csaf_product)
@@ -507,20 +516,18 @@ class CacheDB:
                 )
             )
             if origin_uri is not None:
-                stmt = sel.filter(
+                stmt = stmt.filter(
                     or_(
                         Asset.origin_uri == origin_uri,
                         CsafProduct.origin_uri == origin_uri,
                     )
                 )
-            else:
-                stmt = sel
-            ordered = (
-                stmt.order_by(Match.timestamp.desc(), Match.id.desc())
-                .limit(limit)
-                .offset(offset)
-            )
-            if result := (await session.execute(ordered)).scalars().all():
+            if ids is not None:
+                stmt = stmt.filter(Match.id.in_(ids))
+            stmt = stmt.order_by(Match.timestamp.desc(), Match.id.desc()).offset(offset)
+            if limit is not None:
+                stmt = stmt.limit(limit)
+            if result := (await session.execute(stmt)).scalars().all():
                 return list(result)
         return []
 
