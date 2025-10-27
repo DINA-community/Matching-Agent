@@ -37,14 +37,18 @@ For more details about the synchronizer infrastructure, see the Synchronizer Inf
 
 ### Installation on Ubuntu
 
-Clone the repository.
+1. Install [uv](https://docs.astral.sh/uv/), docker and docker compose in any way that suits you.
+2. Clone the repository.
 
-```cd /home
+```shell
 git clone -b feat/initial_structure https://github.com/DINA-community/Matching-Agent.git
 cd Matching-Agent
 ```
 
-Install [uv](https://docs.astral.sh/uv/), docker and docker compose in any way that suits you.
+3. (optional) If you want to use the docker-compose setup, also clone the submodules:
+```shell
+git submodule update --init --recursive
+```
 
 ### after installation
 
