@@ -24,6 +24,7 @@ from pydantic import BaseModel, HttpUrl
 from dina.cachedb.database import CacheDB
 from dina.cachedb.fetcher_view import FetcherView
 from dina.cachedb.model import Asset, CsafProduct
+from dina.common.logging import LoggingConfig
 from dina.synchronizer.plugin_base.data_source import DataSourcePlugin, Relationship
 from dina.synchronizer.plugin_base.preprocessor import PreprocessorPlugin
 
@@ -55,6 +56,7 @@ class SynchronizerConfig(BaseModel):
     Assetsync: dict | None = None
     Synchronizer: SynchronizerSectionConfig
     Cachedb: CacheDB.Config
+    Logging: LoggingConfig | None = None
 
 
 class PluginLoadError(Exception):

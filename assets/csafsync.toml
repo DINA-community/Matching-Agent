@@ -34,3 +34,16 @@ port = 2345
 database = "cachedb"
 username = "admin"
 password = "secret"
+
+# Optional logging configuration for the matcher component
+# If omitted, logs go to console with INFO level (or LOG_LEVEL env).
+[Logging]
+# File log level (console level is controlled via LOG_LEVEL env):
+# Accepted: "TRACE", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
+level = "TRACE"
+# When set, logs will also be written to this file with rotation
+file = "./logs/csafsync/csafsync.log"
+# Rotate when the file exceeds this many bytes (10 MiB default)
+max_bytes = 10485760
+# How many rotated files to keep
+backup_count = 5

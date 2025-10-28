@@ -21,7 +21,7 @@ import polars as pl
 
 from dina.cachedb.database import CacheDB
 from dina.cachedb.model import Match, CsafProduct, Asset
-from dina.common.logging import configure_logging, get_logger
+from dina.common.logging import configure_logging, get_logger, LoggingConfig
 import sys
 
 from dina.matcher.calculate_score import Score
@@ -30,9 +30,7 @@ from dina.matcher.matching import Matching
 
 from dina.synchronizer.base import load_datasource_plugins
 
-# Configure logging
-configure_logging()
-
+# Logger (handlers configured after config is loaded)
 logger = get_logger(__name__)
 
 if sys.platform.startswith("win"):
@@ -80,6 +78,7 @@ class MatcherConfig(BaseModel):
     Cachedb: CacheDB.Config
     asset_plugins_path: Path
     csaf_plugins_path: Path
+    Logging: LoggingConfig | None = None
 
 
 class MatchingState(enum.Enum):
@@ -109,6 +108,9 @@ class Matcher:
         """
         with open("./assets/matcher.toml", "rb") as f:
             self.__config = Matcher.Config.model_validate(tomllib.load(f))
+
+        # Configure logging based on matcher.toml
+        configure_logging(self.__config.Matcher.Logging)
 
         self.__manager = multiprocessing.Manager()
         self.__matches: Queue[list[Match]] = self.__manager.Queue()
