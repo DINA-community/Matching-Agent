@@ -1,6 +1,6 @@
 [submodule "dev/isduba"]
 	path = dev/isduba
-	url = git@github.com:ISDuBA/ISDuBA.git
+	url = https://github.com/ISDuBA/ISDuBA.git
 [submodule "dev/netbox"]
 	path = dev/netbox
-	url = git@github.com:netbox-community/netbox-docker.git
+	url = https://github.com/netbox-community/netbox-docker.git
