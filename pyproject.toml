@@ -7,7 +7,7 @@ license = "MIT OR Apache-2.0"
 authors = [
     { name = "Mark Giraud", email = "mark.giraud@iosb.fraunhofer.de" }
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.13,<3.14"
 
 dependencies = [
     "aiohttp>=3.12.13",
