@@ -517,6 +517,11 @@ class CacheDB:
         offset: int = 0,
         origin_uri: HttpUrl | None = None,
         ids: list[int] | None = None,
+        time_lte: float | None = None,
+        time_gte: float | None = None,
+        assets: list[int] | None = None,
+        csaf_products: list[int] | None = None,
+        threshold: float | None = None,
     ) -> list[Match]:
         origin_uri = str(origin_uri) if origin_uri else None  # type: ignore
         async with AsyncSession(self.engine) as session:
@@ -538,6 +543,16 @@ class CacheDB:
             if ids is not None:
                 stmt = stmt.filter(Match.id.in_(ids))
             stmt = stmt.order_by(Match.timestamp.desc(), Match.id.desc()).offset(offset)
+            if time_lte is not None:
+                stmt = stmt.where(Match.timestamp <= time_lte)
+            if time_gte is not None:
+                stmt = stmt.where(Match.timestamp >= time_gte)
+            if assets is not None:
+                stmt = stmt.filter(Match.asset_id.in_(assets))
+            if csaf_products is not None:
+                stmt = stmt.filter(Match.csaf_product_id.in_(csaf_products))
+            if threshold is not None:
+                stmt = stmt.where(Match.score >= threshold)
             if limit is not None:
                 stmt = stmt.limit(limit)
             if result := (await session.execute(stmt)).scalars().all():

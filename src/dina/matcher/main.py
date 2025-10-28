@@ -11,10 +11,11 @@ import traceback
 from collections import defaultdict
 from pathlib import Path
 from queue import Empty, Queue
-from typing import Any
+from typing import Any, Annotated
 
 import uvicorn
 from fastapi import APIRouter, FastAPI, HTTPException
+from fastapi.params import Query
 from pydantic import BaseModel, HttpUrl
 import polars as pl
 
@@ -229,7 +230,14 @@ class Matcher:
 
         @matches_route.get("/")
         async def get_matches(
-            limit: int = 100, offset: int = 0, origin_uri: HttpUrl | None = None
+            limit: int = 100,
+            offset: int = 0,
+            origin_uri: HttpUrl | None = None,
+            time_lte: float | None = None,
+            time_gte: float | None = None,
+            assets: Annotated[list[int] | None, Query()] = None,
+            csaf_products: Annotated[list[int] | None, Query()] = None,
+            threshold: float | None = None,
         ) -> list[APIMatch]:
             """Get a list of matches between CSAF advisories and assets.
 
@@ -237,6 +245,11 @@ class Matcher:
                 limit (int): Maximum number of matches to return. Defaults to 100.
                 offset (int): Number of matches to skip for pagination. Defaults to 0.
                 origin_uri (HttpUrl | None): Filter matches to only include matches from a specific origin.
+                time_lte (float | None): Filter matches to only include matches with a timestamp less than or equal to the specified value.
+                time_gte (float | None): Filter matches to only include matches with a timestamp greater than or equal to the specified value.
+                assets (list[int] | None): Filter matches to only include matches with assets from the specified list of asset IDs.
+                csaf_products (list[int] | None): Filter matches to only include matches with csaf_products from the specified list of csaf_product IDs.
+                threshold (float | None): Filter matches to only include matches with a score greater than or equal to the specified value.
 
             Returns:
                 list[APIMatch]: A list of matches, each containing:
@@ -249,7 +262,14 @@ class Matcher:
             """
             logger.info(f"Getting matches limit={limit} offset={offset}")
             matches = await self.__cache_db.get_matches(
-                limit=limit, offset=offset, origin_uri=origin_uri
+                limit=limit,
+                offset=offset,
+                origin_uri=origin_uri,
+                time_lte=time_lte,
+                time_gte=time_gte,
+                assets=assets,
+                csaf_products=csaf_products,
+                threshold=threshold,
             )
             return [
                 APIMatch(
@@ -366,7 +386,9 @@ class Matcher:
           for the given origin_info; return the first non-empty path.
         - If no path is available, just return the origin_uri as-is.
         """
-        path = self.__data_source_plugins[origin_uri].build_resource_path(origin_info)
+        path = self.__data_source_plugins[HttpUrl(origin_uri)].build_resource_path(
+            origin_info
+        )
         if path:
             # Ensure we don't duplicate slashes on join
             if origin_uri.endswith("/") and path.startswith("/"):
