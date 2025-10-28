@@ -1,6 +1,7 @@
 import asyncio
 import concurrent.futures
 import datetime
+import enum
 import itertools
 import multiprocessing
 import queue
@@ -80,6 +81,23 @@ class MatcherConfig(BaseModel):
     csaf_plugins_path: Path
 
 
+class MatchingState(enum.Enum):
+    STOPPED = "stopped"
+    STOP_REQUESTED = "stop_requested"
+    RUNNING = "running"
+
+
+class MatcherStatus(BaseModel):
+    state: MatchingState
+    start: float | None = None
+    last_matching: float | None = None
+
+
+class MatchingTask(BaseModel):
+    assets: list[int]
+    csaf_products: list[int]
+
+
 class Matcher:
     class Config(BaseModel):
         Matcher: MatcherConfig
@@ -95,6 +113,9 @@ class Matcher:
         self.__matches: Queue[list[Match]] = self.__manager.Queue()
         self.__cache_db = CacheDB()
         self.__last_matching: float | None = None
+        self.__matching_tasks: list[MatchingTask] = []
+        self.__matching_state: MatchingState = MatchingState.STOPPED
+        self.__matching_start_time: float | None = None
         self.__last_publish: float | None = None
         self.__data_source_plugins = load_datasource_plugins(
             Path(self.__config.Matcher.asset_plugins_path)
@@ -120,13 +141,26 @@ class Matcher:
                 self.__last_matching is None
                 or self.__last_matching + self.__config.Matcher.sync_interval
                 < time.time()
+                or len(self.__matching_tasks) > 0
             ):
                 try:
+                    try:
+                        task = self.__matching_tasks.pop()
+                    except IndexError:
+                        # If no task is queued, try to match all assets and all csaf products.
+                        task = MatchingTask(assets=[], csaf_products=[])
+                    logger.info(f"Starting matching task: {task}")
+                    self.__matching_state = MatchingState.RUNNING
+                    self.__matching_start_time = time.time()
                     parallel_tasks = []
                     num_processes = multiprocessing.cpu_count()
                     with concurrent.futures.ProcessPoolExecutor() as pool:
                         loop = asyncio.get_event_loop()
-                        async for batch in self.__cache_db.fetch_pairs_batches(20):
+                        async for batch in self.__cache_db.fetch_pairs_batches(
+                            task.assets, task.csaf_products, batch_size_sqrt=20
+                        ):
+                            if self.__matching_state == MatchingState.STOP_REQUESTED:
+                                break
                             if not batch:
                                 continue
                             while self.__matches.qsize() > num_processes * 2:
@@ -146,8 +180,12 @@ class Matcher:
                 except Exception as e:
                     logger.error(f"Error fetching matches: {e}")
                     print(traceback.format_exc())
+                finally:
+                    logger.info("Matching task finished")
+                    self.__matching_state = MatchingState.STOPPED
+                    self.__matching_start_time = None
+                    self.__last_matching = time.time()
 
-                self.__last_matching = time.time()
             else:
                 await asyncio.sleep(1)
 
@@ -170,7 +208,7 @@ class Matcher:
                 # Categorize by asset origin
                 categorized_matches = defaultdict(list)
                 for match in matches:
-                    categorized_matches[match.asset.origin_uri].append(match)
+                    categorized_matches[HttpUrl(match.asset.origin_uri)].append(match)
                 # Let asset plugins notify subscribers of new matches
                 for origin, matches in categorized_matches.items():
                     if self.__data_source_plugins[
@@ -191,7 +229,7 @@ class Matcher:
 
         @matches_route.get("/")
         async def get_matches(
-            limit: int = 100, offset: int = 0, origin_uri: str | None = None
+            limit: int = 100, offset: int = 0, origin_uri: HttpUrl | None = None
         ) -> list[APIMatch]:
             """Get a list of matches between CSAF advisories and assets.
 
@@ -249,17 +287,30 @@ class Matcher:
             )
 
         @task_route.post("/start")
-        async def start():
+        async def start(
+            assets: list[int] | None = None, csaf_products: list[int] | None = None
+        ):
+            if assets is None:
+                assets = []
+            if csaf_products is None:
+                csaf_products = []
             logger.info("Starting matching task")
-            self.__last_matching = None
+            self.__matching_tasks.append(
+                MatchingTask(assets=assets, csaf_products=csaf_products)
+            )
 
         @task_route.get("/status")
-        async def status():
-            return {"status": "running"}
+        async def status() -> MatcherStatus:
+            return MatcherStatus(
+                state=self.__matching_state,
+                start=self.__matching_start_time,
+                last_matching=self.__last_matching,
+            )
 
-        # @task_route.post("/stop")
-        # async def stop():
-        #     logger.info("Stopping matching task")
+        @task_route.post("/stop")
+        async def stop():
+            logger.info("Stopping matching task")
+            self.__matching_state = MatchingState.STOP_REQUESTED
 
         @clear_route.post("/all")
         async def clean_all():
@@ -274,12 +325,12 @@ class Matcher:
         @clear_route.post("/assets")
         async def clean_assets(origin_uri: HttpUrl):
             logger.info("Cleaning matcher assets cache")
-            await self.__cache_db.clear_assets(str(origin_uri))
+            await self.__cache_db.clear_assets(origin_uri)
 
         @clear_route.post("/csaf")
         async def clean_csaf(origin_uri: HttpUrl):
             logger.info("Cleaning matcher csaf cache")
-            await self.__cache_db.clear_csaf_products(str(origin_uri))
+            await self.__cache_db.clear_csaf_products(origin_uri)
 
         @sub_route.post("/new_match")
         async def subscribe(body: MatchSubscription) -> None:

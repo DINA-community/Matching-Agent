@@ -405,6 +405,8 @@ class CacheDB:
 
     async def fetch_pairs_batches(
         self,
+        assets: list[int],
+        csaf_products: list[int],
         batch_size_sqrt: int = 50,
     ) -> AsyncGenerator[list[tuple[CsafProduct, Asset]]]:
         async with AsyncSession(self.engine) as session:
@@ -418,16 +420,25 @@ class CacheDB:
 
             while True:
                 logger.trace(f"Fetching csaf product offset: {csaf_offset}")
+                if csaf_products:
+                    csaf_query = select(CsafProduct).where(
+                        CsafProduct.id.in_(csaf_products)
+                    )
+                else:
+                    csaf_query = select(CsafProduct)
                 csaf_subquery = (
-                    select(CsafProduct).limit(csaf_limit).offset(csaf_offset)
+                    csaf_query.limit(csaf_limit).offset(csaf_offset)
                 ).subquery("csaf")
                 asset_offset = 0
                 asset_limit = batch_size_sqrt
                 while True:
                     logger.trace(f"Fetching asset offset: {asset_offset}")
+                    if assets:
+                        asset_query = select(Asset).where(Asset.id.in_(assets))
+                    else:
+                        asset_query = select(Asset)
                     asset_subquery = (
-                        select(Asset)
-                        .limit(asset_limit)
+                        asset_query.limit(asset_limit)
                         .offset(asset_offset)
                         .subquery("assets")
                     )
