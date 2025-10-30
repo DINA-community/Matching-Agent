@@ -16,7 +16,7 @@ from typing import Any, Annotated
 import uvicorn
 from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.params import Query
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, HttpUrl, Field
 import polars as pl
 
 from dina.cachedb.database import CacheDB
@@ -80,6 +80,16 @@ class MatcherConfig(BaseModel):
     Logging: LoggingConfig | None = None
 
 
+class DatabaseConfig(BaseModel):
+    freetext_fields: dict[str, float] = Field(default_factory=dict)
+    ordered_fields: dict[str, float] = Field(default_factory=dict)
+    other_fields: dict[str, float] = Field(default_factory=dict)
+
+
+class MatchingConfig(BaseModel):
+    database: DatabaseConfig
+
+
 class MatchingState(enum.Enum):
     STOPPED = "stopped"
     STOP_REQUESTED = "stop_requested"
@@ -107,6 +117,11 @@ class Matcher:
         """
         with open("./assets/matcher.toml", "rb") as f:
             self.__config = Matcher.Config.model_validate(tomllib.load(f))
+
+        with open("./assets/plugin_configs/default/matching_config.toml", "rb") as f:
+            mc = MatchingConfig.model_validate(tomllib.load(f))
+
+        self.__matching_cfg_dict = mc.model_dump()
 
         # Configure logging based on matcher.toml
         configure_logging(self.__config.Matcher.Logging)
@@ -174,6 +189,7 @@ class Matcher:
                                     self.__matches,
                                     batch,
                                     self.__config.Matcher.match_threshold,
+                                    self.__matching_cfg_dict,
                                 )
                             )
                             if len(parallel_tasks) >= num_processes:
@@ -400,7 +416,10 @@ class Matcher:
 
 
 def match_pairs(
-    matches: queue.Queue, pairs: list[tuple[CsafProduct, Asset]], threshold: float
+    matches: queue.Queue,
+    pairs: list[tuple[CsafProduct, Asset]],
+    threshold: float,
+    matching_config: dict[str, Any],
 ):
     logger.debug(f"Matching batch with {len(pairs)} pairs")
     batch = []
@@ -413,28 +432,11 @@ def match_pairs(
 
         df = pl.DataFrame([{**csaf_dict, **asset_dict}], strict=False)
 
-        # TODO: add fields to separate file
-        freetext_fields = {
-            "name": 0.20,
-            "hardware_name": 0.17,
-            "manufacturer_name": 0.08,
-            "device_family": 0.01,
-        }
+        db = matching_config.get("database", matching_config)
 
-        ordered_fields = {
-            "version": 0.10,
-            "model": 0.03,
-            "model_numbers": 0.03,
-            "part_numbers": 0.03,
-            "serial_numbers": 0.03,
-        }
-
-        other_fields = {
-            "cpe": 0.15,
-            "purl": 0.13,
-            "product_type": 0.02,
-            "sbom_urls": 0.01,
-        }
+        freetext_fields = db.get("freetext_fields", {})
+        ordered_fields = db.get("ordered_fields", {})
+        other_fields = db.get("other_fields", {})
 
         matching = Matching(freetext_fields, ordered_fields, other_fields)
         df_norm_matches = matching.df_matching(df)

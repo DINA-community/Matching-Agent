@@ -1,0 +1,20 @@
+[database]
+
+[database.freetext_fields]
+name = 0.20
+hardware_name = 0.17
+manufacturer_name = 0.08
+device_family = 0.01
+
+[database.ordered_fields]
+version = 0.10
+model = 0.03
+model_numbers = 0.03
+part_numbers = 0.03
+serial_numbers = 0.03
+
+[database.other_fields]
+cpe = 0.15
+purl = 0.13
+product_type = 0.02
+sbom_urls = 0.01
