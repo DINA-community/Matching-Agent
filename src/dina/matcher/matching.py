@@ -304,11 +304,11 @@ class Matching:
         return round(final_score, 4)
 
     def _safe_load(self, val):
+        if not val or val is None:
+            return None
+
         if val == {}:
             return val
-
-        if not val:
-            return None
 
         try:
             val = json.loads(val)
@@ -443,14 +443,14 @@ class Matching:
 
     def df_matching(self, df_norm: pl.DataFrame) -> pl.DataFrame:
         # TODO: add csaf_cpe_norm and csaf_purl_norm in a separate file
-        csaf_cpe_norm = "csaf_cpe_norm"
-        csaf_purl_norm = "csaf_purl_norm"
+        csaf_cpe_norm = "csaf_cpe"
+        csaf_purl_norm = "csaf_purl"
 
         df_norm_csaf_purl_cpe = df_norm.select([csaf_cpe_norm, csaf_purl_norm])
 
         if self.freetext_fields and self.freetext_fields.keys():
             for field in self.freetext_fields:
-                csaf_norm, asset_norm = f"csaf_{field}_norm", f"asset_{field}_norm"
+                csaf_norm, asset_norm = f"csaf_{field}", f"asset_{field}"
 
                 if csaf_norm in df_norm and asset_norm in df_norm:
                     df_norm = df_norm.with_columns(
@@ -495,7 +495,7 @@ class Matching:
 
         if self.ordered_fields and self.ordered_fields.keys():
             for field in self.ordered_fields:
-                csaf_norm, asset_norm = f"csaf_{field}_norm", f"asset_{field}_norm"
+                csaf_norm, asset_norm = f"csaf_{field}", f"asset_{field}"
 
                 if csaf_norm in df_norm and asset_norm in df_norm:
                     df_norm = df_norm.with_columns(
@@ -544,7 +544,7 @@ class Matching:
 
         if self.other_fields and self.other_fields.keys():
             for field in self.other_fields.keys():
-                csaf_norm, asset_norm = f"csaf_{field}_norm", f"asset_{field}_norm"
+                csaf_norm, asset_norm = f"csaf_{field}", f"asset_{field}"
 
                 weight = None
 

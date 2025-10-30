@@ -1,4 +1,3 @@
-import json
 import re
 import polars as pl
 import enum
@@ -20,6 +19,9 @@ class Standards(enum.Enum):
 
 
 def detect_schema(s: str) -> str:
+    if not s or s is None:
+        return None
+
     patterns_in_order = [
         (Standards.VERS, r"^vers:[a-z0-9_\-]+/.+"),
         (Standards.VLS, r"^(<=|>=|<|>|==|!=)\s*v?[0-9][0-9A-Za-z:._+\-]*(\|.*|,.*)?$"),
@@ -77,7 +79,9 @@ def _base_dict(schema, raw):
 
 
 def parse_csaf(schema, expr: str):
-    """Parser für CSAF / CPE-Syntax (vers:/vls-Form)."""
+    if not expr or expr is None:
+        return None
+
     parts = expr.split("/", 1)
 
     d = _base_dict(
@@ -139,7 +143,7 @@ def parse_csaf(schema, expr: str):
 def parse_calver(expr: str):
     m = re.match(r"^([0-9]{2}|[0-9]{4})\.(\d{2})(?:\.(\d{1,2}))?$", expr)
 
-    if not m:
+    if not m or m is None:
         return None
 
     year, month, day = m.groups()
@@ -158,6 +162,9 @@ def parse_calver(expr: str):
 
 
 def parse_csaf_wildcard(expr: str):
+    if not expr or expr is None:
+        return None
+
     d = _base_dict(Standards.WILDCARD.value, expr)
     parts = expr.split(".")
 
@@ -170,6 +177,9 @@ def parse_csaf_wildcard(expr: str):
 
 
 def parse_rpm(expr: str):
+    if not expr or expr is None:
+        return None
+
     full = re.match(
         r"^(?P<name>[a-z0-9+._-]+)"
         r"-(?:(?P<epoch>\d+):)?"
@@ -214,7 +224,7 @@ def parse_deb(expr: str):
 
     m = re.match(r"^(?:(\d+):)?([0-9A-Za-z.+:~]+)(?:-([0-9A-Za-z+.~]+))?$", expr)
 
-    if not m:
+    if not m or m is None:
         return None
 
     epoch, upstream, revision = m.groups()
@@ -231,7 +241,8 @@ def parse_sap(expr: str):
     normalized = expr.lower().replace("+", "").replace(" ", "")
 
     m = re.match(r"v(\d+)(?:\.(\d+))?(?:sp(\d+))?(?:upd(\d+))?", normalized)
-    if not m:
+
+    if not m or m is None:
         return None
 
     major, minor, sp, upd = m.groups()
@@ -255,6 +266,9 @@ def parse_sap(expr: str):
 
 
 def parse_semver(expr: str):
+    if not expr or expr is None:
+        return None
+
     parts = expr.split(".")
     major, minor, patch = None, None, None
 
@@ -296,7 +310,7 @@ def parse_semver(expr: str):
 def parse_ericsson(expr: str):
     m = re.match(r"^r(\d+)([a-z])(?:_(pc|sp|uc|mr)(\d+))?$", expr.lower())
 
-    if not m:
+    if not m or m is None:
         return None
 
     rel, branch, qtype, qnum = m.groups()
@@ -324,7 +338,7 @@ def parse_pep440(expr: str):
         expr,
     )
 
-    if not m:
+    if not m or m is None:
         return None
 
     base, pre_tag, pre_num, post_num, dev_num = m.groups()
@@ -347,6 +361,9 @@ def parse_pep440(expr: str):
 
 def parse_version_freetext(expr: str):
     # TODO: add separator to the separate file
+    if not expr or expr is None:
+        return None
+
     separator = ":"
     expr = expr.lower()
     expr = re.sub(r"[^a-z0-9.]+", separator, expr)
@@ -359,23 +376,26 @@ def parse_version_freetext(expr: str):
 
 def parse_version(expr: str):
     if isinstance(expr, pl.Series) or isinstance(expr, list):
-        if isinstance(expr, pl.Series):
-            if expr.is_empty():
-                return {}
-            expr = expr.to_list()
-
-        if not expr:
-            return {}
-
         expr_list = []
 
+        if isinstance(expr, pl.Series):
+            if expr.is_empty():
+                return expr_list
+            expr = expr.to_list()
+
+        if not expr or expr is None:
+            return expr_list
+
         for e in expr:
-            expr_list.append(parse_version(e))
+            value = parse_version(e)
+
+            if value:
+                expr_list.append(value)
 
         return expr_list
 
-    if expr is None:
-        return {}
+    if not expr or expr is None:
+        return None
 
     expr = expr.lower()
     expr = re.sub(r"\s*\+\s*", "+", expr).strip()
@@ -405,11 +425,14 @@ def parse_version(expr: str):
         case _:
             result = parse_version_freetext(expr)
 
-    return result or {}
+    return result or None
 
 
 def parse_freetext(expr: str):
     # TODO: add separator in a separate file
+    if not expr or expr is None:
+        return None
+
     separator = ":"
     expr = expr.lower()
     expr = re.sub(r"[^a-z0-9]+", separator, expr)
@@ -489,7 +512,7 @@ def parse_cpe(cpe: str) -> dict:
         d["raw"] = f"cpe:2.3:{':'.join(raw_parts)}"
 
     else:
-        return {}
+        return None
 
     return d
 
@@ -511,7 +534,7 @@ def parse_purl(purl: str) -> dict:
     d = _base_purl_dict(purl)
 
     if not purl.startswith("pkg:"):
-        return {}
+        return None
 
     purl_body = purl[4:]
 
@@ -579,83 +602,6 @@ def parse_files(files: list[dict]) -> list[dict]:
         results.append(d)
 
     return results
-
-
-class Normalizer:
-    def __init__(self, freetext_fields: dict, ordered_fields: dict, other_fields: dict):
-        self.freetext_fields = freetext_fields
-        self.ordered_fields = ordered_fields
-        self.other_fields = other_fields
-
-    def apply(self, df: pl.DataFrame) -> pl.DataFrame:
-        updates = []
-
-        if self.freetext_fields and self.freetext_fields.keys():
-            for col in self.freetext_fields.keys():
-                for prefix in ("csaf_", "asset_"):
-                    full_col = f"{prefix}{col}"
-
-                    if full_col in df.columns:
-                        expr = pl.col(full_col)
-                        expr = expr.map_elements(
-                            lambda x: json.dumps(parse_freetext(x)),
-                            return_dtype=pl.Utf8,
-                        )
-                        expr = expr.alias(f"{full_col}_norm")
-                        updates.append(expr)
-
-        if self.ordered_fields and self.ordered_fields.keys():
-            for col in self.ordered_fields.keys():
-                for prefix in ("csaf_", "asset_"):
-                    full_col = f"{prefix}{col}"
-
-                    if full_col in df.columns:
-                        expr = pl.col(full_col).map_elements(
-                            lambda x: json.dumps(parse_version(x)), return_dtype=pl.Utf8
-                        )
-                        expr = expr.alias(f"{full_col}_norm")
-                        updates.append(expr)
-
-        if self.other_fields and self.other_fields.keys():
-            for col in self.other_fields.keys():
-                for prefix in ("csaf_", "asset_"):
-                    full_col = f"{prefix}{col}"
-
-                    if full_col in df.columns:
-                        parsers = {
-                            "cpe": parse_cpe,
-                            "purl": parse_purl,
-                            "files": parse_files,
-                        }
-
-                        if col in parsers:
-                            parser = parsers[col]
-
-                            if parser:
-                                expr = (
-                                    pl.col(full_col)
-                                    .map_elements(
-                                        lambda x, parser=parser: json.dumps(parser(x)),
-                                        return_dtype=pl.Utf8,
-                                    )
-                                    .alias(f"{full_col}_norm")
-                                )
-                        else:
-                            expr = pl.col(full_col).alias(f"{full_col}_norm")
-
-                        updates.append(expr)
-
-        # ---- for tests
-        # if updates:
-        #     df = df.with_columns(updates)
-
-        # full_col = f"{"csaf_"}{col}"
-        # print(df.select([full_col, f"{full_col}_norm"]))
-
-        # return df
-        # -----
-
-        return df.with_columns(updates)
 
 
 # def main():

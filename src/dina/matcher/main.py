@@ -23,7 +23,6 @@ from dina.common.logging import configure_logging, get_logger
 import sys
 
 from dina.matcher.calculate_score import Score
-from dina.matcher.clean_text import Normalizer
 from dina.matcher.matching import Matching
 
 from dina.synchronizer.base import load_datasource_plugins
@@ -312,24 +311,25 @@ def match_pairs(
         if not (csaf and csaf.product and asset and asset.product):
             continue
 
-        # TODO: add file
         csaf_dict = {f"csaf_{k}": v for k, v in csaf.product.to_dict().items()}
         asset_dict = {f"asset_{k}": v for k, v in asset.product.to_dict().items()}
 
-        df = pl.DataFrame([{**csaf_dict, **asset_dict}])
+        df = pl.DataFrame([{**csaf_dict, **asset_dict}], strict=False)
 
+        # TODO: add fields to separate file
         freetext_fields = {
             "name": 0.20,
-            "hardware_name": 0.18,
+            "hardware_name": 0.17,
             "manufacturer_name": 0.08,
             "device_family": 0.01,
         }
 
         ordered_fields = {
             "version": 0.10,
-            "model": 0.05,
-            "model_numbers": 0.04,
+            "model": 0.03,
+            "model_numbers": 0.03,
             "part_numbers": 0.03,
+            "serial_numbers": 0.03,
         }
 
         other_fields = {
@@ -339,24 +339,19 @@ def match_pairs(
             "sbom_urls": 0.01,
         }
 
-        # pl.Config.set_fmt_str_lengths(2000)
-
-        normalizer = Normalizer(freetext_fields, ordered_fields, other_fields)
-        df_norm = normalizer.apply(df)
-
-        # for field in freetext_fields:
-        #     print(df_norm.select([f"csaf_{field}", f"asset_{field}"]))
-        #     print(df_norm.select([f"csaf_{field}_norm", f"asset_{field}_norm"]))
-
-        # for field in ordered_fields:
-        #     print(df_norm.select([f"csaf_{field}", f"asset_{field}"]))
-        #     print(df_norm.select([f"csaf_{field}_norm", f"asset_{field}_norm"]))
-
         matching = Matching(freetext_fields, ordered_fields, other_fields)
-        df_norm_matches = matching.df_matching(df_norm)
+        df_norm_matches = matching.df_matching(df)
 
         score = Score(freetext_fields, ordered_fields, other_fields)
         result, reason, score_percent = score.calculate_overall_score(df_norm_matches)
+
+        # pl.Config.set_fmt_str_lengths(2000)
+
+        # for field in freetext_fields:
+        #     print(df_norm.select([f"csaf_{field}", f"asset_{field}"]))
+
+        # for field in ordered_fields:
+        #     print(df_norm.select([f"csaf_{field}", f"asset_{field}"]))
 
         # for field in freetext_fields:
         #     print(df_norm_matches.select([f"{field}_match"]))
@@ -373,6 +368,7 @@ def match_pairs(
         match.score = score_percent
         match.timestamp = datetime.datetime.now().timestamp()
         match.status = f"result: {result}, reason: {reason}"
+
         # match = Match()
         # match.asset_id = asset.id
         # match.csaf_product_id = csaf.id

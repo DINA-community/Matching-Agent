@@ -7,8 +7,8 @@ class Score:
 
     def calculate_overall_score(self, df_norm):
         # TODO: add csaf_cpe_norm and csaf_purl_norm in a separate file
-        csaf_cpe_norm = "csaf_cpe_norm"
-        csaf_purl_norm = "csaf_purl_norm"
+        csaf_cpe_norm = "csaf_cpe"
+        csaf_purl_norm = "csaf_purl"
         vendor_score = product_name_score = product_family_score = version_score = (
             keyword_score
         ) = 0.0
