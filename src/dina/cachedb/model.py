@@ -1,9 +1,9 @@
 import datetime
 import enum
-import logging
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional
 
+from pwdlib import PasswordHash
 from sqlalchemy import (
     CheckConstraint,
     Column,
@@ -24,7 +24,11 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-logger = logging.getLogger(__name__)
+from dina.common.log import get_logger
+
+logger = get_logger(__name__)
+
+password_hash = PasswordHash.recommended()
 
 
 class MetaInfo:
@@ -57,6 +61,19 @@ class MetaInfo:
 
 class Base(AsyncAttrs, DeclarativeBase):
     metadata = MetaData(schema="cacheDB")
+
+
+class User(Base):
+    __tablename__ = "users"
+    username: Mapped[str] = mapped_column(Text, primary_key=True)
+    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    active: Mapped[bool] = mapped_column(nullable=False, default=True)
+
+    def set_password(self, password: str):
+        self.password_hash = password_hash.hash(password)
+
+    def check_password(self, password: str) -> bool:
+        return password_hash.verify(password, self.password_hash)
 
 
 class SynchronizerMetadata(Base):

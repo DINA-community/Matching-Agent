@@ -2,7 +2,7 @@ import time
 from typing import Optional, Tuple
 
 from dina.cachedb.model import CsafProduct, Product, ProductType
-from dina.common import logging
+from dina.common import log
 from dina.plugins.datasource.isduba.datamodels import (  # type: ignore
     CsafDocument,
     CsafProductTree,
@@ -10,7 +10,7 @@ from dina.plugins.datasource.isduba.datamodels import (  # type: ignore
     ProductInfo,
 )
 
-logger = logging.get_logger(__name__)
+logger = log.get_logger(__name__)
 
 
 def convert_into_database_format(

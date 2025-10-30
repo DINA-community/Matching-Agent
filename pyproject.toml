@@ -27,7 +27,10 @@ dependencies = [
     "psycopg[binary]>=3.2.9",
     "polars>=0.20.30",
     "rapidfuzz>=3.9.7",
-    "packaging>=24.1"
+    "packaging>=24.1",
+    "pyjwt>=2.10.1",
+    "pwdlib[argon2]>=0.3.0",
+    "python-multipart>=0.0.20",
 ]
 
 [project.optional-dependencies]

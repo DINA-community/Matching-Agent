@@ -10,7 +10,7 @@ from sqlalchemy import String, and_, cast
 from dina.cachedb.database import MappedRelationship
 from dina.cachedb.fetcher_view import FetcherView
 from dina.cachedb.model import Asset, CsafProduct, Match
-from dina.common import logging
+from dina.common import log
 from dina.plugins.datasource.isduba.connector import (
     get_csaf_product_tree,
     get_relationships,
@@ -28,7 +28,7 @@ from dina.synchronizer.plugin_base.data_source import (
     Relationship,
 )
 
-logger = logging.get_logger(__name__)
+logger = log.get_logger(__name__)
 
 
 class IsdubaDataSource(DataSourcePlugin):
@@ -46,8 +46,8 @@ class IsdubaDataSource(DataSourcePlugin):
         self.__limit = 500
         self.__offset = 0
         super().__init__(config)
-        logging.get_logger("httpx").setLevel(logging.WARNING)
-        logging.get_logger("httpcore").setLevel(logging.WARNING)
+        log.get_logger("httpx").setLevel(log.WARNING)
+        log.get_logger("httpcore").setLevel(log.WARNING)
 
     def endpoint_info(self) -> str:
         """Return information about the data source endpoint."""

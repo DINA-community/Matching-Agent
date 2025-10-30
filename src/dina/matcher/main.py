@@ -13,15 +13,18 @@ from pathlib import Path
 from queue import Empty, Queue
 from typing import Any, Annotated
 
+import fastapi
 import uvicorn
 from fastapi import APIRouter, FastAPI, HTTPException
-from fastapi.params import Query
+from fastapi.params import Query, Depends
+from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, HttpUrl
 import polars as pl
 
 from dina.cachedb.database import CacheDB
 from dina.cachedb.model import Match, CsafProduct, Asset
-from dina.common.logging import configure_logging, get_logger, LoggingConfig
+from dina.common.auth import AccessChecker, Token, SessionData, create_access_token
+from dina.common.log import configure_logging, get_logger, LoggingConfig
 import sys
 
 from dina.matcher.calculate_score import Score
@@ -69,6 +72,7 @@ class MatchSubscription(BaseModel):
 class ApiConfig(BaseModel):
     host: str
     port: int
+    access_token_expire_minutes: int
 
 
 class MatcherConfig(BaseModel):
@@ -225,10 +229,38 @@ class Matcher:
     async def __serve_api(self):
         api = FastAPI()
 
-        sub_route = APIRouter(prefix="/subscribe")
-        task_route = APIRouter(prefix="/task")
-        matches_route = APIRouter(prefix="/matches")
-        clear_route = APIRouter(prefix="/clear")
+        sub_route = APIRouter(
+            prefix="/subscribe", dependencies=[Depends(AccessChecker(self.__cache_db))]
+        )
+        task_route = APIRouter(
+            prefix="/task", dependencies=[Depends(AccessChecker(self.__cache_db))]
+        )
+        matches_route = APIRouter(
+            prefix="/matches", dependencies=[Depends(AccessChecker(self.__cache_db))]
+        )
+        clear_route = APIRouter(
+            prefix="/clear", dependencies=[Depends(AccessChecker(self.__cache_db))]
+        )
+
+        @api.post("/token")
+        async def login_for_access_token(
+            form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+        ) -> Token:
+            user = await self.__cache_db.authenticate_user(
+                form_data.username, form_data.password
+            )
+            if not user:
+                raise HTTPException(
+                    status_code=fastapi.status.HTTP_401_UNAUTHORIZED,
+                    detail="Incorrect username or password",
+                )
+            access_token_expires = datetime.timedelta(
+                minutes=self.__config.Matcher.Api.access_token_expire_minutes
+            )
+            token = create_access_token(
+                SessionData(username=user.username), access_token_expires
+            )
+            return Token(access_token=token, token_type="bearer")
 
         @matches_route.get("/")
         async def get_matches(

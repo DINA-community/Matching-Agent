@@ -1,8 +1,10 @@
 import asyncio
 from typing import Any, List
 
+from pydantic import HttpUrl
+
 from dina.cachedb.fetcher_view import FetcherView
-from dina.common import logging
+from dina.common import log
 from dina.synchronizer.base import DataSourcePlugin
 from dina.synchronizer.plugin_base.data_source import (
     MappedRelationship,
@@ -11,7 +13,7 @@ from dina.synchronizer.plugin_base.data_source import (
     FetchProductsResult,
 )
 
-logger = logging.get_logger(__name__)
+logger = log.get_logger(__name__)
 
 
 class SampleDataSource(DataSourcePlugin):
@@ -58,8 +60,8 @@ class SampleDataSource(DataSourcePlugin):
         return FetchProductsResult(again=False)
 
     @property
-    def origin_uri(self) -> str:
-        return "http://endpoint.sample.com/"
+    def origin_uri(self) -> HttpUrl:
+        return HttpUrl("http://endpoint.sample.com/")
 
     async def cleanup_products(self, data_to_check: List[Any]):
         pass
