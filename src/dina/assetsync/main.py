@@ -6,9 +6,6 @@ from dina.common.logging import configure_logging, get_logger
 from dina.synchronizer.base import BaseSynchronizer
 import sys
 
-# Configure logging
-configure_logging()
-
 logger = get_logger(__name__)
 
 if sys.platform.startswith("win"):
@@ -31,6 +28,8 @@ class AssetSynchronizer(BaseSynchronizer):
             cache_db,
             Path("./assets/assetsync.toml"),
         )
+        # Configure logging
+        configure_logging(self.config.Logging)
 
 
 async def run_asset_manager():

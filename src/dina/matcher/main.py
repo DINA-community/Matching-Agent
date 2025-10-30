@@ -1,6 +1,7 @@
 import asyncio
 import concurrent.futures
 import datetime
+import enum
 import itertools
 import multiprocessing
 import queue
@@ -10,16 +11,17 @@ import traceback
 from collections import defaultdict
 from pathlib import Path
 from queue import Empty, Queue
-from typing import Any
+from typing import Any, Annotated
 
 import uvicorn
 from fastapi import APIRouter, FastAPI, HTTPException
+from fastapi.params import Query
 from pydantic import BaseModel, HttpUrl
 import polars as pl
 
 from dina.cachedb.database import CacheDB
 from dina.cachedb.model import Match, CsafProduct, Asset
-from dina.common.logging import configure_logging, get_logger
+from dina.common.logging import configure_logging, get_logger, LoggingConfig
 import sys
 
 from dina.matcher.calculate_score import Score
@@ -27,9 +29,7 @@ from dina.matcher.matching import Matching
 
 from dina.synchronizer.base import load_datasource_plugins
 
-# Configure logging
-configure_logging()
-
+# Logger (handlers configured after config is loaded)
 logger = get_logger(__name__)
 
 if sys.platform.startswith("win"):
@@ -77,6 +77,24 @@ class MatcherConfig(BaseModel):
     Cachedb: CacheDB.Config
     asset_plugins_path: Path
     csaf_plugins_path: Path
+    Logging: LoggingConfig | None = None
+
+
+class MatchingState(enum.Enum):
+    STOPPED = "stopped"
+    STOP_REQUESTED = "stop_requested"
+    RUNNING = "running"
+
+
+class MatcherStatus(BaseModel):
+    state: MatchingState
+    start: float | None = None
+    last_matching: float | None = None
+
+
+class MatchingTask(BaseModel):
+    assets: list[int]
+    csaf_products: list[int]
 
 
 class Matcher:
@@ -90,10 +108,16 @@ class Matcher:
         with open("./assets/matcher.toml", "rb") as f:
             self.__config = Matcher.Config.model_validate(tomllib.load(f))
 
+        # Configure logging based on matcher.toml
+        configure_logging(self.__config.Matcher.Logging)
+
         self.__manager = multiprocessing.Manager()
         self.__matches: Queue[list[Match]] = self.__manager.Queue()
         self.__cache_db = CacheDB()
         self.__last_matching: float | None = None
+        self.__matching_tasks: list[MatchingTask] = []
+        self.__matching_state: MatchingState = MatchingState.STOPPED
+        self.__matching_start_time: float | None = None
         self.__last_publish: float | None = None
         self.__data_source_plugins = load_datasource_plugins(
             Path(self.__config.Matcher.asset_plugins_path)
@@ -119,13 +143,26 @@ class Matcher:
                 self.__last_matching is None
                 or self.__last_matching + self.__config.Matcher.sync_interval
                 < time.time()
+                or len(self.__matching_tasks) > 0
             ):
                 try:
+                    try:
+                        task = self.__matching_tasks.pop()
+                    except IndexError:
+                        # If no task is queued, try to match all assets and all csaf products.
+                        task = MatchingTask(assets=[], csaf_products=[])
+                    logger.info(f"Starting matching task: {task}")
+                    self.__matching_state = MatchingState.RUNNING
+                    self.__matching_start_time = time.time()
                     parallel_tasks = []
                     num_processes = multiprocessing.cpu_count()
                     with concurrent.futures.ProcessPoolExecutor() as pool:
                         loop = asyncio.get_event_loop()
-                        async for batch in self.__cache_db.fetch_pairs_batches(20):
+                        async for batch in self.__cache_db.fetch_pairs_batches(
+                            task.assets, task.csaf_products, batch_size_sqrt=20
+                        ):
+                            if self.__matching_state == MatchingState.STOP_REQUESTED:
+                                break
                             if not batch:
                                 continue
                             while self.__matches.qsize() > num_processes * 2:
@@ -145,8 +182,12 @@ class Matcher:
                 except Exception as e:
                     logger.error(f"Error fetching matches: {e}")
                     print(traceback.format_exc())
+                finally:
+                    logger.info("Matching task finished")
+                    self.__matching_state = MatchingState.STOPPED
+                    self.__matching_start_time = None
+                    self.__last_matching = time.time()
 
-                self.__last_matching = time.time()
             else:
                 await asyncio.sleep(1)
 
@@ -169,7 +210,7 @@ class Matcher:
                 # Categorize by asset origin
                 categorized_matches = defaultdict(list)
                 for match in matches:
-                    categorized_matches[match.asset.origin_uri].append(match)
+                    categorized_matches[HttpUrl(match.asset.origin_uri)].append(match)
                 # Let asset plugins notify subscribers of new matches
                 for origin, matches in categorized_matches.items():
                     if self.__data_source_plugins[
@@ -186,10 +227,18 @@ class Matcher:
         sub_route = APIRouter(prefix="/subscribe")
         task_route = APIRouter(prefix="/task")
         matches_route = APIRouter(prefix="/matches")
+        clear_route = APIRouter(prefix="/clear")
 
         @matches_route.get("/")
         async def get_matches(
-            limit: int = 100, offset: int = 0, origin_uri: str | None = None
+            limit: int = 100,
+            offset: int = 0,
+            origin_uri: HttpUrl | None = None,
+            time_lte: float | None = None,
+            time_gte: float | None = None,
+            assets: Annotated[list[int] | None, Query()] = None,
+            csaf_products: Annotated[list[int] | None, Query()] = None,
+            threshold: float | None = None,
         ) -> list[APIMatch]:
             """Get a list of matches between CSAF advisories and assets.
 
@@ -197,6 +246,11 @@ class Matcher:
                 limit (int): Maximum number of matches to return. Defaults to 100.
                 offset (int): Number of matches to skip for pagination. Defaults to 0.
                 origin_uri (HttpUrl | None): Filter matches to only include matches from a specific origin.
+                time_lte (float | None): Filter matches to only include matches with a timestamp less than or equal to the specified value.
+                time_gte (float | None): Filter matches to only include matches with a timestamp greater than or equal to the specified value.
+                assets (list[int] | None): Filter matches to only include matches with assets from the specified list of asset IDs.
+                csaf_products (list[int] | None): Filter matches to only include matches with csaf_products from the specified list of csaf_product IDs.
+                threshold (float | None): Filter matches to only include matches with a score greater than or equal to the specified value.
 
             Returns:
                 list[APIMatch]: A list of matches, each containing:
@@ -209,7 +263,14 @@ class Matcher:
             """
             logger.info(f"Getting matches limit={limit} offset={offset}")
             matches = await self.__cache_db.get_matches(
-                limit=limit, offset=offset, origin_uri=origin_uri
+                limit=limit,
+                offset=offset,
+                origin_uri=origin_uri,
+                time_lte=time_lte,
+                time_gte=time_gte,
+                assets=assets,
+                csaf_products=csaf_products,
+                threshold=threshold,
             )
             return [
                 APIMatch(
@@ -247,17 +308,50 @@ class Matcher:
             )
 
         @task_route.post("/start")
-        async def start():
+        async def start(
+            assets: list[int] | None = None, csaf_products: list[int] | None = None
+        ):
+            if assets is None:
+                assets = []
+            if csaf_products is None:
+                csaf_products = []
             logger.info("Starting matching task")
-            self.__last_matching = None
+            self.__matching_tasks.append(
+                MatchingTask(assets=assets, csaf_products=csaf_products)
+            )
 
         @task_route.get("/status")
-        async def status():
-            return {"status": "running"}
+        async def status() -> MatcherStatus:
+            return MatcherStatus(
+                state=self.__matching_state,
+                start=self.__matching_start_time,
+                last_matching=self.__last_matching,
+            )
 
-        # @task_route.post("/stop")
-        # async def stop():
-        #     logger.info("Stopping matching task")
+        @task_route.post("/stop")
+        async def stop():
+            logger.info("Stopping matching task")
+            self.__matching_state = MatchingState.STOP_REQUESTED
+
+        @clear_route.post("/all")
+        async def clean_all():
+            logger.info("Cleaning entire matcher cache")
+            await self.__cache_db.clear()
+
+        @clear_route.post("/matches")
+        async def clean_matches():
+            logger.info("Cleaning matcher matches cache")
+            await self.__cache_db.clear_matches()
+
+        @clear_route.post("/assets")
+        async def clean_assets(origin_uri: HttpUrl):
+            logger.info("Cleaning matcher assets cache")
+            await self.__cache_db.clear_assets(origin_uri)
+
+        @clear_route.post("/csaf")
+        async def clean_csaf(origin_uri: HttpUrl):
+            logger.info("Cleaning matcher csaf cache")
+            await self.__cache_db.clear_csaf_products(origin_uri)
 
         @sub_route.post("/new_match")
         async def subscribe(body: MatchSubscription) -> None:
@@ -273,6 +367,7 @@ class Matcher:
         api.include_router(task_route)
         api.include_router(matches_route)
         api.include_router(sub_route)
+        api.include_router(clear_route)
 
         config = uvicorn.Config(
             app=api,
@@ -292,7 +387,9 @@ class Matcher:
           for the given origin_info; return the first non-empty path.
         - If no path is available, just return the origin_uri as-is.
         """
-        path = self.__data_source_plugins[origin_uri].build_resource_path(origin_info)
+        path = self.__data_source_plugins[HttpUrl(origin_uri)].build_resource_path(
+            origin_info
+        )
         if path:
             # Ensure we don't duplicate slashes on join
             if origin_uri.endswith("/") and path.startswith("/"):

@@ -1,6 +1,7 @@
 import datetime
 from typing import Any, Dict, List, Type
 
+from pydantic import HttpUrl
 from sqlalchemy import ColumnExpressionArgument, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
@@ -10,9 +11,9 @@ from dina.cachedb.model import Asset, CsafProduct, SynchronizerMetadata
 
 
 class FetcherView:
-    def __init__(self, origin: str, engine: AsyncEngine) -> None:
+    def __init__(self, origin: HttpUrl, engine: AsyncEngine) -> None:
         self.__engine = engine
-        self.__origin = origin
+        self.__origin = str(origin)
 
     async def get_existing[T: Asset | CsafProduct](
         self,

@@ -3,7 +3,7 @@ import time
 from datetime import timezone
 from typing import List, Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 from sqlalchemy import Integer
 
 from dina.cachedb.fetcher_view import FetcherView
@@ -47,7 +47,7 @@ logger = logging.get_logger(__name__)
 
 class NetboxDataSource(DataSourcePlugin):
     class Config(BaseModel):
-        api_url: str
+        api_url: HttpUrl
         api_token: str
 
     def __init__(self, config: DataSourcePlugin.Config):
@@ -60,7 +60,7 @@ class NetboxDataSource(DataSourcePlugin):
         try:
             netbox = self.config.DataSource.Plugin
             self.client = AuthenticatedClient(
-                base_url=netbox.api_url,
+                base_url=str(netbox.api_url),
                 prefix="Token",
                 token=netbox.api_token,
                 raise_on_unexpected_status=True,
@@ -256,7 +256,7 @@ class NetboxDataSource(DataSourcePlugin):
                 asset = Asset(
                     product=Product(),
                     last_update=current_time,
-                    origin_uri=self.origin_uri,
+                    origin_uri=str(self.origin_uri),
                     origin_info=origin_info,
                     uri=self.build_resource_uri(origin_info),
                 )
@@ -306,7 +306,7 @@ class NetboxDataSource(DataSourcePlugin):
                 asset = Asset(
                     product=Product(),
                     last_update=current_time,
-                    origin_uri=self.origin_uri,
+                    origin_uri=str(self.origin_uri),
                     origin_info=origin_info,
                     uri=self.build_resource_uri(origin_info),
                 )

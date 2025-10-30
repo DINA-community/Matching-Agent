@@ -7,7 +7,7 @@ license = "MIT OR Apache-2.0"
 authors = [
     { name = "Mark Giraud", email = "mark.giraud@iosb.fraunhofer.de" }
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.13,<3.14"
 
 dependencies = [
     "aiohttp>=3.12.13",
@@ -79,6 +79,9 @@ testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+markers = [
+    "asyncio: mark a test as using asyncio"
+]
 addopts = [
     "--strict-markers",
     "--strict-config",

@@ -6,9 +6,6 @@ from dina.common.logging import configure_logging, get_logger
 from dina.synchronizer.base import BaseSynchronizer
 import sys
 
-# Configure logging
-configure_logging()
-
 logger = get_logger(__name__)
 
 if sys.platform.startswith("win"):
@@ -31,8 +28,8 @@ class CSAFSynchronizer(BaseSynchronizer):
             cache_db,
             Path("./assets/csafsync.toml"),
         )
-        # TODO: Initialize connections to asset databases and the cache database.
-        # TODO: Find the appropriate transformer plugins.
+        # Configure logging
+        configure_logging(self.config.Logging)
 
 
 async def run_csaf_manager():

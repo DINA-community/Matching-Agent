@@ -19,11 +19,12 @@ from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 
 from dina.cachedb.database import CacheDB
 from dina.cachedb.fetcher_view import FetcherView
 from dina.cachedb.model import Asset, CsafProduct
+from dina.common.logging import LoggingConfig
 from dina.synchronizer.plugin_base.data_source import DataSourcePlugin, Relationship
 from dina.synchronizer.plugin_base.preprocessor import PreprocessorPlugin
 
@@ -55,6 +56,7 @@ class SynchronizerConfig(BaseModel):
     Assetsync: dict | None = None
     Synchronizer: SynchronizerSectionConfig
     Cachedb: CacheDB.Config
+    Logging: LoggingConfig | None = None
 
 
 class PluginLoadError(Exception):
@@ -76,12 +78,14 @@ class BaseSynchronizer(ABC):
         self.__last_cleanup: float | None = None
         self.cache_db: CacheDB = cache_db
         self.pending_products: list[Asset | CsafProduct] = []
-        self.pending_relationships: dict[str, list[Relationship]] = defaultdict(list)
+        self.pending_relationships: dict[HttpUrl, list[Relationship]] = defaultdict(
+            list
+        )
         self.preprocessed_data: list[Asset | CsafProduct] = []
         self.config_file: Path = config_file
         self.config: SynchronizerConfig = self.load_config(config_file)
 
-        self.data_sources: dict[str, DataSourcePlugin] = load_datasource_plugins(
+        self.data_sources: dict[HttpUrl, DataSourcePlugin] = load_datasource_plugins(
             self.config.Synchronizer.plugin_configs_path
         )
         self.preprocessor_plugins = self.__load_preprocessor_plugins(
@@ -226,7 +230,7 @@ class BaseSynchronizer(ABC):
             logger.debug(f"Fetching data from {source.debug_info()}")
             result = await source.fetch_products(fetcher_view)
             for datapoint in result.data:
-                datapoint.origin_uri = source.origin_uri
+                datapoint.origin_uri = str(source.origin_uri)
                 self.pending_products.append(datapoint)
             again = result.again
 
@@ -331,7 +335,7 @@ class BaseSynchronizer(ABC):
         await server.serve()
 
 
-def load_datasource_plugins(plugin_configs: Path) -> dict[str, DataSourcePlugin]:
+def load_datasource_plugins(plugin_configs: Path) -> dict[HttpUrl, DataSourcePlugin]:
     """
     Load plugins from configuration files in the specified directory.
 
@@ -352,7 +356,7 @@ def load_datasource_plugins(plugin_configs: Path) -> dict[str, DataSourcePlugin]
             f"Plugin configuration directory not found: {plugin_configs}"
         )
 
-    plugins: dict[str, DataSourcePlugin] = {}
+    plugins: dict[HttpUrl, DataSourcePlugin] = {}
 
     # Scan the directory for TOML files
     for config_file in plugin_configs.glob("*.toml"):
