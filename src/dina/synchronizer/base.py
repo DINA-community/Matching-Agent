@@ -9,27 +9,32 @@ from __future__ import annotations
 
 import asyncio
 import datetime
-import logging
 import time
 import tomllib
 from abc import ABC
 from collections import defaultdict
 from importlib.metadata import EntryPoints, entry_points
 from pathlib import Path
+from typing import Annotated
 
+import fastapi
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.params import Depends
+from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, HttpUrl
 
 from dina.cachedb.database import CacheDB
 from dina.cachedb.fetcher_view import FetcherView
 from dina.cachedb.model import Asset, CsafProduct
-from dina.common.logging import LoggingConfig
+from dina.common.log import LoggingConfig, get_logger
+
+from dina.common.auth import AccessChecker, create_access_token, SessionData, Token
 from dina.synchronizer.plugin_base.data_source import DataSourcePlugin, Relationship
 from dina.synchronizer.plugin_base.preprocessor import PreprocessorPlugin
 
 # Set up logging
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 type TomlEntry = (
     dict[str, TomlEntry] | list[TomlEntry] | str | int | float | bool | None
@@ -39,6 +44,7 @@ type TomlEntry = (
 class ApiConfig(BaseModel):
     host: str
     port: int
+    access_token_expire_minutes: int
 
 
 class SynchronizerSectionConfig(BaseModel):
@@ -320,12 +326,32 @@ class BaseSynchronizer(ABC):
     async def __api_client(self):
         api = FastAPI()
 
-        @api.post("/start")
+        @api.post("/token")
+        async def login_for_access_token(
+            form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+        ) -> Token:
+            user = await self.cache_db.authenticate_user(
+                form_data.username, form_data.password
+            )
+            if not user:
+                raise HTTPException(
+                    status_code=fastapi.status.HTTP_401_UNAUTHORIZED,
+                    detail="Incorrect username or password",
+                )
+            access_token_expires = datetime.timedelta(
+                minutes=self.config.Synchronizer.Api.access_token_expire_minutes
+            )
+            token = create_access_token(
+                SessionData(username=user.username), access_token_expires
+            )
+            return Token(access_token=token, token_type="bearer")
+
+        @api.post("/start", dependencies=[Depends(AccessChecker(self.cache_db))])
         async def sync():
             self.__last_synchronization = None
             return {}
 
-        @api.get("/status")
+        @api.get("/status", dependencies=[Depends(AccessChecker(self.cache_db))])
         async def status() -> SynchronizerStatus:
             return SynchronizerStatus(last_synchronization=self.__last_synchronization)
 

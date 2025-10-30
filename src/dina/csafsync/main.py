@@ -2,7 +2,7 @@ import asyncio
 from pathlib import Path
 
 from dina.cachedb.database import CacheDB
-from dina.common.logging import configure_logging, get_logger
+from dina.common.log import configure_logging, get_logger
 from dina.synchronizer.base import BaseSynchronizer
 import sys
 

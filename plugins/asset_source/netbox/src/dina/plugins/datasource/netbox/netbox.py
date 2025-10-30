@@ -14,7 +14,7 @@ from dina.cachedb.model import (
     ProductType,
     Match,
 )
-from dina.common import logging
+from dina.common import log
 from dina.plugins.datasource.netbox.generated.api_client import AuthenticatedClient
 from dina.plugins.datasource.netbox.generated.api_client.api.dcim import (
     dcim_device_types_list,
@@ -42,7 +42,7 @@ from dina.synchronizer.plugin_base.data_source import (
     Relationship,
 )
 
-logger = logging.get_logger(__name__)
+logger = log.get_logger(__name__)
 
 
 class NetboxDataSource(DataSourcePlugin):

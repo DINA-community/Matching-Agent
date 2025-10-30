@@ -28,6 +28,8 @@ host = "0.0.0.0"
 # The port to serve on.
 port = 8992
 
+access_token_expire_minutes = 10
+
 [Cachedb]
 host = "localhost"
 port = 2345

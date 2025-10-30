@@ -1,7 +1,7 @@
 import datetime
-import logging
 from typing import List, Optional, Type, Union, AsyncGenerator
 
+import sqlalchemy.exc
 from pydantic import BaseModel, HttpUrl
 from sqlalchemy import (
     and_,
@@ -31,13 +31,15 @@ from dina.cachedb.model import (
     product_relationship,
     Match,
     SynchronizerMetadata,
+    User,
 )
+from dina.common.log import get_logger
 from dina.synchronizer.plugin_base.data_source import (
     DataSourcePlugin,
     MappedRelationship,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class CacheDB:
@@ -601,6 +603,37 @@ class CacheDB:
                     .values(last_run=datetime.datetime.fromtimestamp(0))
                 )
                 await session.execute(stmt)
+
+    async def user_active(self, username: str) -> bool:
+        async with AsyncSession(self.engine) as session:
+            async with session.begin():
+                stmt = select(User).where(User.username == username)
+                if user := (await session.execute(stmt)).scalars().first():
+                    if user.active:
+                        return True
+        return False
+
+    async def authenticate_user(self, username: str, password: str) -> User | None:
+        async with AsyncSession(self.engine) as session:
+            async with session.begin():
+                stmt = select(User).where(User.username == username)
+                if user := (await session.execute(stmt)).scalars().first():
+                    if user.check_password(password):
+                        session.expunge(user)
+                        return user
+        return None
+
+    async def create_user(self, username: str, password: str):
+        try:
+            async with AsyncSession(self.engine) as session:
+                async with session.begin():
+                    user = User(username=username, active=True)
+                    user.set_password(password)
+                    session.add(user)
+                    await session.flush()
+        except sqlalchemy.exc.IntegrityError:
+            logger.info(f"User {username} already exists.")
+            pass
 
     async def clear(self) -> None:
         async with AsyncSession(self.engine) as session:
