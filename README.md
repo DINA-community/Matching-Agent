@@ -265,3 +265,41 @@ To run the CSAF Synchronizer:
 ```shell
 uv run csafsync
 ```
+
+
+## Authenticate with the API
+
+The synchronizer components (Asset/CSAF) and the Matcher expose a small FastAPI HTTP API that uses OAuth2 Password flow to issue short‑lived JWT bearer tokens.
+
+Quick start:
+
+1) Make sure the component is running (e.g., Asset Synchronizer default at http://localhost:8992; configurable in `assets/assetsync.toml`).
+2) Create or update a user in the CacheDB using the CLI:
+
+```bash
+uv run csaf_matcher_cli user create -u admin -p admin
+```
+
+3) Obtain an access token (form fields `username` and `password`):
+
+```bash
+BASE_URL="http://localhost:8992"  # adjust to the component you call
+curl -sS -X POST "$BASE_URL/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=admin&password=admin"
+# => {"access_token": "<JWT>", "token_type": "bearer"}
+```
+
+4) Call protected endpoints with the token:
+
+```bash
+TOKEN="<paste access_token>"
+curl -sS "$BASE_URL/status" -H "Authorization: Bearer $TOKEN"
+```
+
+Notes:
+- Token lifetime is controlled by `[Synchronizer.Api].access_token_expire_minutes` in the component’s TOML config.
+- Interactive API docs are available at `$BASE_URL/docs` (Swagger UI).
+
+For a detailed guide (including HTTPie and Python examples, troubleshooting, and security notes), see:
+- docs/authentication.rst
