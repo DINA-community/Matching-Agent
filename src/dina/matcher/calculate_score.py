@@ -8,10 +8,10 @@ class Score:
         ordered_fields = db.get("ordered_fields", {})
         other_fields = db.get("other_fields", {})
 
-        cpe = matching_config.get("cpe", matching_config)
+        cpe = matching_config.get("cpe", {})
         self.csaf_cpe_field_name = cpe.get("csaf_cpe_field_name", "csaf_cpe")
 
-        purl = matching_config.get("purl", matching_config)
+        purl = matching_config.get("purl", {})
         self.csaf_purl_field_name = purl.get("csaf_purl_field_name", "csaf_purl")
 
         threshold = matching_config.get("threshold", {})

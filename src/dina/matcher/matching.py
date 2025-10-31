@@ -7,27 +7,27 @@ from packaging.version import Version, InvalidVersion
 
 class Matching:
     def __init__(self, matching_config: dict):
-        db = matching_config.get("database", matching_config)
+        db = matching_config.get("database", {})
         self.freetext_fields = db.get("freetext_fields", {})
         self.ordered_fields = db.get("ordered_fields", {})
         self.other_fields = db.get("other_fields", {})
         self.freetext_fields_weights = db.get("freetext_fields_weights", {})
 
-        version = matching_config.get("version", matching_config)
+        version = matching_config.get("version", {})
         self.version_weights = version.get("weights", {})
 
-        cpe = matching_config.get("cpe", matching_config)
+        cpe = matching_config.get("cpe", {})
         self.csaf_cpe_field_name = cpe.get("csaf_cpe_field_name", "csaf_cpe")
         self.cpe_weights = cpe.get("weights", {})
 
-        purl = matching_config.get("purl", matching_config)
+        purl = matching_config.get("purl", {})
         self.csaf_purl_field_name = purl.get("csaf_purl_field_name", "csaf_purl")
         self.purl_weights = purl.get("weights", {})
 
-        ngram = matching_config.get("ngram", matching_config)
+        ngram = matching_config.get("ngram", {})
         self.ngram_weights = ngram.get("weights", {})
 
-        levenshtein = matching_config.get("levenshtein", matching_config)
+        levenshtein = matching_config.get("levenshtein", {})
         self.levenshtein_max_distance = levenshtein.get("max_distance", 0)
 
     def _safe_version(self, val: str):
