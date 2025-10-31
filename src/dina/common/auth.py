@@ -1,7 +1,9 @@
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 import jwt
+from dotenv import load_dotenv
 from fastapi import HTTPException, status
 from fastapi.params import Depends
 from fastapi.security import OAuth2PasswordBearer
@@ -10,7 +12,15 @@ from pydantic import BaseModel, ValidationError
 
 from dina.cachedb.database import CacheDB
 
-SECRET_KEY = "secret"
+load_dotenv()
+
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+if SECRET_KEY is None:
+    exit(
+        "JWT_SECRET_KEY not set. Please set the envrionment variable to a securely generated random value.\n"
+        'Use for example `echo "export JWT_SECRET_KEY=$(openssl rand -hex 32)" >> .env` to generate a random key.\n'
+        "The key is added to a local .env file which is loaded by the executable."
+    )
 ALGORITHM = "HS256"
 
 
