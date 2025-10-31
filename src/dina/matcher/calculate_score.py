@@ -2,21 +2,31 @@ import numpy as np
 
 
 class Score:
-    def __init__(self, freetext_fields: dict, ordered_fields: dict, other_fields: dict):
+    def __init__(self, matching_config: dict):
+        db = matching_config.get("database", matching_config)
+        freetext_fields = db.get("freetext_fields", {})
+        ordered_fields = db.get("ordered_fields", {})
+        other_fields = db.get("other_fields", {})
+
+        cpe = matching_config.get("cpe", matching_config)
+        self.csaf_cpe_field_name = cpe.get("csaf_cpe_field_name", "csaf_cpe")
+
+        purl = matching_config.get("purl", matching_config)
+        self.csaf_purl_field_name = purl.get("csaf_purl_field_name", "csaf_purl")
+
+        threshold = matching_config.get("threshold", matching_config)
+        self.vendor_threshold = threshold.get("vendor", 0)
+        self.product_family_threshold = threshold.get("product_family", 0)
+        self.product_name_threshold = threshold.get("product_name", 0)
+        self.keyword_threshold = threshold.get("keyword", 0)
+        self.version_threshold = threshold.get("version", 0)
+
         self.fields = {**freetext_fields, **ordered_fields, **other_fields}
 
     def calculate_overall_score(self, df_norm):
-        # TODO: add csaf_cpe_norm and csaf_purl_norm in a separate file
-        csaf_cpe_norm = "csaf_cpe"
-        csaf_purl_norm = "csaf_purl"
         vendor_score = product_name_score = product_family_score = version_score = (
             keyword_score
         ) = 0.0
-        vendor_threshold = 40
-        product_family_threshold = 0
-        product_name_threshold = 60
-        keyword_threshold = 0
-        version_threshold = 60
 
         keyword_scores = []
 
@@ -38,7 +48,7 @@ class Score:
 
                 v = val.item()
 
-                field_csaf_cpe_norm_match = f"{field}_{csaf_cpe_norm}_match"
+                field_csaf_cpe_norm_match = f"{field}_{self.csaf_purl_field_name}_match"
 
                 match field:
                     case "manufacturer_name":
@@ -78,7 +88,9 @@ class Score:
                         version_score = max(v, version_score)
 
                         if "cpe" in self.fields:
-                            asset_csaf_cpe_norm_match = f"asset_{csaf_cpe_norm}_match"
+                            asset_csaf_cpe_norm_match = (
+                                f"asset_{self.csaf_purl_field_name}_match"
+                            )
 
                             if asset_csaf_cpe_norm_match in df_norm.columns:
                                 cpe_asset = df_norm.select(
@@ -96,9 +108,11 @@ class Score:
                                         cpe_version.item(), version_score
                                     )
                         if "purl" in self.fields:
-                            asset_csaf_purl_norm_match = f"asset_{csaf_purl_norm}_match"
+                            asset_csaf_purl_norm_match = (
+                                f"asset_{self.csaf_purl_field_name}_match"
+                            )
                             version_csaf_purl_norm_match = (
-                                f"{field}_{csaf_purl_norm}_match"
+                                f"{field}_{self.csaf_purl_field_name}_match"
                             )
 
                             if asset_csaf_purl_norm_match in df_norm.columns:
@@ -142,27 +156,30 @@ class Score:
         if vendor_score is None:
             return 0, "No Match vendor missing", score_percent
         # Check if vendor score meets threshold
-        elif vendor_score >= vendor_threshold:
+        elif vendor_score >= self.vendor_threshold:
             # Check if product family score is missing
             if product_family_score is None:
                 # Check if product name score is missing
                 if product_name_score is None:
                     return 0, "No Match Product Name and Family missing", score_percent
                 # Check if product name score meets threshold
-                if product_name_score >= product_name_threshold:
+                if product_name_score >= self.product_name_threshold:
                     # Check if version score exists and meets threshold
-                    if version_score is not None and version_score < version_threshold:
+                    if (
+                        version_score is not None
+                        and version_score < self.version_threshold
+                    ):
                         return (
                             0,
-                            f"No Match - Version Score is below {version_threshold}% ({version_score}%)",
+                            f"No Match - Version Score is below {self.version_threshold}% ({version_score}%)",
                             score_percent,
                         )
                     return 1, "Match - Family Missing", score_percent
                 # Check if product name score is within a certain range and version and keyword scores exist
                 elif (
-                    (product_name_threshold - 20)
+                    (self.product_name_threshold - 20)
                     <= product_name_score
-                    < product_name_threshold
+                    < self.product_name_threshold
                     and version_score is not None
                     and keyword_score is not None
                 ):
@@ -173,7 +190,7 @@ class Score:
                         + version_score
                         + keyword_score
                     ) / 7
-                    if overall_score >= keyword_threshold:
+                    if overall_score >= self.keyword_threshold:
                         return (
                             1,
                             "Possible match - version and keyword boost",
@@ -182,21 +199,24 @@ class Score:
                 else:
                     return (
                         0,
-                        f"No match - Product name score is below {product_name_threshold}% ({product_name_score}%)",
+                        f"No match - Product name score is below {self.product_name_threshold}% ({product_name_score}%)",
                         score_percent,
                     )
             # Check if product family score meets threshold
-            elif product_family_score >= product_family_threshold:
+            elif product_family_score >= self.product_family_threshold:
                 # Check if product name score is missing
                 if product_name_score is None:
                     return 1, "Possible Match - Product Name missing", score_percent
                 # Check if product name score meets threshold
-                elif product_name_score >= product_name_threshold:
+                elif product_name_score >= self.product_name_threshold:
                     # Check if version score exists and meets threshold
-                    if version_score is not None and version_score < version_threshold:
+                    if (
+                        version_score is not None
+                        and version_score < self.version_threshold
+                    ):
                         return (
                             0,
-                            f"No Match - Version Score is below {version_threshold}% ({version_score}%)",
+                            f"No Match - Version Score is below {self.version_threshold}% ({version_score}%)",
                             score_percent,
                         )
                     else:
@@ -207,9 +227,9 @@ class Score:
                         )
                 # Check if product name score is within a certain range and version and keyword scores exist
                 elif (
-                    (product_name_threshold - 20)
+                    (self.product_name_threshold - 20)
                     <= product_name_score
-                    < product_name_threshold
+                    < self.product_name_threshold
                     and version_score is not None
                     and keyword_score is not None
                 ):
@@ -220,7 +240,7 @@ class Score:
                         + version_score
                         + keyword_score
                     ) / 7
-                    if overall_score >= keyword_threshold:
+                    if overall_score >= self.keyword_threshold:
                         return (
                             1,
                             "Possible match - version and keyword boost",
@@ -229,20 +249,20 @@ class Score:
                 else:
                     return (
                         0,
-                        f"No match: Product name score is below {product_name_threshold}% ({product_name_score}%)",
+                        f"No match: Product name score is below {self.product_name_threshold}% ({product_name_score}%)",
                         score_percent,
                     )
             else:
                 return (
                     0,
-                    f"No match: Product family score is below {product_family_threshold}% ({product_family_score}%)",
+                    f"No match: Product family score is below {self.product_family_threshold}% ({product_family_score}%)",
                     score_percent,
                 )
         # Check if vendor score is below threshold
-        elif vendor_score <= vendor_threshold:
+        elif vendor_score <= self.vendor_threshold:
             return (
                 0,
-                f"No match: Vendor score is below {vendor_threshold}% ({vendor_score}%)",
+                f"No match: Vendor score is below {self.vendor_threshold}% ({vendor_score}%)",
                 score_percent,
             )
         return 0, "Loop Error", score_percent

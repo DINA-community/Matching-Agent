@@ -6,6 +6,11 @@ hardware_name = 0.17
 manufacturer_name = 0.08
 device_family = 0.01
 
+[database.freetext_fields_weights]
+token = 0.5
+ngram = 0.3
+overlap = 0.2
+
 [database.ordered_fields]
 version = 0.10
 model = 0.03
@@ -18,3 +23,63 @@ cpe = 0.15
 purl = 0.13
 product_type = 0.02
 sbom_urls = 0.01
+
+[version]
+
+[version.weights]
+raw = 0.05
+package = 0.15
+release_prefix = 0.05
+release_number = 0.10
+release_branch = 0.07
+build_number = 0.05
+qualifier = 0.02
+architecture = 0.07
+date = 0.01
+epoch = 0.03
+min_max_version = 0.40
+
+[cpe]
+csaf_cpe_field_name = "csaf_cpe"
+
+[cpe.weights]
+raw = 0.01
+part = 0.05
+vendor = 0.15
+product = 0.35
+version = 0.30
+update = 0.05
+edition = 0.02
+language = 0.00
+sw_edition = 0.02
+target_sw = 0.02
+target_hw = 0.02
+other = 0.01
+
+[purl]
+csaf_purl_field_name = "csaf_purl"
+
+[purl.weights]
+raw = 0.02
+type = 0.15
+namespace = 0.10
+name = 0.35
+version = 0.30
+qualifiers = 0.05
+subpath = 0.03
+
+[ngram]
+[ngram.weights]
+1 = 0.2 
+2 = 0.3 
+3 = 0.5
+
+[levenshtein]
+max_distance = 2
+
+[threshold]
+vendor = 50
+product_family = 5
+product_name = 50 
+keyword = 5
+version = 50

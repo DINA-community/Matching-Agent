@@ -19,7 +19,6 @@ class DefaultPreprocessor(PreprocessorPlugin):
     async def preprocess(
         self, data: List[Union[Asset, CsafProduct]]
     ) -> List[Union[Asset, CsafProduct]]:
-        # TODO: add fields to separate file
         for d in data:
             if product := d.product:
                 if self.freetext_fields and self.freetext_fields.keys():

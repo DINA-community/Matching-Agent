@@ -6,10 +6,29 @@ from packaging.version import Version, InvalidVersion
 
 
 class Matching:
-    def __init__(self, freetext_fields: dict, ordered_fields: dict, other_fields: dict):
-        self.freetext_fields = freetext_fields
-        self.ordered_fields = ordered_fields
-        self.other_fields = other_fields
+    def __init__(self, matching_config: dict):
+        db = matching_config.get("database", matching_config)
+        self.freetext_fields = db.get("freetext_fields", {})
+        self.ordered_fields = db.get("ordered_fields", {})
+        self.other_fields = db.get("other_fields", {})
+        self.freetext_fields_weights = db.get("freetext_fields_weights", {})
+
+        version = matching_config.get("version", matching_config)
+        self.version_weights = version.get("weights", {})
+
+        cpe = matching_config.get("cpe", matching_config)
+        self.csaf_cpe_field_name = cpe.get("csaf_cpe_field_name", "csaf_cpe")
+        self.cpe_weights = cpe.get("weights", {})
+
+        purl = matching_config.get("purl", matching_config)
+        self.csaf_purl_field_name = purl.get("csaf_purl_field_name", "csaf_purl")
+        self.purl_weights = purl.get("weights", {})
+
+        ngram = matching_config.get("ngram", matching_config)
+        self.ngram_weights = ngram.get("weights", {})
+
+        levenshtein = matching_config.get("levenshtein", matching_config)
+        self.levenshtein_max_distance = levenshtein.get("max_distance", 0)
 
     def _safe_version(self, val: str):
         if not val:
@@ -85,25 +104,15 @@ class Matching:
         if not isinstance(csaf_version, dict) or not isinstance(asset_version, dict):
             return 0.0
 
-        # TODO: add version-subfields in a separate file
-        subfields = {
-            "raw": 0.05,
-            "package": 0.15,
-            "release_prefix": 0.05,
-            "release_number": 0.10,
-            "release_branch": 0.07,
-            "build_number": 0.05,
-            "qualifier": 0.02,
-            "architecture": 0.07,
-            "date": 0.01,
-            "epoch": 0.03,
-            "min_max_version": 0.40,
-        }
+        subfields = self.version_weights
 
         scores = np.array([], dtype=float)
         scores_weights = np.array([], dtype=float)
 
         for subfield in subfields.keys():
+            if not isinstance(subfields[subfield], float):
+                continue
+
             scores_weights = np.append(scores_weights, subfields[subfield])
 
             if subfield == "min_max_version":
@@ -228,15 +237,7 @@ class Matching:
             scores.append(best)
         return np.mean(scores) if scores else 0.0
 
-    def _compare_freetext(
-        self,
-        s1,
-        s2,
-        weights={1: 0.2, 2: 0.3, 3: 0.5},
-        global_weights={"token": 0.5, "ngram": 0.3, "overlap": 0.2},
-        ignore_order=True,
-        max_distance=2,
-    ):
+    def _compare_freetext(self, s1, s2, ignore_order=True):
         s1 = (s1 or "").strip().lower().replace("none", "")
         s2 = (s2 or "").strip().lower().replace("none", "")
 
@@ -263,7 +264,7 @@ class Matching:
             best = 0.0
             for t2 in tokens2:
                 dist = Levenshtein.distance(t1, t2)
-                if dist <= max_distance:
+                if dist <= self.levenshtein_max_distance:
                     similar_pairs += 1
                     score = 1 - (dist / max(len(t1), len(t2)))
                     best = max(best, score)
@@ -273,32 +274,45 @@ class Matching:
             return 0.0
 
         token_similarity = np.mean(token_scores) if token_scores else 0.0
-
         ngram_total = np.array([], dtype=float)
         total_w = np.array([], dtype=float)
-        for n, w in weights.items():
-            ngram1 = self._ngrams_from_tokens(tokens1, n, ignore_order=ignore_order)
-            ngram2 = self._ngrams_from_tokens(tokens2, n, ignore_order=ignore_order)
 
-            sim = self._ngram_similarity(ngram1, ngram2, max_distance=max_distance)
-            if sim is None:
-                ngram_total = np.append(ngram_total, np.nan)
-            else:
-                ngram_total = np.append(ngram_total, sim)
-            total_w = np.append(total_w, w)
+        if self.ngram_weights:
+            for n, w in self.ngram_weights.items():
+                if not isinstance(n, int) and not isinstance(w, float):
+                    continue
+
+                ngram1 = self._ngrams_from_tokens(tokens1, n, ignore_order=ignore_order)
+                ngram2 = self._ngrams_from_tokens(tokens2, n, ignore_order=ignore_order)
+
+                sim = self._ngram_similarity(
+                    ngram1, ngram2, max_distance=self.levenshtein_max_distance
+                )
+
+                if sim is None:
+                    ngram_total = np.append(ngram_total, np.nan)
+                else:
+                    ngram_total = np.append(ngram_total, sim)
+                total_w = np.append(total_w, w)
 
         ngram_weighted_sum = np.nansum(ngram_total * total_w)
         ngram_weight_sum = np.nansum(total_w[~np.isnan(ngram_total)])
         ngram_normalized_score = (
-            ngram_weighted_sum / ngram_weight_sum if ngram_weight_sum > 0 else None
+            ngram_weighted_sum / ngram_weight_sum if ngram_weight_sum > 0 else 0.0
         )
 
         overlap = len(set(tokens1) & set(tokens2)) / max(len(tokens1), len(tokens2))
 
+        final_score = 0.0
+
+        token_weight = self.freetext_fields_weights.get("token", 0)
+        ngram_weight = self.freetext_fields_weights.get("ngram", 0)
+        overlap_weight = self.freetext_fields_weights.get("overlap", 0)
+
         final_score = (
-            global_weights["token"] * token_similarity
-            + global_weights["ngram"] * ngram_normalized_score
-            + global_weights["overlap"] * overlap
+            token_weight * token_similarity
+            + ngram_weight * ngram_normalized_score
+            + overlap_weight * overlap
         )
 
         return round(final_score, 4)
@@ -442,9 +456,8 @@ class Matching:
         return 0.0
 
     def df_matching(self, df_norm: pl.DataFrame) -> pl.DataFrame:
-        # TODO: add csaf_cpe_norm and csaf_purl_norm in a separate file
-        csaf_cpe_norm = "csaf_cpe"
-        csaf_purl_norm = "csaf_purl"
+        csaf_cpe_norm = self.csaf_cpe_field_name
+        csaf_purl_norm = self.csaf_purl_field_name
 
         df_norm_csaf_purl_cpe = df_norm.select([csaf_cpe_norm, csaf_purl_norm])
 
@@ -548,23 +561,9 @@ class Matching:
 
                 weight = None
 
-                # TODO: add weights in a separate file
                 match field:
                     case "cpe":
-                        weight = {
-                            "raw": 0.01,
-                            "part": 0.05,
-                            "vendor": 0.15,
-                            "product": 0.35,
-                            "version": 0.30,
-                            "update": 0.05,
-                            "edition": 0.02,
-                            "language": 0.00,
-                            "sw_edition": 0.02,
-                            "target_sw": 0.02,
-                            "target_hw": 0.02,
-                            "other": 0.01,
-                        }
+                        weight = self.cpe_weights
 
                         df_norm = df_norm.with_columns(
                             pl.struct([csaf_norm, asset_norm])
@@ -579,15 +578,7 @@ class Matching:
                         )
                         # print(df_norm.select([csaf_norm, asset_norm,f"asset_{csaf_cpe_norm}_match"]))
                     case "purl":
-                        weight = {
-                            "raw": 0.02,
-                            "type": 0.15,
-                            "namespace": 0.10,
-                            "name": 0.35,
-                            "version": 0.30,
-                            "qualifiers": 0.05,
-                            "subpath": 0.03,
-                        }
+                        weight = self.purl_weights
 
                         df_norm = df_norm.with_columns(
                             pl.struct([csaf_norm, asset_norm])

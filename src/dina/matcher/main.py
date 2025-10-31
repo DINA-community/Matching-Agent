@@ -464,17 +464,11 @@ def match_pairs(
 
         df = pl.DataFrame([{**csaf_dict, **asset_dict}], strict=False)
 
-        db = matching_config.get("database", matching_config)
+        matching = Matching(matching_config)
+        df_matches = matching.df_matching(df)
 
-        freetext_fields = db.get("freetext_fields", {})
-        ordered_fields = db.get("ordered_fields", {})
-        other_fields = db.get("other_fields", {})
-
-        matching = Matching(freetext_fields, ordered_fields, other_fields)
-        df_norm_matches = matching.df_matching(df)
-
-        score = Score(freetext_fields, ordered_fields, other_fields)
-        result, reason, score_percent = score.calculate_overall_score(df_norm_matches)
+        score = Score(matching_config)
+        result, reason, score_percent = score.calculate_overall_score(df_matches)
 
         # pl.Config.set_fmt_str_lengths(2000)
 
