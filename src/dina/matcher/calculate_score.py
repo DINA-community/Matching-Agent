@@ -3,7 +3,7 @@ import numpy as np
 
 class Score:
     def __init__(self, matching_config: dict):
-        db = matching_config.get("database", matching_config)
+        db = matching_config.get("database", {})
         freetext_fields = db.get("freetext_fields", {})
         ordered_fields = db.get("ordered_fields", {})
         other_fields = db.get("other_fields", {})
@@ -14,7 +14,7 @@ class Score:
         purl = matching_config.get("purl", matching_config)
         self.csaf_purl_field_name = purl.get("csaf_purl_field_name", "csaf_purl")
 
-        threshold = matching_config.get("threshold", matching_config)
+        threshold = matching_config.get("threshold", {})
         self.vendor_threshold = threshold.get("vendor", 0)
         self.product_family_threshold = threshold.get("product_family", 0)
         self.product_name_threshold = threshold.get("product_name", 0)

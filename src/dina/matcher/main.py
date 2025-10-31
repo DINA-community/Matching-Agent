@@ -88,10 +88,47 @@ class DatabaseConfig(BaseModel):
     freetext_fields: dict[str, float] = Field(default_factory=dict)
     ordered_fields: dict[str, float] = Field(default_factory=dict)
     other_fields: dict[str, float] = Field(default_factory=dict)
+    freetext_fields_weights: dict[str, float] = Field(default_factory=dict)
+
+
+class VersionConfig(BaseModel):
+    weights: dict[str, float] = Field(default_factory=dict)
+
+
+class CpeConfig(BaseModel):
+    csaf_cpe_field_name: str
+    weights: dict[str, float] = Field(default_factory=dict)
+
+
+class PurlConfig(BaseModel):
+    csaf_purl_field_name: str
+    weights: dict[str, float] = Field(default_factory=dict)
+
+
+class NgramConfig(BaseModel):
+    weights: dict[int, float] = Field(default_factory=dict)
+
+
+class LevenshteinConfig(BaseModel):
+    max_distance: int
+
+
+class ThresholdConfig(BaseModel):
+    vendor: int
+    product_family: int
+    product_name: int
+    keyword: int
+    version: int
 
 
 class MatchingConfig(BaseModel):
     database: DatabaseConfig
+    version: VersionConfig
+    cpe: CpeConfig
+    purl: PurlConfig
+    ngram: NgramConfig
+    levenshtein: LevenshteinConfig
+    threshold: ThresholdConfig
 
 
 class MatchingState(enum.Enum):
@@ -469,20 +506,6 @@ def match_pairs(
 
         score = Score(matching_config)
         result, reason, score_percent = score.calculate_overall_score(df_matches)
-
-        # pl.Config.set_fmt_str_lengths(2000)
-
-        # for field in freetext_fields:
-        #     print(df_norm.select([f"csaf_{field}", f"asset_{field}"]))
-
-        # for field in ordered_fields:
-        #     print(df_norm.select([f"csaf_{field}", f"asset_{field}"]))
-
-        # for field in freetext_fields:
-        #     print(df_norm_matches.select([f"{field}_match"]))
-
-        # for field in ordered_fields:
-        #     print(df_norm_matches.select([f"{field}_match"]))
 
         if score_percent < threshold:
             continue
