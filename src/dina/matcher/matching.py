@@ -33,7 +33,11 @@ class Matching:
         levenshtein = matching_config.get("levenshtein", {})
         self.levenshtein_max_distance = levenshtein.get("max_distance", 0)
 
-    def _safe_version(self, val: str):
+    def _safe_version(self, val: str | None):
+        """
+        Safely convert a string into a Version object.
+        Returns None if the value is invalid or empty.
+        """
         if not val:
             return None
         try:
@@ -41,36 +45,47 @@ class Matching:
         except InvalidVersion:
             return None
 
-    def _range_in_range(self, asset_range, csaf_range):
+    def _range_in_range(self, asset_range: dict, csaf_range: dict) -> bool:
+        """
+        Check if an asset's version range is within a CSAF version range.
+
+        Both ranges are expected to be dicts with optional 'min' and 'max' keys.
+        Missing bounds are interpreted as open-ended ranges.
+
+        Returns:
+            bool: True if the asset range fits entirely within the CSAF range.
+        """
         asset_min = self._safe_version(asset_range.get("min"))
         asset_max = self._safe_version(asset_range.get("max"))
         csaf_min = self._safe_version(csaf_range.get("min"))
         csaf_max = self._safe_version(csaf_range.get("max"))
 
-        if (asset_min is None and asset_max is None) and (
-            csaf_min is None and csaf_max is None
-        ):
+        # --- Case 1: both ranges empty
+        if all(v is None for v in (asset_min, asset_max, csaf_min, csaf_max)):
             return True
 
+        # --- Case 2: CSAF has no bounds, cannot compare
         if csaf_min is None and csaf_max is None:
             return False
 
+        # --- Case 3: Asset has no bounds, not within CSAF
         if asset_min is None and asset_max is None:
             return False
 
-        if asset_min is not None and csaf_min is not None and asset_min < csaf_min:
+        # --- Lower bound check
+        if asset_min and csaf_min and asset_min < csaf_min:
             return False
 
-        if asset_max is not None and csaf_max is not None and asset_max > csaf_max:
+        # --- Upper bound check
+        if asset_max and csaf_max and asset_max > csaf_max:
             return False
 
-        if asset_min is None and csaf_min is not None:
-            if csaf_min > asset_max:
-                return False
+        # --- Handle open-ended bounds
+        if asset_min is None and csaf_min and asset_max and csaf_min > asset_max:
+            return False
 
-        if asset_max is None and csaf_max is not None:
-            if csaf_max < asset_min:
-                return False
+        if asset_max is None and csaf_max and asset_min and csaf_max < asset_min:
+            return False
 
         return True
 
@@ -746,6 +761,27 @@ class Matching:
 #         mc = tomllib.load(f)
 
 #     matcher = Matching(mc)
+
+#     # print(matcher._safe_version("1.2.3") == Version("1.2.3"))
+#     # print(matcher._safe_version("") is None)
+#     # print(matcher._safe_version("not_a_version") is None)
+
+#     # test_cases = [
+#     #     ({"min": "1.0", "max": "1.2"}, {"min": "0.9", "max": "1.3"}, True),
+#     #     ({"min": "0.8"}, {"min": "0.9"}, False),
+#     #     ({"max": "1.5"}, {"max": "1.2"}, False),
+#     #     ({"min": "1.0", "max": "1.2"}, {"min": "1.0", "max": "1.2"}, True),
+#     #     ({}, {}, True),
+#     #     ({"min": "1.0"}, {}, False),
+#     #     ({}, {"max": "2.0"}, False),
+#     # ]
+
+#     # for asset_range, csaf_range, expected in test_cases:
+#     #     result = matcher._range_in_range(asset_range, csaf_range)
+#     #     if result == expected:
+#     #         print(f"Passed for asset_range={asset_range} csaf_range={csaf_range}")
+#     #     else:
+#     #         print(f"Failed for asset_range={asset_range} csaf_range={csaf_range} got {result}, expected {expected}")
 
 #     # print(matcher._compare_freetext("nginx", "nginx") == 1.0)
 #     # print(matcher._compare_freetext("nginx", "apache") < 1.0)
