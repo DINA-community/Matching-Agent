@@ -196,126 +196,197 @@ class Matching:
         avg_score = np.nanmean(sub_scores)
         return round(avg_score, 4) if avg_score else np.nan
 
-    def _ngrams_from_tokens(self, tokens, n, ignore_order=True):
-        clean_tokens = [
-            str(t).strip()
-            for t in tokens
-            if t not in (None, "", "none", "null", "nan")
-            and str(t).strip().lower() not in ("none", "null", "nan")
-        ]
+    def _compare_freetext(
+        self, s1: str | None, s2: str | None, ignore_order: bool = True
+    ) -> float | None:
+        """
+        Compare two freetext strings using token, n-gram, and overlap similarity.
+        Returns 1.0 for exact matches.
+        """
+        # --- Normalize ---
+        s1 = self._normalize_text(s1)
+        s2 = self._normalize_text(s2)
 
-        if not clean_tokens:
-            return []
-
-        if len(clean_tokens) < n:
-            return [":".join(clean_tokens)]
-
-        ngrams = [
-            ":".join(clean_tokens[i : i + n]) for i in range(len(clean_tokens) - n + 1)
-        ]
-
-        return sorted(ngrams) if ignore_order else ngrams
-
-    def _ngram_similarity(self, tokens1, tokens2, max_distance=2):
-        if not tokens1 or not tokens2:
-            return 0.0
-
-        scores = []
-
-        for t1 in tokens1:
-            best = 0.0
-            for t2 in tokens2:
-                dist = Levenshtein.distance(t1, t2)
-                if dist > max_distance:
-                    continue
-                score = 1 - (dist / max(len(t1), len(t2)))
-                best = max(best, score)
-            scores.append(best)
-        return np.mean(scores) if scores else 0.0
-
-    def _compare_freetext(self, s1, s2, ignore_order=True):
-        s1 = (s1 or "").strip().lower().replace("none", "")
-        s2 = (s2 or "").strip().lower().replace("none", "")
-
+        # --- Early exits ---
         if not s1 and not s2:
             return None
-
         if not s1 or not s2:
             return 0.0
 
-        tokens1 = [t for t in s1.split(":") if t]
-        tokens2 = [t for t in s2.split(":") if t]
+        # --- Exact match shortcut ---
+        if s1 == s2:
+            return 1.0
 
-        if ignore_order:
-            tokens1.sort()
-            tokens2.sort()
-
+        # --- Tokenize ---
+        tokens1, tokens2 = self._tokenize_freetext(s1, s2, ignore_order)
         if not tokens1 or not tokens2:
             return 0.0
 
+        # --- Token-level similarity ---
+        token_similarity = self._token_similarity(tokens1, tokens2)
+        if token_similarity == 0.0:
+            return 0.0
+
+        # --- N-gram similarity ---
+        ngram_score = self._weighted_ngram_similarity(tokens1, tokens2, ignore_order)
+
+        # --- Token overlap ---
+        overlap_ratio = len(set(tokens1) & set(tokens2)) / max(
+            len(tokens1), len(tokens2)
+        )
+
+        # --- Weighted combination ---
+        weights = self.freetext_fields_weights or {}
+        final_score = (
+            weights.get("token", 0.0) * token_similarity
+            + weights.get("ngram", 0.0) * ngram_score
+            + weights.get("overlap", 0.0) * overlap_ratio
+        )
+
+        return round(final_score, 4)
+
+    def _normalize_text(self, text: str | None) -> str:
+        """Normalize a text string for comparison."""
+        if not text:
+            return ""
+        return (
+            str(text)
+            .strip()
+            .lower()
+            .replace("none", "")
+            .replace("null", "")
+            .replace("nan", "")
+        )
+
+    def _tokenize_freetext(
+        self, s1: str, s2: str, ignore_order: bool
+    ) -> tuple[list[str], list[str]]:
+        """Split and optionally sort tokens by ':' delimiter."""
+        tokens1 = [t for t in s1.split(":") if t]
+        tokens2 = [t for t in s2.split(":") if t]
+        if ignore_order:
+            tokens1.sort()
+            tokens2.sort()
+        return tokens1, tokens2
+
+    def _token_similarity(self, tokens1: list[str], tokens2: list[str]) -> float:
+        """Compute token-level Levenshtein similarity."""
         token_scores = []
         similar_pairs = 0
 
         for t1 in tokens1:
-            best = 0.0
+            best_score = 0.0
             for t2 in tokens2:
                 dist = Levenshtein.distance(t1, t2)
                 if dist <= self.levenshtein_max_distance:
                     similar_pairs += 1
-                    score = 1 - (dist / max(len(t1), len(t2)))
-                    best = max(best, score)
-            token_scores.append(best)
+                    best_score = max(best_score, 1 - dist / max(len(t1), len(t2)))
+            token_scores.append(best_score)
 
-        if similar_pairs == 0:
+        if similar_pairs == 0 or not token_scores:
             return 0.0
 
-        token_similarity = np.mean(token_scores) if token_scores else 0.0
-        ngram_total = np.array([], dtype=float)
-        total_w = np.array([], dtype=float)
+        return float(np.mean(token_scores))
 
-        if self.ngram_weights:
-            for n, w in self.ngram_weights.items():
-                if not isinstance(n, int) and not isinstance(w, float):
-                    continue
+    def _weighted_ngram_similarity(
+        self, tokens1: list[str], tokens2: list[str], ignore_order: bool
+    ) -> float:
+        """Compute weighted similarity across multiple n-gram sizes."""
+        if not self.ngram_weights:
+            return 0.0
 
-                ngram1 = self._ngrams_from_tokens(
-                    tokens1, int(n), ignore_order=ignore_order
-                )
-                ngram2 = self._ngrams_from_tokens(
-                    tokens2, int(n), ignore_order=ignore_order
-                )
+        scores, weights = [], []
 
-                sim = self._ngram_similarity(
-                    ngram1, ngram2, max_distance=self.levenshtein_max_distance
-                )
+        for n, w in self.ngram_weights.items():
+            if not isinstance(n, int) or not isinstance(w, float):
+                continue
 
-                if sim is None:
-                    ngram_total = np.append(ngram_total, np.nan)
-                else:
-                    ngram_total = np.append(ngram_total, sim)
-                total_w = np.append(total_w, w)
+            ngram1 = self._ngrams_from_tokens(
+                tokens1, int(n), ignore_order=ignore_order
+            )
+            ngram2 = self._ngrams_from_tokens(
+                tokens2, int(n), ignore_order=ignore_order
+            )
+            sim = self._ngram_similarity(
+                ngram1, ngram2, max_distance=self.levenshtein_max_distance
+            )
+            scores.append(sim if sim is not None else np.nan)
+            weights.append(w)
 
-        ngram_weighted_sum = np.nansum(ngram_total * total_w)
-        ngram_weight_sum = np.nansum(total_w[~np.isnan(ngram_total)])
-        ngram_normalized_score = (
-            ngram_weighted_sum / ngram_weight_sum if ngram_weight_sum > 0 else 0.0
-        )
+        return self._weighted_mean(scores, weights)
 
-        overlap = len(set(tokens1) & set(tokens2)) / max(len(tokens1), len(tokens2))
+    def _clean_tokens(self, tokens: list[str]) -> list[str]:
+        """Remove invalid or placeholder tokens."""
+        return [
+            str(t).strip()
+            for t in tokens or []
+            if t not in (None, "", "none", "null", "nan")
+            and str(t).strip().lower() not in ("none", "null", "nan")
+        ]
 
-        final_score = 0.0
+    def _ngrams_from_tokens(
+        self, tokens: list[str], n: int, ignore_order: bool = True
+    ) -> list[str]:
+        """
+        Generate n-grams from a list of tokens.
 
-        token_weight = self.freetext_fields_weights.get("token", 0)
-        ngram_weight = self.freetext_fields_weights.get("ngram", 0)
-        overlap_weight = self.freetext_fields_weights.get("overlap", 0)
+        Args:
+            tokens (list[str]): List of input tokens.
+            n (int): Size of the n-gram.
+            ignore_order (bool): Whether to sort the resulting n-grams.
 
-        final_score = (
-            token_weight * token_similarity
-            + ngram_weight * ngram_normalized_score
-            + overlap_weight * overlap
-        )
+        Returns:
+            list[str]: A list of n-gram strings joined by ':'.
+        """
+        # Clean and normalize tokens
+        clean_tokens = self._clean_tokens(tokens)
 
-        return round(final_score, 4)
+        if not clean_tokens:
+            return []
+
+        # If fewer tokens than n, return one joined sequence
+        if len(clean_tokens) < n:
+            ngrams = [":".join(clean_tokens)]
+        else:
+            ngrams = [
+                ":".join(clean_tokens[i : i + n])
+                for i in range(len(clean_tokens) - n + 1)
+            ]
+
+        return sorted(ngrams) if ignore_order else ngrams
+
+    def _ngram_similarity(
+        self, tokens1: list[str], tokens2: list[str], max_distance: int = 2
+    ) -> float:
+        """
+        Compute the average similarity between two n-gram token lists
+        based on normalized Levenshtein distance.
+
+        Args:
+            tokens1 (list[str]): First n-gram list.
+            tokens2 (list[str]): Second n-gram list.
+            max_distance (int): Maximum Levenshtein distance threshold.
+
+        Returns:
+            float: Mean similarity between 0.0 and 1.0.
+        """
+        if not tokens1 or not tokens2:
+            return 0.0
+
+        tokens1 = self._clean_tokens(tokens1)
+        tokens2 = self._clean_tokens(tokens2)
+
+        scores = []
+        for t1 in tokens1:
+            best = 0.0
+            for t2 in tokens2:
+                dist = Levenshtein.distance(t1, t2)
+                if dist <= max_distance:
+                    score = 1 - (dist / max(len(t1), len(t2)))
+                    best = max(best, score)
+            scores.append(best)
+
+        return float(np.mean(scores)) if scores else 0.0
 
     def _safe_load(self, val):
         if not val or val is None:
@@ -371,17 +442,24 @@ class Matching:
 
         return value
 
-    def _has_valid_json(self, df, col):
-        return (
-            df is not None
-            and col in df.columns
-            and not df[col].is_null().all()
-            and any(
-                json.loads(x) != {}
-                for x in df[col].to_list()
-                if x not in (None, "null")
-            )
-        )
+    def _has_valid_json(self, df, col: str) -> bool:
+        """
+        Check if the given DataFrame column contains at least one valid non-empty JSON object.
+        """
+        if df is None or col not in df.columns or df[col].is_null().all():
+            return False
+
+        for x in df[col].to_list():
+            if not x or str(x).strip().lower() in ("null", "none", "nan", ""):
+                continue
+            try:
+                val = json.loads(x)
+                if isinstance(val, dict) and val != {}:
+                    return True
+            except json.JSONDecodeError:
+                continue
+
+        return False
 
     def compare_fields(
         self,
@@ -657,6 +735,17 @@ class Matching:
 #         mc = tomllib.load(f)
 
 #     matcher = Matching(mc)
+
+#     # print(matcher._compare_freetext("nginx", "nginx") == 1.0)
+#     # print(matcher._compare_freetext("nginx", "apache") < 1.0)
+#     # print(matcher._compare_freetext("", "") is None)
+#     # print(matcher._compare_freetext("foo", "") == 0.0)
+
+#     # tokens1 = ["nginx", "server"]
+#     # tokens2 = ["nginx", "proxy"]
+
+#     # score = matcher._weighted_ngram_similarity(tokens1, tokens2, ignore_order=True)
+#     # print(0.0 <= score <= 1.0)
 #     #
 #     # asset_field = {'schema': 'pep-440', 'raw': '21.0.0.0', 'package': None, 'release_prefix': None, 'release_number': '21.0.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': '21.0.0.0', 'max': '21.0.0.0'}]}
 #     # csaf_field = {'schema': 'pep-440', 'raw': '21.0.0.0', 'package': None, 'release_prefix': None, 'release_number': '21.0.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': None, 'max': '21.0.0.0'}]}
