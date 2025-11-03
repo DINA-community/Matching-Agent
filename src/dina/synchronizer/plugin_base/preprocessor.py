@@ -20,7 +20,7 @@ class PreprocessorPlugin(ABC):
             self.config_file = None
             self.config = {}
 
-        db = self.config.get("database", self.config)
+        db = self.config.get("database", {})
         self.freetext_fields = db.get("freetext_fields", {})
         self.ordered_fields = db.get("ordered_fields", {})
         self.other_fields = db.get("other_fields", {})

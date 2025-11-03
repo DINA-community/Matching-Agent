@@ -85,6 +85,7 @@ class MatcherConfig(BaseModel):
 
 
 class DatabaseConfig(BaseModel):
+    freetext_fields_separator: str
     freetext_fields: dict[str, float] = Field(default_factory=dict)
     ordered_fields: dict[str, float] = Field(default_factory=dict)
     other_fields: dict[str, float] = Field(default_factory=dict)

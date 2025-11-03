@@ -22,6 +22,9 @@ class Standards(enum.Enum):
 
 class Normalizer:
     def __init__(self, config: dict):
+        db = config.get("database", {})
+        self.freetext_fields_separator = db.get("freetext_fields_separator", ":")
+
         version = config.get("version", {})
         self.version_weights = version.get("weights", {})
 
@@ -32,6 +35,25 @@ class Normalizer:
         self.purl_weights = purl.get("weights", {})
 
     def _detect_schema(self, s: str) -> str:
+        """
+        Detect the version schema (standard) for a given version string.
+
+        The method checks the input string `s` against a prioritized list of
+        regular expression patterns, each representing a known versioning
+        standard (e.g., PEP440, SEMVER, SAP, RPM, CALVER, etc.).
+
+        The order of patterns is significant — certain schemas (like CALVER or
+        SAP) must be checked before more generic ones (like SEMVER or WILDCARD)
+        to ensure correct classification.
+
+        Args:
+            s (str): Input version string to analyze.
+
+        Returns:
+            str: The detected schema name from the `Standards` enum,
+                or `Standards.FREETEXT` if no pattern matches.
+        """
+
         if not s or s is None:
             return None
 
@@ -80,6 +102,8 @@ class Normalizer:
         return Standards.FREETEXT
 
     def _base_dict(self, schema, raw) -> dict:
+        """Initialize a version dict from config fields, setting all values to None."""
+
         base = {"schema": schema, "raw": raw}
 
         for field in self.version_weights.keys():
@@ -88,12 +112,20 @@ class Normalizer:
         return base
 
     def _safe_version(self, val: str) -> str:
+        """Return a normalized version string if valid, otherwise the original value."""
         try:
             return str(Version(val))
         except Exception:
             return val
 
     def _parse_csaf(self, schema, expr: str):
+        """
+        Parse CSAF-style version expressions into a structured version dictionary.
+        Handles both `vers:` and comparison-based (`VLS`) schemas by extracting
+        package information and version range constraints (min/max) from the input.
+        Returns a normalized dictionary compatible with the internal version model.
+        """
+
         if not expr or expr is None:
             return None
 
@@ -363,11 +395,10 @@ class Normalizer:
         return d
 
     def _parse_version_freetext(self, expr: str):
-        # TODO: add separator to the separate file
         if not expr or expr is None:
             return None
 
-        separator = ":"
+        separator = self.freetext_fields_separator
         expr = expr.lower()
         expr = re.sub(r"[^a-z0-9.]+", separator, expr)
         expr = expr.strip(separator)
@@ -430,11 +461,10 @@ class Normalizer:
         return result or None
 
     def parse_freetext(self, expr: str):
-        # TODO: add separator in a separate file
         if not expr or expr is None:
             return None
 
-        separator = ":"
+        separator = self.freetext_fields_separator
         expr = expr.lower()
         expr = re.sub(r"[^a-z0-9]+", separator, expr)
         expr = expr.strip(separator)

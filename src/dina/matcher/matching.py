@@ -11,6 +11,7 @@ from packaging.version import Version, InvalidVersion
 class Matching:
     def __init__(self, matching_config: dict):
         db = matching_config.get("database", {})
+        self.freetext_fields_separator = db.get("freetext_fields_separator", ":")
         self.freetext_fields = db.get("freetext_fields", {})
         self.ordered_fields = db.get("ordered_fields", {})
         self.other_fields = db.get("other_fields", {})
@@ -235,9 +236,12 @@ class Matching:
     def _tokenize_freetext(
         self, s1: str, s2: str, ignore_order: bool
     ) -> tuple[list[str], list[str]]:
-        """Split and optionally sort tokens by ':' delimiter."""
-        tokens1 = [t for t in s1.split(":") if t]
-        tokens2 = [t for t in s2.split(":") if t]
+        """Split and optionally sort tokens by separator delimiter."""
+        separator = self.freetext_fields_separator
+
+        tokens1 = [t for t in s1.split(separator) if t]
+        tokens2 = [t for t in s2.split(separator) if t]
+
         if ignore_order:
             tokens1.sort()
             tokens2.sort()
