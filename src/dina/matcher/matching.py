@@ -1,4 +1,7 @@
 import json
+
+# from pathlib import Path
+# import tomllib
 import numpy as np
 from rapidfuzz.distance import Levenshtein
 import polars as pl
@@ -389,75 +392,106 @@ class Matching:
 
     def compare_fields(
         self,
-        csaf_field: dict | str | None,
-        asset_field: dict | str | None,
-        weight: dict = None,
-    ) -> float:
+        csaf_field: dict | str | list | None,
+        asset_field: dict | str | list | None,
+        weight: dict | None = None,
+    ) -> float | None:
+        """
+        Compare two CSAF and asset fields using the most appropriate method
+        based on their data type (string, list, dict).
+
+        Returns:
+            float | None: Similarity score between 0.0 and 1.0, or None if both fields are empty.
+        """
+        # --- Base cases ---
         if not csaf_field and not asset_field:
             return None
-
         if not csaf_field or not asset_field:
             return 0.0
 
+        # --- Delegate based on type ---
         if isinstance(csaf_field, str) and isinstance(asset_field, str):
-            return self._compare_freetext(csaf_field, asset_field, ignore_order=False)
+            return self._compare_string_fields(csaf_field, asset_field)
 
         if isinstance(csaf_field, list) and isinstance(asset_field, list):
-            for a_field in asset_field:
-                for c_field in csaf_field:
-                    if isinstance(a_field, str) and isinstance(c_field, str):
-                        if c_field == a_field:
-                            return 1.0
+            return self._compare_list_fields(csaf_field, asset_field)
 
-        if weight and isinstance(csaf_field, dict) and isinstance(asset_field, dict):
-            scores = np.array([], dtype=float)
-            scores_weights = np.array([], dtype=float)
-
-            for key in csaf_field.keys() & asset_field.keys():
-                val1 = csaf_field[key]
-                val2 = asset_field[key]
-                cpe_weight = weight.get(key, 0.0)
-
-                if val1 is None and val2 is None:
-                    scores_weights = np.append(scores_weights, cpe_weight)
-                    scores = np.append(scores, np.nan)
-                    continue
-
-                if (
-                    key == "version"
-                    and isinstance(val1, dict)
-                    and isinstance(val2, dict)
-                ):
-                    scores_weights = np.append(scores_weights, cpe_weight)
-                    similarity = self._compare_versions(val1, val2)
-
-                    if similarity is None:
-                        scores = np.append(scores, np.nan)
-                    else:
-                        scores = np.append(scores, similarity)
-                    continue
-
-                if isinstance(val1, (str, dict)) and isinstance(val2, (str, dict)):
-                    scores_weights = np.append(scores_weights, cpe_weight)
-                    similarity = self._compare_freetext(val1, val2, ignore_order=False)
-
-                    if similarity is None:
-                        scores = np.append(scores, np.nan)
-                    else:
-                        scores = np.append(scores, similarity)
-
-            valid_scores = scores[~np.isnan(scores)]
-
-            if valid_scores.size < 2:
-                return 0.0
-
-            weighted_sum = np.nansum(scores * scores_weights)
-            weight_sum = np.nansum(scores_weights[~np.isnan(scores)])
-            normalized_score = weighted_sum / weight_sum if weight_sum > 0 else None
-
-            return round(normalized_score, 4)
+        if isinstance(csaf_field, dict) and isinstance(asset_field, dict):
+            return self._compare_dict_fields(csaf_field, asset_field, weight)
 
         return 0.0
+
+    def _compare_string_fields(self, csaf_field: str, asset_field: str) -> float:
+        """Compare two string fields using Levenshtein-based freetext comparison."""
+        return (
+            self._compare_freetext(csaf_field, asset_field, ignore_order=False) or 0.0
+        )
+
+    def _compare_list_fields(self, csaf_list: list, asset_list: list) -> float:
+        """Compare lists of string values and return 1.0 if any overlap exists."""
+        for asset in asset_list:
+            for csaf in csaf_list:
+                if isinstance(asset, str) and isinstance(csaf, str) and asset == csaf:
+                    return 1.0
+        return 0.0
+
+    def _compare_dict_fields(
+        self, csaf_dict: dict, asset_dict: dict, weight: dict | None = None
+    ) -> float:
+        """Compare dictionary-based fields using weighted subfield similarity."""
+        if not weight:
+            return 0.0
+
+        scores, weights = [], []
+
+        for key in csaf_dict.keys() & asset_dict.keys():
+            val1, val2 = csaf_dict[key], asset_dict[key]
+            w = weight.get(key, 0.0)
+            weights.append(w)
+
+            # Both None → neutral
+            if val1 is None and val2 is None:
+                scores.append(np.nan)
+                continue
+
+            # Special case: version
+            if key == "version" and isinstance(val1, dict) and isinstance(val2, dict):
+                sim = self._compare_versions(val1, val2)
+                scores.append(sim if sim is not None else np.nan)
+                continue
+
+            # Freetext fallback
+            if isinstance(val1, (str, dict)) and isinstance(val2, (str, dict)):
+                sim = self._compare_freetext(val1, val2, ignore_order=False)
+                scores.append(sim if sim is not None else np.nan)
+                continue
+
+            scores.append(np.nan)
+
+        return self._weighted_mean(scores, weights)
+
+    def _weighted_mean(self, scores: list[float], weights: list[float]) -> float:
+        """Compute weighted mean, ignoring NaN values."""
+        if not scores or not weights:
+            return 0.0
+
+        scores_arr, weights_arr = (
+            np.array(scores, dtype=float),
+            np.array(weights, dtype=float),
+        )
+        valid_mask = ~np.isnan(scores_arr)
+        valid_scores = scores_arr[valid_mask]
+
+        if valid_scores.size < 2:
+            return 0.0
+
+        weighted_sum = np.nansum(scores_arr * weights_arr)
+        total_weight = np.nansum(weights_arr[valid_mask])
+
+        if total_weight == 0:
+            return 0.0
+
+        return round(weighted_sum / total_weight, 4)
 
     def df_matching(self, df_norm: pl.DataFrame) -> pl.DataFrame:
         """
@@ -631,7 +665,7 @@ class Matching:
 
 #     matcher = Matching(mc)
 #     #
-#     # asset_field = {'schema': 'pep-440', 'raw': '21.0.0.0', 'package': None, 'release_prefix': None, 'release_number': '21.0.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': '20.0.0.0', 'max': '20.0.0.0'}]}
+#     # asset_field = {'schema': 'pep-440', 'raw': '21.0.0.0', 'package': None, 'release_prefix': None, 'release_number': '21.0.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': '22.0.0.0', 'max': '22.0.0.0'}]}
 #     # csaf_field = {'schema': 'pep-440', 'raw': '21.0.0.0', 'package': None, 'release_prefix': None, 'release_number': '21.0.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': None, 'max': '21.0.0.0'}]}
 #     # print(matcher._extract_field(csaf_field, "min_max_version"))
 #     # print(matcher._compare_versions(csaf_field, asset_field))
