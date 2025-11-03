@@ -487,7 +487,7 @@ class Matching:
 
         return False
 
-    def compare_fields(
+    def _compare_fields(
         self,
         csaf_field: dict | str | list | None,
         asset_field: dict | str | list | None,
@@ -738,7 +738,7 @@ class Matching:
             df = df.with_columns(
                 pl.struct([csaf_col, asset_col])
                 .map_elements(
-                    lambda row: self.compare_fields(
+                    lambda row: self._compare_fields(
                         self._safe_load(row[csaf_col]),
                         self._safe_load(row[asset_col]),
                         weight,
@@ -798,7 +798,7 @@ class Matching:
 #     # csaf_field = {'schema': 'pep-440', 'raw': '21.0.0.0', 'package': None, 'release_prefix': None, 'release_number': '21.0.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': None, 'max': '21.0.0.0'}]}
 #     # print(matcher._extract_field(csaf_field, "min_max_version"))
 #     # print(matcher._compare_versions(csaf_field, asset_field))
-#     # print(matcher.compare_fields(
+#     # print(matcher._compare_fields(
 #     #     csaf_field,
 #     #     asset_field,
 #     #     {
@@ -819,11 +819,11 @@ class Matching:
 #     #
 #     # csaf_sbom_urls = ["https://www.freecodecamp.org/news/python-switch-statement-switch-case-example/", "https://www.test.org"]
 #     # asset_sbom_urls = ["https://www.freecodecamp.org/news/python-switch-statement-switch-case-example/"]
-#     # print(matcher.compare_fields(csaf_sbom_urls, asset_sbom_urls))
+#     # print(matcher._compare_fields(csaf_sbom_urls, asset_sbom_urls))
 #     #
 #     # csaf_product_type = "Device"
 #     # asset_product_type = "Undefined"
-#     # print(matcher.compare_fields(csaf_product_type, asset_product_type))
+#     # print(matcher._compare_fields(csaf_product_type, asset_product_type))
 #     #
 #     # csaf_version = {'schema': 'pep-440', 'raw': '1.15.0.0', 'package': None, 'release_prefix': None, 'release_number': '1.15.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': '1.15.0.0', 'max': '1.15.0.0'}]}
 #     # asset_version1 = {'schema': 'pep-440', 'raw': '1.15.0.0', 'package': None, 'release_prefix': None, 'release_number': '1.15.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': '1.15.0.0', 'max': '1.15.0.0'}]}
