@@ -75,133 +75,126 @@ class Matching:
         return True
 
     def _compare_versions(
-        self, csaf_version: dict | list, asset_version: dict | list
-    ) -> float:
-        if (csaf_version is None and asset_version is None) or (
-            csaf_version == {} and asset_version == {}
-        ):
-            return None
+        self, csaf_version: dict | list | None, asset_version: dict | list | None
+    ) -> float | None:
+        """
+        Compare version structures (dict or list) using configured version subfield weights.
 
+        This function handles nested lists of versions, version ranges, and qualifiers,
+        and computes a weighted similarity score between 0.0 and 1.0.
+
+        Returns:
+            float | None: Weighted similarity score, or None if both versions are empty.
+        """
+        # --- 1. Base cases ---
+        if not csaf_version and not asset_version:
+            return None
         if not csaf_version or not asset_version:
             return 0.0
 
+        # --- 2. Handle list of versions recursively ---
         if isinstance(csaf_version, list):
-            scores = np.array([], dtype=float)
+            return self._compare_version_lists(csaf_version, asset_version)
 
-            if isinstance(asset_version, list):
-                for v1 in asset_version:
-                    for v2 in csaf_version:
-                        scores = np.append(scores, self._compare_versions(v1, v2))
-            else:
-                for v2 in csaf_version:
-                    scores = np.append(
-                        scores, self._compare_versions(v2, asset_version)
-                    )
-
-            valid_scores = [
-                s for s in scores if isinstance(s, (int, float)) and s is not None
-            ]
-
-            return round(max(valid_scores), 4) if valid_scores else None
-
+        # --- 3. Ensure both are dicts ---
         if not isinstance(csaf_version, dict) or not isinstance(asset_version, dict):
             return 0.0
 
-        subfields = self.version_weights
+        # --- 4. Weighted field comparison ---
+        scores, weights = [], []
 
-        scores = np.array([], dtype=float)
-        scores_weights = np.array([], dtype=float)
-
-        for subfield in subfields.keys():
-            if not isinstance(subfields[subfield], float):
+        for field, w in (self.version_weights or {}).items():
+            if not isinstance(w, float):
                 continue
+            weights.append(w)
 
-            scores_weights = np.append(scores_weights, subfields[subfield])
-
-            if subfield == "min_max_version":
-                csaf_ranges = csaf_version.get("min_max_version") or []
-                asset_ranges = asset_version.get("min_max_version") or []
-
-                csaf_ranges = [r for r in csaf_ranges if r.get("min") or r.get("max")]
-                asset_ranges = [r for r in asset_ranges if r.get("min") or r.get("max")]
-
-                if not csaf_ranges and not asset_ranges:
-                    scores = np.append(scores, np.nan)
-                    continue
-
-                if not csaf_ranges or not asset_ranges:
-                    scores = np.append(scores, 0.0)
-                    continue
-
-                valid = all(
-                    any(
-                        self._range_in_range(a_range, c_range)
-                        for c_range in csaf_ranges
-                    )
-                    for a_range in asset_ranges
-                )
-                if valid:
-                    scores = np.append(scores, 1.0)
-                else:
-                    scores = np.append(scores, 0.0)
-                continue
-            elif subfield == "qualifier":
-                csaf_qualifier = csaf_version.get("qualifier") or []
-                asset_qualifier = asset_version.get("qualifier") or []
-
-                if not csaf_qualifier and not asset_qualifier:
-                    scores = np.append(scores, np.nan)
-                    continue
-
-                if not csaf_qualifier or not asset_qualifier:
-                    scores = np.append(scores, 0.0)
-                    continue
-
-                if len(csaf_qualifier) != len(asset_qualifier):
-                    scores = np.append(scores, 0.0)
-                    continue
-
-                part_scores = []
-
-                for c, a in zip(csaf_qualifier, asset_qualifier):
-                    ft_score = self._compare_freetext(
-                        str(c), str(a), ignore_order=False
-                    )
-                    if ft_score is not None:
-                        part_scores.append(ft_score)
-
-                if part_scores:
-                    if sum(part_scores) == 0.0 or len(part_scores) == 0:
-                        scores = np.append(scores, np.nan)
-                    else:
-                        scores = np.append(scores, sum(part_scores) / len(part_scores))
-
-                    continue
-
-                scores = np.append(scores, np.nan)
+            # Dispatch subfield handling
+            if field == "min_max_version":
+                score = self._compare_version_ranges(csaf_version, asset_version)
+            elif field == "qualifier":
+                score = self._compare_qualifiers(csaf_version, asset_version)
             else:
-                csaf_field = str(csaf_version.get(subfield) or "")
-                asset_field = str(asset_version.get(subfield) or "")
+                csaf_val = str(csaf_version.get(field) or "")
+                asset_val = str(asset_version.get(field) or "")
+                score = self._compare_freetext(csaf_val, asset_val, ignore_order=False)
 
-                ft_score = self._compare_freetext(
-                    csaf_field, asset_field, ignore_order=False
+            scores.append(score if score is not None else np.nan)
+
+        # --- 5. Weighted mean computation ---
+        return self._weighted_mean(scores, weights)
+
+    def _compare_version_lists(
+        self, csaf_list: list, asset_versions: dict | list | None
+    ) -> float | None:
+        """Compare lists of version dictionaries recursively."""
+        if not csaf_list:
+            return None
+
+        scores = []
+
+        for csaf_v in csaf_list:
+            if isinstance(asset_versions, list):
+                scores.extend(
+                    self._compare_versions(csaf_v, asset_v)
+                    for asset_v in asset_versions
+                    if asset_v
                 )
+            else:
+                scores.append(self._compare_versions(csaf_v, asset_versions))
 
-                if ft_score is None:
-                    scores = np.append(scores, np.nan)
-                else:
-                    scores = np.append(scores, ft_score)
+        valid = [s for s in scores if isinstance(s, (int, float)) and s is not None]
 
-        valid_scores = scores[~np.isnan(scores)]
+        return round(max(valid), 4) if valid else None
 
-        if valid_scores.size < 2:
+    def _compare_version_ranges(
+        self, csaf_version: dict, asset_version: dict
+    ) -> float | None:
+        """Compare version ranges (min/max) between CSAF and asset."""
+        csaf_ranges = [
+            r
+            for r in csaf_version.get("min_max_version", [])
+            if r.get("min") or r.get("max")
+        ]
+        asset_ranges = [
+            r
+            for r in asset_version.get("min_max_version", [])
+            if r.get("min") or r.get("max")
+        ]
+
+        if not csaf_ranges and not asset_ranges:
+            return np.nan
+        if not csaf_ranges or not asset_ranges:
             return 0.0
 
-        weighted_sum = np.nansum(scores * scores_weights)
-        weight_sum = np.nansum(scores_weights[~np.isnan(scores)])
-        normalized_score = weighted_sum / weight_sum if weight_sum > 0 else None
+        valid = all(
+            any(self._range_in_range(a_range, c_range) for c_range in csaf_ranges)
+            for a_range in asset_ranges
+        )
+        return 1.0 if valid else 0.0
 
-        return round(normalized_score, 4)
+    def _compare_qualifiers(
+        self, csaf_version: dict, asset_version: dict
+    ) -> float | None:
+        """Compare version qualifiers using freetext similarity."""
+        csaf_q = csaf_version.get("qualifier") or []
+        asset_q = asset_version.get("qualifier") or []
+
+        if not csaf_q and not asset_q:
+            return np.nan
+        if not csaf_q or not asset_q or len(csaf_q) != len(asset_q):
+            return 0.0
+
+        sub_scores = [
+            self._compare_freetext(str(c), str(a), ignore_order=False)
+            for c, a in zip(csaf_q, asset_q)
+            if c is not None and a is not None
+        ]
+
+        if not sub_scores:
+            return np.nan
+
+        avg_score = np.nanmean(sub_scores)
+        return round(avg_score, 4) if avg_score else np.nan
 
     def _ngrams_from_tokens(self, tokens, n, ignore_order=True):
         clean_tokens = [
@@ -665,7 +658,7 @@ class Matching:
 
 #     matcher = Matching(mc)
 #     #
-#     # asset_field = {'schema': 'pep-440', 'raw': '21.0.0.0', 'package': None, 'release_prefix': None, 'release_number': '21.0.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': '22.0.0.0', 'max': '22.0.0.0'}]}
+#     # asset_field = {'schema': 'pep-440', 'raw': '21.0.0.0', 'package': None, 'release_prefix': None, 'release_number': '21.0.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': '21.0.0.0', 'max': '21.0.0.0'}]}
 #     # csaf_field = {'schema': 'pep-440', 'raw': '21.0.0.0', 'package': None, 'release_prefix': None, 'release_number': '21.0.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': None, 'max': '21.0.0.0'}]}
 #     # print(matcher._extract_field(csaf_field, "min_max_version"))
 #     # print(matcher._compare_versions(csaf_field, asset_field))
