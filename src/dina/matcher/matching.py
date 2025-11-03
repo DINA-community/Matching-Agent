@@ -33,183 +33,142 @@ class Matching:
         levenshtein = matching_config.get("levenshtein", {})
         self.levenshtein_max_distance = levenshtein.get("max_distance", 0)
 
-    def _safe_version(self, val: str | None):
+    # ============================================================
+    # PUBLIC METHODS
+    # ============================================================
+
+    def df_matching(self, df_norm: pl.DataFrame) -> pl.DataFrame:
         """
-        Safely convert a string into a Version object.
-        Returns None if the value is invalid or empty.
+        Apply all configured field comparisons (freetext, version, other)
+        to a normalized Polars DataFrame and return a DataFrame
+        containing similarity scores for each field.
         """
-        if not val:
+
+        csaf_cpe = self.csaf_cpe_field_name
+        csaf_purl = self.csaf_purl_field_name
+
+        df_norm_csaf = df_norm.select([csaf_cpe, csaf_purl])
+
+        df_norm = self._match_freetext_fields(df_norm, df_norm_csaf, csaf_cpe)
+        df_norm = self._match_ordered_fields(df_norm, df_norm_csaf, csaf_cpe, csaf_purl)
+        df_norm = self._match_other_fields(df_norm, csaf_cpe, csaf_purl)
+
+        return df_norm
+
+    # ============================================================
+    # PRIVATE UTILITIES
+    # ============================================================
+
+    def _safe_load(self, val):
+        if not val or val is None:
             return None
+
+        if val == {}:
+            return val
+
         try:
-            return Version(str(val))
-        except InvalidVersion:
+            val = json.loads(val)
+            if val:
+                return val
+            else:
+                return {}
+        except Exception:
             return None
 
-    def _range_in_range(self, asset_range: dict, csaf_range: dict) -> bool:
+    def _extract_field(self, data: str | dict | None, field: str) -> dict | str | None:
         """
-        Check if an asset's version range is within a CSAF version range.
+        Extract a specific field from a JSON-like string or dictionary.
+        Handles both JSON strings and already-parsed dicts.
+        Special case: when field == "version", always returns a dict.
 
-        Both ranges are expected to be dicts with optional 'min' and 'max' keys.
-        Missing bounds are interpreted as open-ended ranges.
+        Args:
+            data (str | dict | None): Input data, possibly JSON encoded.
+            field (str): Field name to extract.
 
         Returns:
-            bool: True if the asset range fits entirely within the CSAF range.
+            dict | str | None: Extracted field value or None if missing/invalid.
         """
-        asset_min = self._safe_version(asset_range.get("min"))
-        asset_max = self._safe_version(asset_range.get("max"))
-        csaf_min = self._safe_version(csaf_range.get("min"))
-        csaf_max = self._safe_version(csaf_range.get("max"))
-
-        # --- Case 1: both ranges empty
-        if all(v is None for v in (asset_min, asset_max, csaf_min, csaf_max)):
-            return True
-
-        # --- Case 2: CSAF has no bounds, cannot compare
-        if csaf_min is None and csaf_max is None:
-            return False
-
-        # --- Case 3: Asset has no bounds, not within CSAF
-        if asset_min is None and asset_max is None:
-            return False
-
-        # --- Lower bound check
-        if asset_min and csaf_min and asset_min < csaf_min:
-            return False
-
-        # --- Upper bound check
-        if asset_max and csaf_max and asset_max > csaf_max:
-            return False
-
-        # --- Handle open-ended bounds
-        if asset_min is None and csaf_min and asset_max and csaf_min > asset_max:
-            return False
-
-        if asset_max is None and csaf_max and asset_min and csaf_max < asset_min:
-            return False
-
-        return True
-
-    def _compare_versions(
-        self, csaf_version: dict | list | None, asset_version: dict | list | None
-    ) -> float | None:
-        """
-        Compare version structures (dict or list) using configured version subfield weights.
-
-        This function handles nested lists of versions, version ranges, and qualifiers,
-        and computes a weighted similarity score between 0.0 and 1.0.
-
-        Returns:
-            float | None: Weighted similarity score, or None if both versions are empty.
-        """
-        # --- 1. Base cases ---
-        if not csaf_version and not asset_version:
+        if not data:
             return None
-        if not csaf_version or not asset_version:
-            return 0.0
 
-        # --- 2. Handle list of versions recursively ---
-        if isinstance(csaf_version, list):
-            return self._compare_version_lists(csaf_version, asset_version)
+        # --- Already a dict ---
+        if isinstance(data, dict):
+            value = data.get(field)
+        # --- JSON string ---
+        elif isinstance(data, str):
+            try:
+                obj = json.loads(data)
+            except json.JSONDecodeError:
+                return None
+            if not isinstance(obj, dict) or obj == {}:
+                return None
+            value = obj.get(field)
+        # --- Invalid type ---
+        else:
+            return None
 
-        # --- 3. Ensure both are dicts ---
-        if not isinstance(csaf_version, dict) or not isinstance(asset_version, dict):
-            return 0.0
+        if value is None or value == "":
+            return None
 
-        # --- 4. Weighted field comparison ---
-        scores, weights = [], []
+        # --- Special handling for "version" fields ---
+        if field == "version":
+            if isinstance(value, dict):
+                return value
+            if isinstance(value, str):
+                try:
+                    parsed = json.loads(value)
+                    return parsed if isinstance(parsed, dict) else {"raw": value}
+                except json.JSONDecodeError:
+                    return {"raw": value}
+            return {"raw": str(value)}
 
-        for field, w in (self.version_weights or {}).items():
-            if not isinstance(w, float):
+        return value
+
+    def _has_valid_json(self, df, col: str) -> bool:
+        """
+        Check if the given DataFrame column contains at least one valid non-empty JSON object.
+        """
+        if df is None or col not in df.columns or df[col].is_null().all():
+            return False
+
+        for x in df[col].to_list():
+            if not x or str(x).strip().lower() in ("null", "none", "nan", ""):
                 continue
-            weights.append(w)
+            try:
+                val = json.loads(x)
+                if isinstance(val, dict) and val != {}:
+                    return True
+            except json.JSONDecodeError:
+                continue
 
-            # Dispatch subfield handling
-            if field == "min_max_version":
-                score = self._compare_version_ranges(csaf_version, asset_version)
-            elif field == "qualifier":
-                score = self._compare_qualifiers(csaf_version, asset_version)
-            else:
-                csaf_val = str(csaf_version.get(field) or "")
-                asset_val = str(asset_version.get(field) or "")
-                score = self._compare_freetext(csaf_val, asset_val, ignore_order=False)
+        return False
 
-            scores.append(score if score is not None else np.nan)
-
-        # --- 5. Weighted mean computation ---
-        return self._weighted_mean(scores, weights)
-
-    def _compare_version_lists(
-        self, csaf_list: list, asset_versions: dict | list | None
-    ) -> float | None:
-        """Compare lists of version dictionaries recursively."""
-        if not csaf_list:
-            return None
-
-        scores = []
-
-        for csaf_v in csaf_list:
-            if isinstance(asset_versions, list):
-                scores.extend(
-                    self._compare_versions(csaf_v, asset_v)
-                    for asset_v in asset_versions
-                    if asset_v
-                )
-            else:
-                scores.append(self._compare_versions(csaf_v, asset_versions))
-
-        valid = [s for s in scores if isinstance(s, (int, float)) and s is not None]
-
-        return round(max(valid), 4) if valid else None
-
-    def _compare_version_ranges(
-        self, csaf_version: dict, asset_version: dict
-    ) -> float | None:
-        """Compare version ranges (min/max) between CSAF and asset."""
-        csaf_ranges = [
-            r
-            for r in csaf_version.get("min_max_version", [])
-            if r.get("min") or r.get("max")
-        ]
-        asset_ranges = [
-            r
-            for r in asset_version.get("min_max_version", [])
-            if r.get("min") or r.get("max")
-        ]
-
-        if not csaf_ranges and not asset_ranges:
-            return np.nan
-        if not csaf_ranges or not asset_ranges:
+    def _weighted_mean(self, scores: list[float], weights: list[float]) -> float:
+        """Compute weighted mean, ignoring NaN values."""
+        if not scores or not weights:
             return 0.0
 
-        valid = all(
-            any(self._range_in_range(a_range, c_range) for c_range in csaf_ranges)
-            for a_range in asset_ranges
+        scores_arr, weights_arr = (
+            np.array(scores, dtype=float),
+            np.array(weights, dtype=float),
         )
-        return 1.0 if valid else 0.0
+        valid_mask = ~np.isnan(scores_arr)
+        valid_scores = scores_arr[valid_mask]
 
-    def _compare_qualifiers(
-        self, csaf_version: dict, asset_version: dict
-    ) -> float | None:
-        """Compare version qualifiers using freetext similarity."""
-        csaf_q = csaf_version.get("qualifier") or []
-        asset_q = asset_version.get("qualifier") or []
-
-        if not csaf_q and not asset_q:
-            return np.nan
-        if not csaf_q or not asset_q or len(csaf_q) != len(asset_q):
+        if valid_scores.size < 2:
             return 0.0
 
-        sub_scores = [
-            self._compare_freetext(str(c), str(a), ignore_order=False)
-            for c, a in zip(csaf_q, asset_q)
-            if c is not None and a is not None
-        ]
+        weighted_sum = np.nansum(scores_arr * weights_arr)
+        total_weight = np.nansum(weights_arr[valid_mask])
 
-        if not sub_scores:
-            return np.nan
+        if total_weight == 0:
+            return 0.0
 
-        avg_score = np.nanmean(sub_scores)
-        return round(avg_score, 4) if avg_score else np.nan
+        return round(weighted_sum / total_weight, 4)
+
+    # ============================================================
+    # FREETEXT COMPARISON
+    # ============================================================
 
     def _compare_freetext(
         self, s1: str | None, s2: str | None, ignore_order: bool = True
@@ -403,120 +362,191 @@ class Matching:
 
         return float(np.mean(scores)) if scores else 0.0
 
-    def _safe_load(self, val):
-        if not val or val is None:
-            return None
+    # ============================================================
+    # VERSION COMPARISON
+    # ============================================================
 
-        if val == {}:
-            return val
-
-        try:
-            val = json.loads(val)
-            if val:
-                return val
-            else:
-                return {}
-        except Exception:
-            return None
-
-    def _extract_field(self, data: str | dict | None, field: str) -> dict | str | None:
+    def _safe_version(self, val: str | None):
         """
-        Extract a specific field from a JSON-like string or dictionary.
-        Handles both JSON strings and already-parsed dicts.
-        Special case: when field == "version", always returns a dict.
+        Safely convert a string into a Version object.
+        Returns None if the value is invalid or empty.
+        """
+        if not val:
+            return None
+        try:
+            return Version(str(val))
+        except InvalidVersion:
+            return None
 
-        Args:
-            data (str | dict | None): Input data, possibly JSON encoded.
-            field (str): Field name to extract.
+    def _range_in_range(self, asset_range: dict, csaf_range: dict) -> bool:
+        """
+        Check if an asset's version range is within a CSAF version range.
+
+        Both ranges are expected to be dicts with optional 'min' and 'max' keys.
+        Missing bounds are interpreted as open-ended ranges.
 
         Returns:
-            dict | str | None: Extracted field value or None if missing/invalid.
+            bool: True if the asset range fits entirely within the CSAF range.
         """
-        if not data:
-            return None
+        asset_min = self._safe_version(asset_range.get("min"))
+        asset_max = self._safe_version(asset_range.get("max"))
+        csaf_min = self._safe_version(csaf_range.get("min"))
+        csaf_max = self._safe_version(csaf_range.get("max"))
 
-        # --- Already a dict ---
-        if isinstance(data, dict):
-            value = data.get(field)
-        # --- JSON string ---
-        elif isinstance(data, str):
-            try:
-                obj = json.loads(data)
-            except json.JSONDecodeError:
-                return None
-            if not isinstance(obj, dict) or obj == {}:
-                return None
-            value = obj.get(field)
-        # --- Invalid type ---
-        else:
-            return None
+        # --- Case 1: both ranges empty
+        if all(v is None for v in (asset_min, asset_max, csaf_min, csaf_max)):
+            return True
 
-        if value is None or value == "":
-            return None
-
-        # --- Special handling for "version" fields ---
-        if field == "version":
-            if isinstance(value, dict):
-                return value
-            if isinstance(value, str):
-                try:
-                    parsed = json.loads(value)
-                    return parsed if isinstance(parsed, dict) else {"raw": value}
-                except json.JSONDecodeError:
-                    return {"raw": value}
-            return {"raw": str(value)}
-
-        return value
-
-    def _has_valid_json(self, df, col: str) -> bool:
-        """
-        Check if the given DataFrame column contains at least one valid non-empty JSON object.
-        """
-        if df is None or col not in df.columns or df[col].is_null().all():
+        # --- Case 2: CSAF has no bounds, cannot compare
+        if csaf_min is None and csaf_max is None:
             return False
 
-        for x in df[col].to_list():
-            if not x or str(x).strip().lower() in ("null", "none", "nan", ""):
-                continue
-            try:
-                val = json.loads(x)
-                if isinstance(val, dict) and val != {}:
-                    return True
-            except json.JSONDecodeError:
-                continue
+        # --- Case 3: Asset has no bounds, not within CSAF
+        if asset_min is None and asset_max is None:
+            return False
 
-        return False
+        # --- Lower bound check
+        if asset_min and csaf_min and asset_min < csaf_min:
+            return False
 
-    def _compare_fields(
-        self,
-        csaf_field: dict | str | list | None,
-        asset_field: dict | str | list | None,
-        weight: dict | None = None,
+        # --- Upper bound check
+        if asset_max and csaf_max and asset_max > csaf_max:
+            return False
+
+        # --- Handle open-ended bounds
+        if asset_min is None and csaf_min and asset_max and csaf_min > asset_max:
+            return False
+
+        if asset_max is None and csaf_max and asset_min and csaf_max < asset_min:
+            return False
+
+        return True
+
+    def _compare_versions(
+        self, csaf_version: dict | list | None, asset_version: dict | list | None
     ) -> float | None:
         """
-        Compare two CSAF and asset fields using the most appropriate method
-        based on their data type (string, list, dict).
+        Compare version structures (dict or list) using configured version subfield weights.
+
+        This function handles nested lists of versions, version ranges, and qualifiers,
+        and computes a weighted similarity score between 0.0 and 1.0.
 
         Returns:
-            float | None: Similarity score between 0.0 and 1.0, or None if both fields are empty.
+            float | None: Weighted similarity score, or None if both versions are empty.
         """
-        # --- Base cases ---
-        if not csaf_field and not asset_field:
+        # --- 1. Base cases ---
+        if not csaf_version and not asset_version:
             return None
-        if not csaf_field or not asset_field:
+        if not csaf_version or not asset_version:
             return 0.0
 
-        # --- Delegate based on type ---
-        if isinstance(csaf_field, str) and isinstance(asset_field, str):
-            return self._compare_string_fields(csaf_field, asset_field)
+        # --- 2. Handle list of versions recursively ---
+        if isinstance(csaf_version, list):
+            return self._compare_version_lists(csaf_version, asset_version)
 
-        if isinstance(csaf_field, list) and isinstance(asset_field, list):
-            return self._compare_list_fields(csaf_field, asset_field)
+        # --- 3. Ensure both are dicts ---
+        if not isinstance(csaf_version, dict) or not isinstance(asset_version, dict):
+            return 0.0
 
-        if isinstance(csaf_field, dict) and isinstance(asset_field, dict):
-            return self._compare_dict_fields(csaf_field, asset_field, weight)
+        # --- 4. Weighted field comparison ---
+        scores, weights = [], []
 
-        return 0.0
+        for field, w in (self.version_weights or {}).items():
+            if not isinstance(w, float):
+                continue
+            weights.append(w)
+
+            # Dispatch subfield handling
+            if field == "min_max_version":
+                score = self._compare_version_ranges(csaf_version, asset_version)
+            elif field == "qualifier":
+                score = self._compare_qualifiers(csaf_version, asset_version)
+            else:
+                csaf_val = str(csaf_version.get(field) or "")
+                asset_val = str(asset_version.get(field) or "")
+                score = self._compare_freetext(csaf_val, asset_val, ignore_order=False)
+
+            scores.append(score if score is not None else np.nan)
+
+        # --- 5. Weighted mean computation ---
+        return self._weighted_mean(scores, weights)
+
+    def _compare_version_lists(
+        self, csaf_list: list, asset_versions: dict | list | None
+    ) -> float | None:
+        """Compare lists of version dictionaries recursively."""
+        if not csaf_list:
+            return None
+
+        scores = []
+
+        for csaf_v in csaf_list:
+            if isinstance(asset_versions, list):
+                scores.extend(
+                    self._compare_versions(csaf_v, asset_v)
+                    for asset_v in asset_versions
+                    if asset_v
+                )
+            else:
+                scores.append(self._compare_versions(csaf_v, asset_versions))
+
+        valid = [s for s in scores if isinstance(s, (int, float)) and s is not None]
+
+        return round(max(valid), 4) if valid else None
+
+    def _compare_version_ranges(
+        self, csaf_version: dict, asset_version: dict
+    ) -> float | None:
+        """Compare version ranges (min/max) between CSAF and asset."""
+        csaf_ranges = [
+            r
+            for r in csaf_version.get("min_max_version", [])
+            if r.get("min") or r.get("max")
+        ]
+        asset_ranges = [
+            r
+            for r in asset_version.get("min_max_version", [])
+            if r.get("min") or r.get("max")
+        ]
+
+        if not csaf_ranges and not asset_ranges:
+            return np.nan
+        if not csaf_ranges or not asset_ranges:
+            return 0.0
+
+        valid = all(
+            any(self._range_in_range(a_range, c_range) for c_range in csaf_ranges)
+            for a_range in asset_ranges
+        )
+        return 1.0 if valid else 0.0
+
+    def _compare_qualifiers(
+        self, csaf_version: dict, asset_version: dict
+    ) -> float | None:
+        """Compare version qualifiers using freetext similarity."""
+        csaf_q = csaf_version.get("qualifier") or []
+        asset_q = asset_version.get("qualifier") or []
+
+        if not csaf_q and not asset_q:
+            return np.nan
+        if not csaf_q or not asset_q or len(csaf_q) != len(asset_q):
+            return 0.0
+
+        sub_scores = [
+            self._compare_freetext(str(c), str(a), ignore_order=False)
+            for c, a in zip(csaf_q, asset_q)
+            if c is not None and a is not None
+        ]
+
+        if not sub_scores:
+            return np.nan
+
+        avg_score = np.nanmean(sub_scores)
+        return round(avg_score, 4) if avg_score else np.nan
+
+    # ============================================================
+    # FIELD COMPARISON HELPERS
+    # ============================================================
 
     def _compare_string_fields(self, csaf_field: str, asset_field: str) -> float:
         """Compare two string fields using Levenshtein-based freetext comparison."""
@@ -567,46 +597,40 @@ class Matching:
 
         return self._weighted_mean(scores, weights)
 
-    def _weighted_mean(self, scores: list[float], weights: list[float]) -> float:
-        """Compute weighted mean, ignoring NaN values."""
-        if not scores or not weights:
-            return 0.0
-
-        scores_arr, weights_arr = (
-            np.array(scores, dtype=float),
-            np.array(weights, dtype=float),
-        )
-        valid_mask = ~np.isnan(scores_arr)
-        valid_scores = scores_arr[valid_mask]
-
-        if valid_scores.size < 2:
-            return 0.0
-
-        weighted_sum = np.nansum(scores_arr * weights_arr)
-        total_weight = np.nansum(weights_arr[valid_mask])
-
-        if total_weight == 0:
-            return 0.0
-
-        return round(weighted_sum / total_weight, 4)
-
-    def df_matching(self, df_norm: pl.DataFrame) -> pl.DataFrame:
+    def _compare_fields(
+        self,
+        csaf_field: dict | str | list | None,
+        asset_field: dict | str | list | None,
+        weight: dict | None = None,
+    ) -> float | None:
         """
-        Apply all configured field comparisons (freetext, version, other)
-        to a normalized Polars DataFrame and return a DataFrame
-        containing similarity scores for each field.
+        Compare two CSAF and asset fields using the most appropriate method
+        based on their data type (string, list, dict).
+
+        Returns:
+            float | None: Similarity score between 0.0 and 1.0, or None if both fields are empty.
         """
+        # --- Base cases ---
+        if not csaf_field and not asset_field:
+            return None
+        if not csaf_field or not asset_field:
+            return 0.0
 
-        csaf_cpe = self.csaf_cpe_field_name
-        csaf_purl = self.csaf_purl_field_name
+        # --- Delegate based on type ---
+        if isinstance(csaf_field, str) and isinstance(asset_field, str):
+            return self._compare_string_fields(csaf_field, asset_field)
 
-        df_norm_csaf = df_norm.select([csaf_cpe, csaf_purl])
+        if isinstance(csaf_field, list) and isinstance(asset_field, list):
+            return self._compare_list_fields(csaf_field, asset_field)
 
-        df_norm = self._match_freetext_fields(df_norm, df_norm_csaf, csaf_cpe)
-        df_norm = self._match_ordered_fields(df_norm, df_norm_csaf, csaf_cpe, csaf_purl)
-        df_norm = self._match_other_fields(df_norm, csaf_cpe, csaf_purl)
+        if isinstance(csaf_field, dict) and isinstance(asset_field, dict):
+            return self._compare_dict_fields(csaf_field, asset_field, weight)
 
-        return df_norm
+        return 0.0
+
+    # ============================================================
+    # DATAFRAME MATCHING
+    # ============================================================
 
     def _match_freetext_fields(
         self, df: pl.DataFrame, df_csaf: pl.DataFrame, csaf_cpe: str
@@ -793,7 +817,7 @@ class Matching:
 
 #     # score = matcher._weighted_ngram_similarity(tokens1, tokens2, ignore_order=True)
 #     # print(0.0 <= score <= 1.0)
-#     #
+
 #     # asset_field = {'schema': 'pep-440', 'raw': '21.0.0.0', 'package': None, 'release_prefix': None, 'release_number': '21.0.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': '21.0.0.0', 'max': '21.0.0.0'}]}
 #     # csaf_field = {'schema': 'pep-440', 'raw': '21.0.0.0', 'package': None, 'release_prefix': None, 'release_number': '21.0.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': None, 'max': '21.0.0.0'}]}
 #     # print(matcher._extract_field(csaf_field, "min_max_version"))
@@ -816,24 +840,24 @@ class Matching:
 #     #         "other": 0.01,
 #     #     }
 #     #     ))
-#     #
+
 #     # csaf_sbom_urls = ["https://www.freecodecamp.org/news/python-switch-statement-switch-case-example/", "https://www.test.org"]
 #     # asset_sbom_urls = ["https://www.freecodecamp.org/news/python-switch-statement-switch-case-example/"]
 #     # print(matcher._compare_fields(csaf_sbom_urls, asset_sbom_urls))
-#     #
+
 #     # csaf_product_type = "Device"
 #     # asset_product_type = "Undefined"
 #     # print(matcher._compare_fields(csaf_product_type, asset_product_type))
-#     #
+
 #     # csaf_version = {'schema': 'pep-440', 'raw': '1.15.0.0', 'package': None, 'release_prefix': None, 'release_number': '1.15.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': '1.15.0.0', 'max': '1.15.0.0'}]}
 #     # asset_version1 = {'schema': 'pep-440', 'raw': '1.15.0.0', 'package': None, 'release_prefix': None, 'release_number': '1.15.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': '1.15.0.0', 'max': '1.15.0.0'}]}
 #     # asset_version2 = {'schema': 'rpm-package-naming', 'raw': 'rubygem-activemodel-0:5.2.0-1.el7rhgs.src', 'package': 'rubygem-activemodel', 'release_prefix': None, 'release_number': None, 'release_branch': None, 'qualifier': None, 'build_number': '1.el7rhgs', 'architecture': 'src', 'date': None, 'epoch': '0', 'min_max_version': [{'min': '5.2.0', 'max': '5.2.0'}]}
 #     # print(matcher._compare_versions(csaf_version, asset_version1))
-#     #
+
 #     # a = {'schema': 'windows-sap-schema', 'raw': 'v17 upd1', 'package': None, 'release_prefix': 'v', 'release_number': 17, 'release_branch': 0, 'qualifier': [None, None], 'build_number': 'upd1', 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': '17.0.0.1', 'max': '17.0.0.1'}]}
 #     # c = {'schema': 'csaf-constraint-vls', 'raw': '<v5.7', 'package': None, 'release_prefix': None, 'release_number': None, 'release_branch': None, 'qualifier': None, 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': None, 'max': '5.7'}]}
 #     # print(matcher._compare_versions(c, a))
-#     #
+
 #     # textc = "21.0.0.0".lower()
 #     # texta = "21.0.0.0".lower()
 #     # print(matcher._compare_freetext(textc, texta))
