@@ -34,6 +34,193 @@ class Normalizer:
         purl = config.get("purl", {})
         self.purl_weights = purl.get("weights", {})
 
+    # ============================================================
+    # PUBLIC METHODS
+    # ============================================================
+
+    def parse_version(self, expr: str):
+        if isinstance(expr, pl.Series) or isinstance(expr, list):
+            expr_list = []
+
+            if isinstance(expr, pl.Series):
+                if expr.is_empty():
+                    return expr_list
+                expr = expr.to_list()
+
+            if not expr or expr is None:
+                return expr_list
+
+            for e in expr:
+                value = self.parse_version(e)
+
+                if value:
+                    expr_list.append(value)
+
+            return expr_list
+
+        if not expr or expr is None:
+            return None
+
+        expr = expr.lower()
+        expr = re.sub(r"\s*\+\s*", "+", expr).strip()
+        schema = self._detect_schema(expr)
+
+        match schema:
+            case Standards.VERS:
+                result = self._parse_csaf(Standards.VERS, expr)
+            case Standards.VLS:
+                result = self._parse_csaf(Standards.VLS, expr)
+            case Standards.CALVER:
+                result = self._parse_calver(expr)
+            case Standards.RPM:
+                result = self._parse_rpm(expr)
+            case Standards.SAP:
+                result = self._parse_sap(expr)
+            case Standards.PEP440:
+                result = self._parse_pep440(expr)
+            case Standards.ERICSSON_RELEASE_SCHEMA:
+                result = self._parse_ericsson(expr)
+            case Standards.SEMVER:
+                result = self._parse_semver(expr)
+            case Standards.WILDCARD:
+                result = self._parse_csaf_wildcard(expr)
+            case Standards.DEB:
+                result = self._parse_deb(expr)
+            case _:
+                result = self._parse_version_freetext(expr)
+
+        return result or None
+
+    def parse_freetext(self, expr: str):
+        if not expr or expr is None:
+            return None
+
+        separator = self.freetext_fields_separator
+        expr = expr.lower()
+        expr = re.sub(r"[^a-z0-9]+", separator, expr)
+        expr = expr.strip(separator)
+        expr = re.sub(r"\%s+" % re.escape(separator), separator, expr)
+
+        return expr
+
+    def parse_cpe(self, cpe: str) -> dict:
+        d = self._base_cpe_dict(cpe)
+
+        if cpe.startswith("cpe:2.3:"):
+            parts = cpe.split(":")[2:]
+            fields = list(d.keys())[1:]
+            for i, field in enumerate(fields):
+                if i < len(parts):
+                    d[field] = parts[i] if parts[i] else None
+
+            d["raw"] = "cpe:2.3:" + ":".join(d.get(f, "*") or "*" for f in fields)
+
+        elif cpe.startswith("cpe:/"):
+            parts_raw = cpe.split(":")
+            d["part"] = parts_raw[1][1:] if len(parts_raw) > 1 else None
+            d["vendor"] = parts_raw[2] if len(parts_raw) > 2 else None
+            d["product"] = parts_raw[3] if len(parts_raw) > 3 else None
+            d["version"] = (
+                self.parse_version(parts_raw[4]) if len(parts_raw) > 4 else {}
+            )
+            d["update"] = (
+                parts_raw[5] if len(parts_raw) > 5 and parts_raw[5] != "" else None
+            )
+            d["edition"] = parts_raw[6] if len(parts_raw) > 6 else None
+
+            fields_23 = [f for f in self.cpe_weights.keys() if f != "raw"]
+
+            raw_parts = []
+
+            for f in fields_23:
+                val = d.get(f, "*")
+
+                if isinstance(val, dict):
+                    val = val.get("raw", "*")
+
+                if not isinstance(val, str) or not val:
+                    val = "*"
+
+                raw_parts.append(val)
+
+            d["raw"] = f"cpe:2.3:{':'.join(raw_parts)}"
+
+        else:
+            return None
+
+        return d
+
+    def parse_purl(self, purl: str) -> dict:
+        d = self._base_purl_dict(purl)
+
+        if not purl.startswith("pkg:"):
+            return None
+
+        purl_body = purl[4:]
+
+        if "#" in purl_body:
+            purl_body, subpath = purl_body.split("#", 1)
+            d["subpath"] = subpath or None
+
+        if "?" in purl_body:
+            purl_body, qualifiers_str = purl_body.split("?", 1)
+            qualifiers = {}
+            for q in qualifiers_str.split("&"):
+                if "=" in q:
+                    k, v = q.split("=", 1)
+                    qualifiers[k] = v
+                else:
+                    qualifiers[q] = None
+            d["qualifiers"] = qualifiers
+
+        version = None
+        if "@" in purl_body:
+            purl_body, version = purl_body.split("@", 1)
+            d["version"] = self.parse_version(version) or {}
+
+        parts = purl_body.split("/")
+        d["type"] = parts[0] if len(parts) > 0 else None
+
+        if len(parts) == 2:
+            d["name"] = parts[1] or None
+        elif len(parts) >= 3:
+            d["namespace"] = "/".join(parts[1:-1]) or None
+            d["name"] = parts[-1] or None
+        else:
+            d["name"] = None
+
+        for key in ("type", "namespace", "name", "subpath"):
+            if d[key] in (None, ""):
+                d[key] = None
+
+        if not d["qualifiers"]:
+            d["qualifiers"] = {}
+
+        return d
+
+    def parse_files(self, files: list[dict]) -> list[dict]:
+        results = []
+
+        for file in files:
+            name = file.get("name")
+            hash_algorithm = file.get("hash_algorithm")
+            file_hash = file.get("file_hash")
+
+            name = self.parse_freetext(name) if name else None
+            file_hash = self.parse_freetext(file_hash) if file_hash else None
+
+            d = self._base_file_dict(name)
+            d["hash_algorithm"] = hash_algorithm or None
+            d["file_hash"] = file_hash or None
+
+            results.append(d)
+
+        return results
+
+    # ============================================================
+    # PRIVATE UTILITIES
+    # ============================================================
+
     def _detect_schema(self, s: str) -> str:
         """
         Detect the version schema (standard) for a given version string.
@@ -101,6 +288,13 @@ class Normalizer:
 
         return Standards.FREETEXT
 
+    def _safe_version(self, val: str) -> str:
+        """Return a normalized version string if valid, otherwise the original value."""
+        try:
+            return str(Version(val))
+        except Exception:
+            return val
+
     def _base_dict(self, schema, raw) -> dict:
         """Initialize a version dict from config fields, setting all values to None."""
 
@@ -111,12 +305,36 @@ class Normalizer:
                 base[field] = None
         return base
 
-    def _safe_version(self, val: str) -> str:
-        """Return a normalized version string if valid, otherwise the original value."""
-        try:
-            return str(Version(val))
-        except Exception:
-            return val
+    def _base_cpe_dict(self, raw) -> dict:
+        base = {"raw": raw}
+
+        for field in self.cpe_weights.keys():
+            if field == "version":
+                base[field] = {}
+            elif field not in ("schema", "raw"):
+                base[field] = None
+        return base
+
+    def _base_purl_dict(self, raw) -> dict:
+        base = {"raw": raw}
+
+        for field in self.purl_weights.keys():
+            if field == "version" or field == "qualifiers":
+                base[field] = {}
+            elif field not in ("schema", "raw"):
+                base[field] = None
+        return base
+
+    def _base_file_dict(self, name: str) -> dict:
+        return {
+            "name": name if name else None,
+            "hash_algorithm": None,
+            "file_hash": None,
+        }
+
+    # ============================================================
+    # PRIVATE PARSER
+    # ============================================================
 
     def _parse_csaf(self, schema, expr: str):
         """
@@ -406,212 +624,6 @@ class Normalizer:
         d = self._base_dict(Standards.FREETEXT.value, expr)
 
         return d
-
-    def parse_version(self, expr: str):
-        if isinstance(expr, pl.Series) or isinstance(expr, list):
-            expr_list = []
-
-            if isinstance(expr, pl.Series):
-                if expr.is_empty():
-                    return expr_list
-                expr = expr.to_list()
-
-            if not expr or expr is None:
-                return expr_list
-
-            for e in expr:
-                value = self.parse_version(e)
-
-                if value:
-                    expr_list.append(value)
-
-            return expr_list
-
-        if not expr or expr is None:
-            return None
-
-        expr = expr.lower()
-        expr = re.sub(r"\s*\+\s*", "+", expr).strip()
-        schema = self._detect_schema(expr)
-
-        match schema:
-            case Standards.VERS:
-                result = self._parse_csaf(Standards.VERS, expr)
-            case Standards.VLS:
-                result = self._parse_csaf(Standards.VLS, expr)
-            case Standards.CALVER:
-                result = self._parse_calver(expr)
-            case Standards.RPM:
-                result = self._parse_rpm(expr)
-            case Standards.SAP:
-                result = self._parse_sap(expr)
-            case Standards.PEP440:
-                result = self._parse_pep440(expr)
-            case Standards.ERICSSON_RELEASE_SCHEMA:
-                result = self._parse_ericsson(expr)
-            case Standards.SEMVER:
-                result = self._parse_semver(expr)
-            case Standards.WILDCARD:
-                result = self._parse_csaf_wildcard(expr)
-            case Standards.DEB:
-                result = self._parse_deb(expr)
-            case _:
-                result = self._parse_version_freetext(expr)
-
-        return result or None
-
-    def parse_freetext(self, expr: str):
-        if not expr or expr is None:
-            return None
-
-        separator = self.freetext_fields_separator
-        expr = expr.lower()
-        expr = re.sub(r"[^a-z0-9]+", separator, expr)
-        expr = expr.strip(separator)
-        expr = re.sub(r"\%s+" % re.escape(separator), separator, expr)
-
-        return expr
-
-    def _base_cpe_dict(self, raw) -> dict:
-        base = {"raw": raw}
-
-        for field in self.cpe_weights.keys():
-            if field == "version":
-                base[field] = {}
-            elif field not in ("schema", "raw"):
-                base[field] = None
-        return base
-
-    def parse_cpe(self, cpe: str) -> dict:
-        d = self._base_cpe_dict(cpe)
-
-        if cpe.startswith("cpe:2.3:"):
-            parts = cpe.split(":")[2:]
-            fields = list(d.keys())[1:]
-            for i, field in enumerate(fields):
-                if i < len(parts):
-                    d[field] = parts[i] if parts[i] else None
-
-            d["raw"] = "cpe:2.3:" + ":".join(d.get(f, "*") or "*" for f in fields)
-
-        elif cpe.startswith("cpe:/"):
-            parts_raw = cpe.split(":")
-            d["part"] = parts_raw[1][1:] if len(parts_raw) > 1 else None
-            d["vendor"] = parts_raw[2] if len(parts_raw) > 2 else None
-            d["product"] = parts_raw[3] if len(parts_raw) > 3 else None
-            d["version"] = (
-                self.parse_version(parts_raw[4]) if len(parts_raw) > 4 else {}
-            )
-            d["update"] = (
-                parts_raw[5] if len(parts_raw) > 5 and parts_raw[5] != "" else None
-            )
-            d["edition"] = parts_raw[6] if len(parts_raw) > 6 else None
-
-            fields_23 = [f for f in self.cpe_weights.keys() if f != "raw"]
-
-            raw_parts = []
-
-            for f in fields_23:
-                val = d.get(f, "*")
-
-                if isinstance(val, dict):
-                    val = val.get("raw", "*")
-
-                if not isinstance(val, str) or not val:
-                    val = "*"
-
-                raw_parts.append(val)
-
-            d["raw"] = f"cpe:2.3:{':'.join(raw_parts)}"
-
-        else:
-            return None
-
-        return d
-
-    def _base_purl_dict(self, raw) -> dict:
-        base = {"raw": raw}
-
-        for field in self.purl_weights.keys():
-            if field == "version" or field == "qualifiers":
-                base[field] = {}
-            elif field not in ("schema", "raw"):
-                base[field] = None
-        return base
-
-    def parse_purl(self, purl: str) -> dict:
-        d = self._base_purl_dict(purl)
-
-        if not purl.startswith("pkg:"):
-            return None
-
-        purl_body = purl[4:]
-
-        if "#" in purl_body:
-            purl_body, subpath = purl_body.split("#", 1)
-            d["subpath"] = subpath or None
-
-        if "?" in purl_body:
-            purl_body, qualifiers_str = purl_body.split("?", 1)
-            qualifiers = {}
-            for q in qualifiers_str.split("&"):
-                if "=" in q:
-                    k, v = q.split("=", 1)
-                    qualifiers[k] = v
-                else:
-                    qualifiers[q] = None
-            d["qualifiers"] = qualifiers
-
-        version = None
-        if "@" in purl_body:
-            purl_body, version = purl_body.split("@", 1)
-            d["version"] = self.parse_version(version) or {}
-
-        parts = purl_body.split("/")
-        d["type"] = parts[0] if len(parts) > 0 else None
-
-        if len(parts) == 2:
-            d["name"] = parts[1] or None
-        elif len(parts) >= 3:
-            d["namespace"] = "/".join(parts[1:-1]) or None
-            d["name"] = parts[-1] or None
-        else:
-            d["name"] = None
-
-        for key in ("type", "namespace", "name", "subpath"):
-            if d[key] in (None, ""):
-                d[key] = None
-
-        if not d["qualifiers"]:
-            d["qualifiers"] = {}
-
-        return d
-
-    def _base_file_dict(self, name: str) -> dict:
-        return {
-            "name": name if name else None,
-            "hash_algorithm": None,
-            "file_hash": None,
-        }
-
-    def parse_files(self, files: list[dict]) -> list[dict]:
-        results = []
-
-        for file in files:
-            name = file.get("name")
-            hash_algorithm = file.get("hash_algorithm")
-            file_hash = file.get("file_hash")
-
-            name = self.parse_freetext(name) if name else None
-            file_hash = self.parse_freetext(file_hash) if file_hash else None
-
-            d = self._base_file_dict(name)
-            d["hash_algorithm"] = hash_algorithm or None
-            d["file_hash"] = file_hash or None
-
-            results.append(d)
-
-        return results
 
 
 # def main():
