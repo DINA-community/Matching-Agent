@@ -404,41 +404,52 @@ class Matching:
         except Exception:
             return None
 
-    def _extract_field(self, data: str | dict, field: str) -> dict | str | None:
+    def _extract_field(self, data: str | dict | None, field: str) -> dict | str | None:
+        """
+        Extract a specific field from a JSON-like string or dictionary.
+        Handles both JSON strings and already-parsed dicts.
+        Special case: when field == "version", always returns a dict.
+
+        Args:
+            data (str | dict | None): Input data, possibly JSON encoded.
+            field (str): Field name to extract.
+
+        Returns:
+            dict | str | None: Extracted field value or None if missing/invalid.
+        """
         if not data:
             return None
 
+        # --- Already a dict ---
         if isinstance(data, dict):
-            return data.get(field)
-
-        if not isinstance(data, str):
+            value = data.get(field)
+        # --- JSON string ---
+        elif isinstance(data, str):
+            try:
+                obj = json.loads(data)
+            except json.JSONDecodeError:
+                return None
+            if not isinstance(obj, dict) or obj == {}:
+                return None
+            value = obj.get(field)
+        # --- Invalid type ---
+        else:
             return None
 
-        try:
-            obj = json.loads(data)
-
-            if obj == {}:
-                return obj
-
-        except json.JSONDecodeError:
+        if value is None or value == "":
             return None
 
-        value = obj.get(field)
-
-        if not value:
-            return None
-
+        # --- Special handling for "version" fields ---
         if field == "version":
             if isinstance(value, dict):
                 return value
-            elif isinstance(value, str):
+            if isinstance(value, str):
                 try:
-                    inner = json.loads(value)
-                    return inner if isinstance(inner, dict) else {"raw": value}
+                    parsed = json.loads(value)
+                    return parsed if isinstance(parsed, dict) else {"raw": value}
                 except json.JSONDecodeError:
                     return {"raw": value}
-            else:
-                return {"raw": str(value)}
+            return {"raw": str(value)}
 
         return value
 
