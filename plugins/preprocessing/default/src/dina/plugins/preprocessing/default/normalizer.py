@@ -1,3 +1,4 @@
+from datetime import datetime
 import re
 import polars as pl
 import enum
@@ -252,6 +253,13 @@ class Normalizer:
             ),
             # Standards.CALVER should stand before Standards.WILDCARD and Standards.SEMVER
             (Standards.CALVER, r"^([0-9]{2}|[0-9]{4})\.\d{2}(?:\.\d{1,2})?$"),
+            # Standards.SEMVER should stand before Standards.PEP440
+            (
+                Standards.SEMVER,
+                r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
+                r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
+                r"(?:\+[0-9A-Za-z.-]+(?:\.[0-9A-Za-z.-]+)*)?$",
+            ),
             # Standards.RPM should stand before Standards.DEB
             (
                 Standards.RPM,
@@ -265,11 +273,12 @@ class Normalizer:
                 Standards.ERICSSON_RELEASE_SCHEMA,
                 r"^r[0-9]+[a-z](?:_(?:pc|sp|uc|mr)[0-9]+)?$",
             ),
-            # Standards.SEMVER should stand before Standards.PEP440
-            (Standards.SEMVER, r"^(0|[1-9]\d*)\.(0|[1-9]\d*)(?:\.(0|[1-9]\d*))?$"),
             (
                 Standards.PEP440,
-                r"^(0|[1-9]\d*)(\.(0|[1-9]\d*))*((a|b|rc)([1-9]\d*))?(\.post([1-9]\d*))?(\.dev([1-9]\d*))?$",
+                r"^(0|[1-9]\d*)(?:\.(0|[1-9]\d*))*"
+                r"(?:(a|b|rc)(\d+))?"
+                r"(?:\.post(\d+))?"
+                r"(?:\.dev(\d+))?$",
             ),
             # Standards.WILDCARD should stand before Standards.DEB
             (
@@ -533,42 +542,52 @@ class Normalizer:
         return d
 
     def _parse_semver(self, expr: str):
-        if not expr or expr is None:
+        if not expr:
             return None
 
-        parts = expr.split(".")
-        major, minor, patch = None, None, None
+        main = expr
+        pre = None
+        build = None
 
-        if len(parts) > 0:
-            if parts[0] == "+":
-                major = 0
-            elif parts[0].isdigit():
-                major = int(parts[0])
-            else:
-                major = None
+        if "+" in expr:
+            main, build = expr.split("+", 1)
+        if "-" in main:
+            main, pre = main.split("-", 1)
 
-        if len(parts) > 1:
-            if parts[1] == "+":
-                minor = 9999
-            elif parts[1].isdigit():
-                minor = int(parts[1])
-            else:
-                minor = None
+        m = re.match(r"^(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)$", main)
+        if not m:
+            parts = main.split(".")
+            while len(parts) < 3:
+                parts.append("0")
+            m = re.match(
+                r"^(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)$", ".".join(parts)
+            )
 
-        if len(parts) > 2:
-            if parts[2] == "+":
-                patch = 9999
-            elif parts[2].isdigit():
-                patch = int(parts[2])
-            else:
-                patch = None
+        major = int(m.group("major"))
+        minor = int(m.group("minor"))
+        patch = int(m.group("patch"))
 
         d = self._base_dict(Standards.SEMVER.value, expr)
+        d["release_number"] = f"{major}.{minor}.{patch}"
+        d["qualifier"] = None
+        d["build_number"] = None
+        d["date"] = None
+
+        if pre:
+            d["qualifier"] = pre
+
+        if build:
+            if re.match(r"^\d{14}$", build):  # YYYYMMDDHHMMSS
+                try:
+                    dt = datetime.strptime(build, "%Y%m%d%H%M%S")
+                    d["date"] = dt.isoformat()
+                except ValueError:
+                    d["build_number"] = build
+            else:
+                d["build_number"] = build
+
         d["min_max_version"] = [
-            {
-                "min": f"{major or 0}.{minor or 0}.{patch or 0}",
-                "max": f"{major or 9999}.{minor or 9999}.{patch or 9999}",
-            }
+            {"min": f"{major}.{minor}.{patch}", "max": f"{major}.{minor}.{patch}"}
         ]
 
         return d
@@ -692,7 +711,16 @@ class Normalizer:
 #         # "<V3.0"
 #         # "14 Sp1",
 #         # "All versions < V5.7 SP1 HF1"
-#         # "21.0.0.0"
+#         # "21.0.0.0",
+#         # "1.0.0-0.3.7",
+#         # "1.0.0-alpha",
+#         # "1.0.0-alpha.1",
+#         # "1.0.0-x.7.z.92",
+#         # "1.0.0-x-y-z.-",
+#         # "1.0.0+20130313144700",
+#         # "1.0.0+21AF26D3--117B344092BD",
+#         # "1.0.0-alpha+001",
+#         # "1.0.0-beta+exp.sha.5114f85"
 #     ]
 
 #     for ex in examples:
