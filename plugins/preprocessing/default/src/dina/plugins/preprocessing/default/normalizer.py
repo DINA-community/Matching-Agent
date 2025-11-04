@@ -376,6 +376,8 @@ class Normalizer:
                             break
 
                     cond = cond.lstrip("v")
+                    min_inclusive = True
+                    max_inclusive = True
 
                     if cond in ("*", ""):
                         min_v, max_v = None, None
@@ -383,10 +385,12 @@ class Normalizer:
                         min_v = self._safe_version(cond)
                     elif op == ">":
                         min_v = self._safe_version(cond)
+                        min_inclusive = False
                     elif op == "<=":
                         max_v = self._safe_version(cond)
                     elif op == "<":
                         max_v = self._safe_version(cond)
+                        max_inclusive = False
                     elif op == "=":
                         val = self._safe_version(cond)
                         min_v = max_v = val
@@ -394,7 +398,14 @@ class Normalizer:
                         val = self._safe_version(cond)
                         min_v = max_v = val
 
-                results.append({"min": min_v, "max": max_v})
+                results.append(
+                    {
+                        "min": min_v,
+                        "max": max_v,
+                        "min_inclusive": min_inclusive,
+                        "max_inclusive": max_inclusive,
+                    }
+                )
 
         d["min_max_version"] = results if results else None
         return d
@@ -641,6 +652,8 @@ class Normalizer:
 #         # "<V4.2.5015",
 #         # "grafana-0:5.2.4-6.el7rhgs.src",
 #         # "22.1.4_2024-11-11_Hot_Fix",
+#         # "< 3.12.0",
+#         # "> 3.12.0",
 #         # ">= 3.12.0",
 #         # "vers:all/*",
 #         # "vers:all/<V3.1.2.1",

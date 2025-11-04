@@ -382,46 +382,70 @@ class Matching:
         except InvalidVersion:
             return None
 
+    def _bool_or_default(self, value, default=True):
+        """
+        Returns the given value if it's not None,
+        otherwise returns the default (True by default).
+        """
+        return value if value is not None else default
+
     def _range_in_range(self, asset_range: dict, csaf_range: dict) -> bool:
         """
-        Check if an asset's version range is within a CSAF version range.
+        Check if an asset's version range overlaps with (or fits within)
+        a CSAF version range.
 
-        Both ranges are expected to be dicts with optional 'min' and 'max' keys.
-        Missing bounds are interpreted as open-ended ranges.
-
-        Returns:
-            bool: True if the asset range fits entirely within the CSAF range.
+        This means: returns True if there is any intersection between the two ranges.
+        Missing bounds are treated as open (±∞).
+        Missing inclusive flags default to True.
         """
-        asset_min = self._safe_version(asset_range.get("min"))
-        asset_max = self._safe_version(asset_range.get("max"))
-        csaf_min = self._safe_version(csaf_range.get("min"))
-        csaf_max = self._safe_version(csaf_range.get("max"))
+
+        def _to_float(value):
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return None
+
+        # --- Extract numbers ---
+        a_min = _to_float(asset_range.get("min"))
+        a_max = _to_float(asset_range.get("max"))
+        c_min = _to_float(csaf_range.get("min"))
+        c_max = _to_float(csaf_range.get("max"))
+
+        # --- Inclusivity flags (default True) ---
+        a_min_inc = self._bool_or_default(asset_range.get("min_inclusive"))
+        a_max_inc = self._bool_or_default(asset_range.get("max_inclusive"))
+        c_min_inc = self._bool_or_default(csaf_range.get("min_inclusive"))
+        c_max_inc = self._bool_or_default(csaf_range.get("max_inclusive"))
 
         # --- Case 1: both ranges empty
-        if all(v is None for v in (asset_min, asset_max, csaf_min, csaf_max)):
+        if all(v is None for v in (a_min, a_max, c_min, c_max)):
             return True
 
         # --- Case 2: CSAF has no bounds, cannot compare
-        if csaf_min is None and csaf_max is None:
+        if c_min is None and c_max is None:
             return False
 
         # --- Case 3: Asset has no bounds, not within CSAF
-        if asset_min is None and asset_max is None:
+        if a_min is None and a_max is None:
             return False
 
-        # --- Lower bound check
-        if asset_min and csaf_min and asset_min < csaf_min:
+        # --- Replace None with ±∞ ---
+        a_min = a_min if a_min is not None else float("-inf")
+        a_max = a_max if a_max is not None else float("inf")
+        c_min = c_min if c_min is not None else float("-inf")
+        c_max = c_max if c_max is not None else float("inf")
+
+        # --- Check if they overlap ---
+        # Overlap exists if left edge of one is <= right edge of the other, and vice versa
+        if a_max < c_min:
+            return False
+        if a_min > c_max:
             return False
 
-        # --- Upper bound check
-        if asset_max and csaf_max and asset_max > csaf_max:
+        # Handle exclusive bounds equality
+        if a_max == c_min and (not a_max_inc or not c_min_inc):
             return False
-
-        # --- Handle open-ended bounds
-        if asset_min is None and csaf_min and asset_max and csaf_min > asset_max:
-            return False
-
-        if asset_max is None and csaf_max and asset_min and csaf_max < asset_min:
+        if a_min == c_max and (not a_min_inc or not c_max_inc):
             return False
 
         return True
@@ -795,13 +819,8 @@ class Matching:
 #     # print(matcher._safe_version("not_a_version") is None)
 
 #     # test_cases = [
-#     #     ({"min": "1.0", "max": "1.2"}, {"min": "0.9", "max": "1.3"}, True),
-#     #     ({"min": "0.8"}, {"min": "0.9"}, False),
-#     #     ({"max": "1.5"}, {"max": "1.2"}, False),
+#     #     ({"min": "0.8", "max": "0.9", "min_inclusive": False}, {"min": "0.9", "max": "1.3"}, True),
 #     #     ({"min": "1.0", "max": "1.2"}, {"min": "1.0", "max": "1.2"}, True),
-#     #     ({}, {}, True),
-#     #     ({"min": "1.0"}, {}, False),
-#     #     ({}, {"max": "2.0"}, False),
 #     # ]
 
 #     # for asset_range, csaf_range, expected in test_cases:
