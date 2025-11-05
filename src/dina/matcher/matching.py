@@ -154,10 +154,6 @@ class Matching:
             np.array(weights, dtype=float),
         )
         valid_mask = ~np.isnan(scores_arr)
-        valid_scores = scores_arr[valid_mask]
-
-        if valid_scores.size < 2:
-            return 0.0
 
         weighted_sum = np.nansum(scores_arr * weights_arr)
         total_weight = np.nansum(weights_arr[valid_mask])
@@ -479,24 +475,37 @@ class Matching:
         # --- 4. Weighted field comparison ---
         scores, weights = [], []
 
-        for field, w in (self.version_weights or {}).items():
-            if not isinstance(w, float):
-                continue
-            weights.append(w)
+        score_min_max_version = self._compare_version_ranges(
+            csaf_version, asset_version
+        )
 
-            # Dispatch subfield handling
-            if field == "min_max_version":
-                score = self._compare_version_ranges(csaf_version, asset_version)
-            elif field == "qualifier":
-                score = self._compare_qualifiers(csaf_version, asset_version)
-            else:
-                csaf_val = str(csaf_version.get(field) or "")
-                asset_val = str(asset_version.get(field) or "")
-                score = self._compare_freetext(csaf_val, asset_val, ignore_order=False)
+        if score_min_max_version > 0:
+            for field, w in (self.version_weights or {}).items():
+                if not isinstance(w, float):
+                    continue
 
-            scores.append(score if score is not None else np.nan)
+                if field == "min_max_version":
+                    score = score_min_max_version
+                elif field == "qualifier":
+                    score = self._compare_qualifiers(csaf_version, asset_version)
+                elif field == "release_number":
+                    csaf_rel = csaf_version.get("release_number")
+                    asset_rel = asset_version.get("release_number")
+                    score = self._compare_release_numbers(csaf_rel, asset_rel)
+                else:
+                    # fallback freetext
+                    csaf_val = str(csaf_version.get(field) or "")
+                    asset_val = str(asset_version.get(field) or "")
+                    score = self._compare_freetext(
+                        csaf_val, asset_val, ignore_order=False
+                    )
 
-        # --- 5. Weighted mean computation ---
+                if score is None or np.isnan(score):
+                    continue
+
+                weights.append(w)
+                scores.append(score)
+
         return self._weighted_mean(scores, weights)
 
     def _compare_version_lists(
@@ -551,26 +560,77 @@ class Matching:
     def _compare_qualifiers(
         self, csaf_version: dict, asset_version: dict
     ) -> float | None:
-        """Compare version qualifiers using freetext similarity."""
-        csaf_q = csaf_version.get("qualifier") or []
-        asset_q = asset_version.get("qualifier") or []
+        """
+        Compare pre-release (qualifier) parts according to SemVer precedence:
+        - pre-release < release
+        - Numeric identifiers compared numerically
+        - Non-numeric identifiers compared lexically
+        Returns:
+            1.0 if asset is same or newer pre-release than CSAF
+            0.0 if asset is older
+            np.nan if both empty
+        """
+        csaf_q = csaf_version.get("qualifier")
+        asset_q = asset_version.get("qualifier")
 
         if not csaf_q and not asset_q:
             return np.nan
-        if not csaf_q or not asset_q or len(csaf_q) != len(asset_q):
+        if not csaf_q and asset_q:
+            return np.nan
+        if csaf_q and not asset_q:
             return 0.0
 
-        sub_scores = [
-            self._compare_freetext(str(c), str(a), ignore_order=False)
-            for c, a in zip(csaf_q, asset_q)
-            if c is not None and a is not None
-        ]
+        csaf_parts = str(csaf_q).split(".")
+        asset_parts = str(asset_q).split(".")
 
-        if not sub_scores:
+        for c, a in zip(csaf_parts, asset_parts):
+            if c == a:
+                continue
+            c_is_num, a_is_num = c.isdigit(), a.isdigit()
+            if c_is_num and a_is_num:
+                return 1.0 if int(a) > int(c) else 0.0
+            elif c_is_num and not a_is_num:
+                return 1.0
+            elif not c_is_num and a_is_num:
+                return 0.0
+            else:
+                return 1.0 if a > c else 0.0
+
+        return 1.0 if len(asset_parts) >= len(csaf_parts) else 0.0
+
+    def _compare_release_numbers(self, csaf_rel: str, asset_rel: str) -> float:
+        """
+        Compare two release numbers (major.minor.patch) numerically.
+        Returns:
+            1.0 if equal
+            0.5 if same major but different minor/patch
+            0.0 otherwise
+        """
+        if not csaf_rel and not asset_rel:
             return np.nan
+        if not csaf_rel or not asset_rel:
+            return 0.0
 
-        avg_score = np.nanmean(sub_scores)
-        return round(avg_score, 4) if avg_score else np.nan
+        def to_tuple(v):
+            parts = str(v).split(".")
+            nums = []
+            for p in parts[:3]:
+                try:
+                    nums.append(int(p))
+                except ValueError:
+                    nums.append(0)
+            while len(nums) < 3:
+                nums.append(0)
+            return tuple(nums)
+
+        c = to_tuple(csaf_rel)
+        a = to_tuple(asset_rel)
+
+        if a == c:
+            return 1.0
+        if a[0] == c[0]:
+            return 0.5
+        return 0.0
 
     # ============================================================
     # FIELD COMPARISON HELPERS
@@ -843,6 +903,19 @@ class Matching:
 
 #     # asset_field = {'schema': 'pep-440', 'raw': '21.0.0.0', 'package': None, 'release_prefix': None, 'release_number': '21.0.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': '21.0.0.0', 'max': '21.0.0.0'}]}
 #     # csaf_field = {'schema': 'pep-440', 'raw': '21.0.0.0', 'package': None, 'release_prefix': None, 'release_number': '21.0.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': None, 'max': '21.0.0.0'}]}
+#     # csaf_field = {
+#     #     "schema": "semantic-versioning",
+#     #     "release_number": None,
+#     #     "qualifier": None,
+#     #     "min_max_version": [{"min": "1.0.0", "max": "1.0.0"}]
+#     # }
+
+#     # asset_field = {
+#     #     "schema": "semantic-versioning",
+#     #     "release_number": None,
+#     #     "qualifier": "alpha",
+#     #     "min_max_version": [{"min": "1.0.0", "max": "1.0.0"}]
+#     # }
 #     # print(matcher._extract_field(csaf_field, "min_max_version"))
 #     # print(matcher._compare_versions(csaf_field, asset_field))
 #     # print(matcher._compare_fields(
