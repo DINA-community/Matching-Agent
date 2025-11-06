@@ -224,8 +224,12 @@ class BaseSynchronizer(ABC):
                 try:
                     start_time = datetime.datetime.now()
                     fetcher_view = self.cache_db.fetcher_view(source.origin_uri)
-                    await self.fetch_products(fetcher_view, source)
-                    await self.fetch_relationships(fetcher_view, source)
+                    again = True
+
+                    while again:
+                        again = await self.fetch_products(fetcher_view, source)
+                        await self.fetch_relationships(fetcher_view, source)
+
                     await fetcher_view.set_last_run(start_time)
                 except Exception as e:
                     logger.error(f"Error fetching data from {source.debug_info()}: {e}")
@@ -235,14 +239,13 @@ class BaseSynchronizer(ABC):
                 await asyncio.sleep(1)
 
     async def fetch_products(self, fetcher_view: FetcherView, source: DataSourcePlugin):
-        again = True
-        while again:
-            logger.debug(f"Fetching data from {source.debug_info()}")
-            result = await source.fetch_products(fetcher_view)
-            for datapoint in result.data:
-                datapoint.origin_uri = str(source.origin_uri)
-                self.pending_products.append(datapoint)
-            again = result.again
+        logger.debug(f"Fetching data from {source.debug_info()}")
+        result = await source.fetch_products(fetcher_view)
+        for datapoint in result.data:
+            datapoint.origin_uri = str(source.origin_uri)
+            self.pending_products.append(datapoint)
+
+        return result.again
 
     async def fetch_relationships(
         self, fetcher_view: FetcherView, source: DataSourcePlugin

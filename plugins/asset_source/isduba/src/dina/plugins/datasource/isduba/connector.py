@@ -37,12 +37,12 @@ def get_csaf_product_tree(
 
     product_list = [get_product_info(branch) for branch in branches]
 
-    relationships_list = get_relationships(product_tree)
+    # relationships_list = get_relationships(product_tree)
 
     return CsafProductTree(
         csaf_document=csaf_document,
         product_list=product_list,
-        relationships_list=relationships_list,
+        # relationships_list=relationships_list,
     )
 
 

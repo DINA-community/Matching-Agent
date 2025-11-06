@@ -299,7 +299,7 @@ class IsdubaDataSource(DataSourcePlugin):
     async def cleanup_products(
         self, data_to_check: List[Asset | CsafProduct]
     ) -> List[CleanUpDecision]:
-        logger.debug(f"Cleanup data: {data_to_check}")
+        logger.debug(f"Cleanup data length: {len(data_to_check)}")
 
         if not data_to_check:
             return []
