@@ -84,35 +84,6 @@ def convert_into_database_format(
     return [item for item in deduped.values()]
 
 
-# TODO: relationship between the products
-"""
-for relationship in product_tree.relationships_list:
-    product_reference: Optional[CsafProduct] = None
-    relates_to_product_reference: Optional[CsafProduct] = None
-
-    for csaf_product in csaf_full_product_list:
-        if csaf_product.origin_uri["product_name_id"] == relationship.product_reference:
-            product_reference = csaf_product
-
-        if (
-            csaf_product.origin_uri["product_name_id"]
-            == relationship.relates_to_product_reference
-        ):
-            relates_to_product_reference = csaf_product
-
-        if (
-            product_reference is not None
-            and relates_to_product_reference is not None
-        ):
-            relationship_value = CsafProductRelationship()
-            relationship_value.category = relationship.category
-            relationship_value.csaf_product_source = product_reference
-            relationship_value.csaf_product_target = relates_to_product_reference
-            csaf_full_product_list.append(relationship_value)
-            break
-"""
-
-
 def _update_product_fields(target: Product, source: Product) -> None:
     """Update all relevant fields of a Product without overwriting the object itself."""
     target.product_type = source.product_type
