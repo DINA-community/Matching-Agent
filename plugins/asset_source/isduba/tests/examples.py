@@ -42,15 +42,43 @@ DOCUMENTS_FULL = [
                             "name": "SENTRON 7KT PAC1260",
                             "product": {
                                 "name": "SENTRON 7KT PAC1260",
-                                "product_id": "4711",
+                                "product_id": "fake-product-id-1",
                                 "product_identification_helper": {
                                     "cpe": "cpe:/o:siemens:sentron_7kt_pac1260:-"
                                 },
                             },
                         }
                     ],
+                },
+                {
+                    "category": "vendor",
+                    "name": "Siemens",
+                    "branches": [
+                        {
+                            "category": "product_name",
+                            "name": "TeleControl Server Basic V3.1",
+                            "product": {
+                                "name": "TeleControl Server Basic V3.1",
+                                "product_id": "fake-product-id-11",
+                                "product_identification_helper": {
+                                    "cpe": "cpe:/o:siemens:telecontrol_server_basic:3.1"
+                                },
+                            },
+                        }
+                    ],
+                },
+            ],
+            "relationships": [
+                {
+                    "category": "fake-category",
+                    "full_product_name": {
+                        "name": "SENTRON 7KT PAC1260",
+                        "product_id": "fake-product-id-1",
+                    },
+                    "product_reference": "fake-product-id-1",
+                    "relates_to_product_reference": "fake-product-id-11",
                 }
-            ]
+            ],
         },
         "vulnerabilities": [
             {"cve": "CVE-2024-0001", "title": "Improper Input Validation"},
@@ -75,7 +103,7 @@ DOCUMENTS_FULL = [
                             "name": "ProGauge MAGLINK LX CONSOLE",
                             "product": {
                                 "name": "ProGauge MAGLINK LX CONSOLE",
-                                "product_id": "5822",
+                                "product_id": "fake-product-id-2",
                                 "product_identification_helper": {
                                     "cpe": "cpe:/o:dover:progauge_maglink_lx_console:-"
                                 },
@@ -108,7 +136,7 @@ DOCUMENTS_FULL = [
                             "name": "TeleControl Server Basic V3.1",
                             "product": {
                                 "name": "TeleControl Server Basic V3.1",
-                                "product_id": "9348",
+                                "product_id": "fake-product-id-3",
                                 "product_identification_helper": {
                                     "cpe": "cpe:/o:siemens:telecontrol_server_basic:3.1"
                                 },
