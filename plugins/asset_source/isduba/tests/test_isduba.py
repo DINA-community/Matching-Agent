@@ -16,7 +16,7 @@ from examples import DOCS_META, DOCUMENTS_FULL
 
 
 # -----------------------------------------------------------
-# Fixtures & Hilfsfunktionen
+# Fixtures & Helper Functions
 # -----------------------------------------------------------
 
 

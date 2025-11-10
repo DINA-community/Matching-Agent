@@ -1,3 +1,13 @@
+from dina.plugins.datasource.isduba.datamodels import (
+    CsafProductTree,
+    Product,
+    ProductIdentificationHelper,
+    ProductInfo,
+    ProductVersion,
+    Relationship,
+    CsafDocument,
+)
+
 DOCS_META = [
     {
         "id": 1,
@@ -151,3 +161,61 @@ DOCUMENTS_FULL = [
         ],
     },
 ]
+
+PRODUCT_HELPER = ProductIdentificationHelper(
+    cpe="cpe:/a:vendor:product:1.2.3",
+    purl="pkg:generic/vendor@1.2.3",
+    model_numbers=["1234", "5678"],
+    skus=["SKU-123"],
+    sbom_urls=["https://example.com/sbom.json"],
+    serial_numbers=["SN-98765"],
+)
+
+PRODUCT = Product(
+    name="Example Product",
+    product_id="P-001",
+    product_identification_helper=PRODUCT_HELPER,
+)
+
+PRODUCT_VERSION = ProductVersion(
+    name="1.2.3",
+    product=PRODUCT,
+)
+
+PRODUCT_INFO = ProductInfo(
+    manufacturer="ExampleCorp",
+    product_name="Example Product",
+    product_family="Example Family",
+    service_pack="SP1",
+    patch_level="PL2",
+    host_name="example-host",
+    product_version=PRODUCT_VERSION,
+)
+
+CSAF_DOCUMENT = CsafDocument(
+    host="https://example.com",
+    path="/api/documents/123",
+    title="Example Security Advisory",
+    version="2.0",
+    lang="en",
+    publisher="ExampleCERT",
+)
+
+RELATIONSHIPS = [
+    Relationship(
+        category="default_component_of",
+        product_reference="P-001",
+        relates_to_product_reference="P-002",
+    ),
+    Relationship(
+        category="installed_on",
+        product_reference="P-002",
+        relates_to_product_reference="P-003",
+    ),
+]
+
+CSAF_PRODUCT_TREE = CsafProductTree(
+    csaf_document=CSAF_DOCUMENT,
+    product_list=[[PRODUCT_INFO]],
+    relationships_list=RELATIONSHIPS,
+)
