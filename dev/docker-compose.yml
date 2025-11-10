@@ -91,7 +91,7 @@ services:
     container_name: "isduba-server"
     build:
       context: ./isduba
-      dockerfile: ../isduba.Dockerfile
+      dockerfile: ../isduba/docker/server/Dockerfile
       args:
         BUILD_VERSION: v0.0.0
     networks:
