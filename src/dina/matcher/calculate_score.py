@@ -38,9 +38,16 @@ class Score:
 
         # Extract base field matches
         for field, weight in (self.fields or {}).items():
-            val = df_norm.select([f"{field}_match"]).to_series()
-            v = val.item() if not val.is_empty() else np.nan
             weights.append(weight)
+
+            try:
+                val = df_norm.select([f"{field}_match"])
+                val = val.to_series()
+            except pl.ColumnNotFoundError:
+                scores.append(np.nan)
+                continue
+
+            v = val.item() if not val.is_empty() else np.nan
 
             if v is None or np.isnan(v):
                 scores.append(np.nan)
