@@ -67,6 +67,9 @@ class Matching:
         if val == {}:
             return val
 
+        if isinstance(val, dict):
+            return val
+
         try:
             val = json.loads(val)
             if val:
@@ -179,9 +182,9 @@ class Matching:
         s2 = self._normalize_text(s2)
 
         # --- Early exits ---
-        if not s1 and not s2:
+        if (not s1 and not s2) or (s1 is None and s2 is None):
             return None
-        if not s1 or not s2:
+        if (not s1 or not s2) or (s1 is None or s2 is None):
             return 0.0
 
         # --- Exact match shortcut ---
@@ -535,6 +538,17 @@ class Matching:
         self, csaf_version: dict, asset_version: dict
     ) -> float | None:
         """Compare version ranges (min/max) between CSAF and asset."""
+        if not csaf_version and not asset_version:
+            return np.nan
+
+        if (
+            not csaf_version
+            or not asset_version
+            or not isinstance(csaf_version, dict)
+            or not isinstance(asset_version, dict)
+        ):
+            return 0.0
+
         csaf_ranges = [
             r
             for r in csaf_version.get("min_max_version", [])
@@ -570,6 +584,12 @@ class Matching:
             0.0 if asset is older
             np.nan if both empty
         """
+        if not csaf_version and not asset_version:
+            return np.nan
+
+        if not csaf_version or not asset_version:
+            return 0.0
+
         csaf_q = csaf_version.get("qualifier")
         asset_q = asset_version.get("qualifier")
 
