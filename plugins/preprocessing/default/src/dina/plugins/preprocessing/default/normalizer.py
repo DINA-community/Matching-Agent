@@ -40,27 +40,25 @@ class Normalizer:
     # ============================================================
 
     def parse_version(self, expr: str):
-        if isinstance(expr, pl.Series) or isinstance(expr, list):
-            expr_list = []
+        if isinstance(expr, dict) and "schema" in expr:
+            return expr
 
+        if isinstance(expr, (list, pl.Series)):
             if isinstance(expr, pl.Series):
                 if expr.is_empty():
-                    return expr_list
+                    return []
                 expr = expr.to_list()
 
-            if not expr or expr is None:
-                return expr_list
+            if all(isinstance(e, dict) and "schema" in e for e in expr):
+                return expr
 
-            for e in expr:
-                value = self.parse_version(e)
-
-                if value:
-                    expr_list.append(value)
-
-            return expr_list
+            return [v for e in expr if (v := self.parse_version(e))]
 
         if not expr or expr is None:
             return None
+
+        if not isinstance(expr, str):
+            expr = str(expr)
 
         expr = expr.lower()
         expr = re.sub(r"\s*\+\s*", "+", expr).strip()
@@ -191,10 +189,10 @@ class Normalizer:
             d["name"] = None
 
         for key in ("type", "namespace", "name", "subpath"):
-            if d[key] in (None, ""):
+            if d.get(key) in (None, ""):
                 d[key] = None
 
-        if not d["qualifiers"]:
+        if not d.get("qualifiers"):
             d["qualifiers"] = {}
 
         return d
@@ -202,10 +200,13 @@ class Normalizer:
     def parse_files(self, files: list[dict]) -> list[dict]:
         results = []
 
-        for file in files:
-            name = file.get("name")
-            hash_algorithm = file.get("hash_algorithm")
-            file_hash = file.get("file_hash")
+        if not files:
+            return results
+
+        for file in files.files:
+            name = getattr(file, "name", None)
+            hash_algorithm = getattr(file, "hash_algorithm", None)
+            file_hash = getattr(file, "file_hash", None)
 
             name = self.parse_freetext(name) if name else None
             file_hash = self.parse_freetext(file_hash) if file_hash else None
@@ -267,7 +268,7 @@ class Normalizer:
             ),
             (
                 Standards.SAP,
-                r"^[vV]?\d+(?:[ ._+]+(?:sp\d+|r\d+|upd\d+|update\d+|hf\d+|patch\d+|build\d+|h\d+|lts\d+))+$",
+                r"^[vV]?\d+(?:[ ._+]*(?:sp\d+|r\d+|upd\d+|update\d+|hf\d+|patch\d+|build\d+|h\d+|lts\d+))*$",
             ),
             (
                 Standards.ERICSSON_RELEASE_SCHEMA,
