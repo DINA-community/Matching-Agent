@@ -268,7 +268,7 @@ class Normalizer:
             ),
             (
                 Standards.SAP,
-                r"^[vV]?\d+(?:[ ._+]*(?:sp\d+|r\d+|upd\d+|update\d+|hf\d+|patch\d+|build\d+|h\d+|lts\d+))*$",
+                r"^[vV]?\d+(?:[._+]?\d+)?(?:[ ._+]*(?:sp\d+|r\d+|upd\d+|update\d+|hf\d+|patch\d+|build\d+|h\d+|lts\d+))*$",
             ),
             (
                 Standards.ERICSSON_RELEASE_SCHEMA,
@@ -721,7 +721,8 @@ class Normalizer:
 #         # "1.0.0+20130313144700",
 #         # "1.0.0+21AF26D3--117B344092BD",
 #         # "1.0.0-alpha+001",
-#         # "1.0.0-beta+exp.sha.5114f85"
+#         # "1.0.0-beta+exp.sha.5114f85",
+#         # "v4.2sp3"
 #     ]
 
 #     for ex in examples:
