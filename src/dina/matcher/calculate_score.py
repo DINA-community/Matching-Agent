@@ -1,4 +1,5 @@
 import numpy as np
+import polars as pl
 
 
 class Score:
@@ -23,134 +24,124 @@ class Score:
 
         self.fields = {**freetext_fields, **ordered_fields, **other_fields}
 
-    def calculate_overall_score(self, df_norm):
-        vendor_score = product_name_score = product_family_score = version_score = (
-            keyword_score
-        ) = 0.0
-
+    def calculate_overall_score(self, df_norm: pl.DataFrame):
+        """
+        Compute an overall matching score with threshold-based classification.
+        Returns:
+            (int, str, float): (match_flag, message, score_percent)
+        """
+        scores, weights = [], []
         keyword_scores = []
+        cpe_score, purl_score = 0.0, 0.0
 
-        scores = np.array([], dtype=float)
-        scores_weights = np.array([], dtype=float)
+        vendor_score = product_name_score = product_family_score = version_score = None
 
-        if self.fields and self.fields.items():
-            for field, weight in self.fields.items():
-                val = df_norm.select([f"{field}_match"]).to_series()
-                scores_weights = np.append(scores_weights, weight)
+        # Extract base field matches
+        for field, weight in (self.fields or {}).items():
+            val = df_norm.select([f"{field}_match"]).to_series()
+            v = val.item() if not val.is_empty() else np.nan
+            weights.append(weight)
 
-                if val.item() is None:
-                    scores = np.append(scores, np.nan)
-                    continue
+            if v is None or np.isnan(v):
+                scores.append(np.nan)
+                continue
 
-                if val.is_empty():
-                    scores = np.append(scores, np.nan)
-                    continue
+            if field == "cpe":
+                cpe_score = v
 
-                v = val.item()
+            if field == "purl":
+                purl_score = v
 
-                field_csaf_cpe_norm_match = f"{field}_{self.csaf_purl_field_name}_match"
+            # Compute field-specific score
+            score = self._compute_field_score(df_norm, field, v)
+            scores.append(score)
 
-                match field:
-                    case "manufacturer_name":
-                        vendor_score = max(v, vendor_score)
+            # Keep for reporting
+            if field == "manufacturer_name":
+                vendor_score = score * 100
+            elif field == "name":
+                product_name_score = score * 100
+            elif field == "device_family":
+                product_family_score = score * 100
+            elif field == "version":
+                version_score = score * 100
+            else:
+                keyword_scores.append(score * 100)
 
-                        if "cpe" in self.fields:
-                            if field_csaf_cpe_norm_match in df_norm.columns:
-                                cpe_asset = df_norm.select(
-                                    [field_csaf_cpe_norm_match]
-                                ).to_series()
+        # Compute combined weighted score
+        keyword_score = np.mean(keyword_scores) if keyword_scores else None
 
-                                if cpe_asset.item() is not None:
-                                    vendor_score = max(cpe_asset.item(), vendor_score)
+        if cpe_score == 1.0 or purl_score == 1.0:
+            score_percent = 1.0
+        else:
+            scores = np.array(scores, dtype=float)
+            weights = np.array(weights, dtype=float)
+            valid_mask = ~np.isnan(scores)
 
-                        scores = np.append(scores, vendor_score)
-                        vendor_score = vendor_score * 100
-                    case "name":
-                        product_name_score = max(v, product_name_score)
+            score_percent = (
+                np.nansum(scores * weights) / np.nansum(weights[valid_mask]) * 100
+                if np.any(valid_mask)
+                else 0.0
+            )
 
-                        if "cpe" in self.fields:
-                            if field_csaf_cpe_norm_match in df_norm.columns:
-                                cpe_asset = df_norm.select(
-                                    [field_csaf_cpe_norm_match]
-                                ).to_series()
-
-                                if cpe_asset.item() is not None:
-                                    product_name_score = max(
-                                        cpe_asset.item(), product_name_score
-                                    )
-
-                        scores = np.append(scores, product_name_score)
-                        product_name_score = product_name_score * 100
-                    case "device_family":
-                        scores = np.append(scores, v)
-                        product_family_score = v * 100
-                    case "version":
-                        version_score = max(v, version_score)
-
-                        if "cpe" in self.fields:
-                            asset_csaf_cpe_norm_match = (
-                                f"asset_{self.csaf_purl_field_name}_match"
-                            )
-
-                            if asset_csaf_cpe_norm_match in df_norm.columns:
-                                cpe_asset = df_norm.select(
-                                    [asset_csaf_cpe_norm_match]
-                                ).to_series()
-                                if cpe_asset.item() is not None:
-                                    version_score = max(cpe_asset.item(), version_score)
-
-                            if field_csaf_cpe_norm_match in df_norm.columns:
-                                cpe_version = df_norm.select(
-                                    [field_csaf_cpe_norm_match]
-                                ).to_series()
-                                if cpe_version.item() is not None:
-                                    version_score = max(
-                                        cpe_version.item(), version_score
-                                    )
-                        if "purl" in self.fields:
-                            asset_csaf_purl_norm_match = (
-                                f"asset_{self.csaf_purl_field_name}_match"
-                            )
-                            version_csaf_purl_norm_match = (
-                                f"{field}_{self.csaf_purl_field_name}_match"
-                            )
-
-                            if asset_csaf_purl_norm_match in df_norm.columns:
-                                purl_asset = df_norm.select(
-                                    [asset_csaf_purl_norm_match]
-                                ).to_series()
-                                if purl_asset.item() is not None:
-                                    version_score = max(
-                                        purl_asset.item(), version_score
-                                    )
-
-                            if version_csaf_purl_norm_match in df_norm.columns:
-                                purl_version = df_norm.select(
-                                    [version_csaf_purl_norm_match]
-                                ).to_series()
-                                if purl_version.item() is not None:
-                                    version_score = max(
-                                        purl_version.item(), version_score
-                                    )
-
-                        scores = np.append(scores, version_score)
-                        version_score = version_score * 100
-                    case _:
-                        scores = np.append(scores, v)
-                        keyword_scores.append(v * 100)
-
-        keyword_score = (
-            sum(keyword_scores) / len(keyword_scores) if keyword_scores else 0.0
+        return self._evaluate_thresholds(
+            vendor_score,
+            product_name_score,
+            product_family_score,
+            version_score,
+            keyword_score,
+            score_percent,
         )
 
-        valid_scores = scores[~np.isnan(scores)]
-        score_percent = 0.0
+    def _compute_field_score(
+        self, df: pl.DataFrame, field: str, base_value: float
+    ) -> float:
+        """Compute the best score for a given field, considering CPE and PURL enhancements."""
+        score = base_value
 
-        if valid_scores.size >= 2:
-            weighted_sum = np.nansum(scores * scores_weights)
-            weight_sum = np.nansum(scores_weights[~np.isnan(scores)])
-            normalized_score = weighted_sum / weight_sum if weight_sum > 0 else None
-            score_percent = normalized_score * 100
+        # ---- Vendor and Product fields can be improved via CPE ----
+        if field in {"manufacturer_name", "name", "version"}:
+            score = self._max_field_score(df, field, base_value)
+
+        return score
+
+    def _max_field_score(self, df: pl.DataFrame, field: str, score: float) -> float:
+        """Return max score among base, CPE and PURL fields if available."""
+        check_fields = []
+
+        if "cpe" in self.fields:
+            check_fields.extend(
+                [
+                    f"asset_{self.csaf_cpe_field_name}_match",
+                    f"{field}_{self.csaf_cpe_field_name}_match",
+                ]
+            )
+        if "purl" in self.fields and field == "version":
+            check_fields.extend(
+                [
+                    f"asset_{self.csaf_purl_field_name}_match",
+                    f"{field}_{self.csaf_purl_field_name}_match",
+                ]
+            )
+
+        for col in check_fields:
+            if col in df.columns:
+                val = df.select([col]).to_series().item()
+                if val is not None:
+                    score = max(score, val)
+
+        return score
+
+    def _evaluate_thresholds(
+        self,
+        vendor_score,
+        product_name_score,
+        product_family_score,
+        version_score,
+        keyword_score,
+        score_percent,
+    ):
+        """Apply threshold-based match logic and return classification."""
 
         # Check if vendor score is missing
         if vendor_score is None:
