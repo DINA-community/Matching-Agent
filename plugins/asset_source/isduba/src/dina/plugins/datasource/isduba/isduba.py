@@ -201,7 +201,7 @@ class IsdubaDataSource(DataSourcePlugin):
             api_key_prefix={"bearerAuth": "Bearer"},
             debug=True,
         )
-        configuration.verify_ssl = self.config.DataSource.Plugin.verify_ssl
+        configuration.verify_ssl = self.config.DataSource.Plugin.verify_ssl or False
 
         return configuration
 
@@ -221,65 +221,83 @@ class IsdubaDataSource(DataSourcePlugin):
         config = self._create_api_config(self.origin_uri, token)
 
         async with isduba_api_client.ApiClient(config) as api_client:
-            api = isduba_api_client.DefaultApi(api_client)
+            api_instance = isduba_api_client.DefaultApi(api_client)
 
             for prod in existing_products:
-                try:
-                    doc_id_str = prod.origin_info["path"]
-                    doc_id = int(doc_id_str.removeprefix("/api/documents/"))
+                again = True
+                attempt = 0
 
-                    response = await api.documents_id_get(doc_id)
+                while again and attempt <= 1:
+                    try:
+                        again = False
+                        doc_id_str = prod.origin_info["path"]
+                        doc_id = int(doc_id_str.removeprefix("/api/documents/"))
 
-                    product_tree = response.get("product_tree")
+                        response = await api_instance.documents_id_get(doc_id)
 
-                    if not product_tree:
-                        continue
+                        product_tree = response.get("product_tree")
 
-                    relationships: list[Relationship] = []
+                        if not product_tree:
+                            continue
 
-                    existing_relationships: List[Relationship] = get_relationships(
-                        product_tree
-                    )
+                        relationships: list[Relationship] = []
 
-                    for rel in existing_relationships:
-                        product_ref = await fetcher_view.get_existing(
-                            CsafProduct,
-                            and_(
-                                cast(
-                                    CsafProduct.origin_info["product_name_id"].astext,
-                                    String,
-                                )
-                                == str(rel.product_reference),
-                                cast(CsafProduct.origin_info["path"].astext, String)
-                                == doc_id_str,
-                            ),
-                        )
-                        relates_to_ref = await fetcher_view.get_existing(
-                            CsafProduct,
-                            and_(
-                                cast(
-                                    CsafProduct.origin_info["product_name_id"].astext,
-                                    String,
-                                )
-                                == str(rel.relates_to_product_reference),
-                                cast(CsafProduct.origin_info["path"].astext, String)
-                                == doc_id_str,
-                            ),
+                        existing_relationships: List[Relationship] = get_relationships(
+                            product_tree
                         )
 
-                        if product_ref and relates_to_ref:
-                            relationships.append(
-                                Relationship(
-                                    parent=product_ref[0],
-                                    child=relates_to_ref[0],
-                                    ty=CsafProduct,
-                                )
+                        for rel in existing_relationships:
+                            product_ref = await fetcher_view.get_existing(
+                                CsafProduct,
+                                and_(
+                                    cast(
+                                        CsafProduct.origin_info[
+                                            "product_name_id"
+                                        ].astext,
+                                        String,
+                                    )
+                                    == str(rel.product_reference),
+                                    cast(CsafProduct.origin_info["path"].astext, String)
+                                    == doc_id_str,
+                                ),
+                            )
+                            relates_to_ref = await fetcher_view.get_existing(
+                                CsafProduct,
+                                and_(
+                                    cast(
+                                        CsafProduct.origin_info[
+                                            "product_name_id"
+                                        ].astext,
+                                        String,
+                                    )
+                                    == str(rel.relates_to_product_reference),
+                                    cast(CsafProduct.origin_info["path"].astext, String)
+                                    == doc_id_str,
+                                ),
                             )
 
-                    return FetchRelationshipsResult(again=False, data=relationships)
+                            if product_ref and relates_to_ref:
+                                relationships.append(
+                                    Relationship(
+                                        parent=product_ref[0],
+                                        child=relates_to_ref[0],
+                                        ty=CsafProduct,
+                                    )
+                                )
 
-                except Exception as e:
-                    logger.error(f"Error fetching relationships for {prod.id}: {e}")
+                        return FetchRelationshipsResult(again=False, data=relationships)
+
+                    except isduba_api_client.exceptions.ApiException as e:
+                        if e.status == 401:
+                            api_instance.api_client.configuration.api_key[
+                                "bearerAuth"
+                            ] = await self.get_new_token()
+                            again = True
+                            attempt += 1
+                        else:
+                            logger.error(f"Unhandled API error ({e.status}): {e}")
+                    except Exception as e:
+                        logger.error(f"Error fetching data for {prod.id}: {e}")
 
         return FetchRelationshipsResult(again=False)
 
@@ -313,34 +331,46 @@ class IsdubaDataSource(DataSourcePlugin):
             results = []
 
             for d in data_to_check:
-                try:
-                    doc_id = int(d.origin_info["path"].removeprefix("/api/documents/"))
-                    document_result = await self._safe_documents_id_get(
-                        api_instance, doc_id
-                    )
+                again = True
+                attempt = 0
 
-                    results.append(
-                        CleanUpDecision(
-                            can_delete=document_result is None,
-                            id=d.id,
-                            ty=CsafProduct,
+                while again and attempt <= 2:
+                    try:
+                        again = False
+                        doc_id = int(
+                            d.origin_info["path"].removeprefix("/api/documents/")
                         )
-                    )
-                except Exception as e:
-                    logger.error(f"Error checking CSAF product {d.id}: {e}")
-                    raise
+                        document_result = await api_instance.documents_id_get(doc_id)
+
+                        results.append(
+                            CleanUpDecision(
+                                can_delete=document_result is None,
+                                id=d.id,
+                                ty=CsafProduct,
+                            )
+                        )
+                    except isduba_api_client.exceptions.ApiException as e:
+                        if e.status == 401:
+                            api_instance.api_client.configuration.api_key[
+                                "bearerAuth"
+                            ] = await self.get_new_token()
+                            again = True
+                            attempt += 1
+                        else:
+                            logger.error(f"Unhandled API error ({e.status}): {e}")
+                    except Exception as e:
+                        logger.error(f"Error checking CSAF product {d.id}: {e}")
+                        raise
 
         return results
 
-    async def _safe_documents_id_get(self, api_instance, doc_id: int):
+    async def get_new_token(self) -> str:
         try:
-            return await api_instance.documents_id_get(doc_id)
-        except isduba_api_client.exceptions.UnauthorizedException:
-            token = await self._get_token(self.config.DataSource.Plugin.keycloak_url)
-            configuration = self._create_api_config(self.origin_uri, token)
-            async with isduba_api_client.ApiClient(configuration) as new_client:
-                new_instance = isduba_api_client.DefaultApi(new_client)
-                return await new_instance.documents_id_get(doc_id)
+            logger.warning("Token expired, refreshing token...")
+            return await self._get_token(self.config.DataSource.Plugin.keycloak_url)
+        except Exception as e:
+            logger.error(f"Unhandled API error ({e.status}): {e}")
+            raise
 
     async def cleanup_relationships(
         self, relationships_to_check: List[MappedRelationship]

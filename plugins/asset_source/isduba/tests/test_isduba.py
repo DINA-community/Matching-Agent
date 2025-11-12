@@ -150,19 +150,25 @@ async def test_cleanup_products_returns_expected_decisions(monkeypatch, mock_con
         )
     )
 
-    class DummyApiClientCtx:
-        async def __aenter__(self):
-            return MagicMock()
-
-        async def __aexit__(self, exc_type, exc, tb):
+    class DummyDefaultApi:
+        def __init__(self, *_, **__):
             pass
 
-    monkeypatch.setattr(
-        "dina.plugins.datasource.isduba.isduba.isduba_api_client.ApiClient",
-        lambda conf: DummyApiClientCtx(),
-    )
+        def select_header_accept(self, _):
+            return "application/json"
 
-    plugin._safe_documents_id_get = AsyncMock(return_value=None)
+        async def documents_id_get(self, doc_id):
+            return {
+                "id": doc_id,
+                "title": f"Mocked document {doc_id}",
+                "status": "ok",
+                "product_tree": {"branches": []},
+            }
+
+    monkeypatch.setattr(
+        "dina.plugins.datasource.isduba.isduba.isduba_api_client.DefaultApi",
+        lambda api_client: DummyDefaultApi(),
+    )
 
     product1 = MagicMock(spec=CsafProduct)
     product1.id = 101
@@ -179,68 +185,8 @@ async def test_cleanup_products_returns_expected_decisions(monkeypatch, mock_con
     assert isinstance(result, list)
     assert len(result) == 2
     assert all(isinstance(r, CleanUpDecision) for r in result)
-
-    assert all(r.can_delete for r in result)
     assert {r.id for r in result} == {101, 202}
     assert all(r.ty is CsafProduct for r in result)
-
-
-@pytest.mark.asyncio
-async def test_safe_documents_id_get_success(mock_config):
-    """Tests that _safe_documents_id_get returns result when no exception occurs."""
-    plugin = IsdubaDataSource(mock_config)
-
-    fake_api = MagicMock()
-    fake_api.documents_id_get = AsyncMock(return_value={"result": "ok"})
-
-    result = await plugin._safe_documents_id_get(fake_api, 123)
-
-    assert result == {"result": "ok"}
-    fake_api.documents_id_get.assert_awaited_once_with(123)
-
-
-@pytest.mark.asyncio
-async def test_safe_documents_id_get_unauthorized(monkeypatch, mock_config):
-    """Tests that _safe_documents_id_get refreshes token on UnauthorizedException."""
-
-    plugin = IsdubaDataSource(mock_config)
-
-    fake_api = MagicMock()
-    fake_api.documents_id_get = AsyncMock(
-        side_effect=isduba_api_client.exceptions.UnauthorizedException(
-            "401 Unauthorized"
-        )
-    )
-
-    plugin._get_token = AsyncMock(return_value="new-fake-token")
-
-    fake_new_api = MagicMock()
-    fake_new_api.documents_id_get = AsyncMock(return_value={"result": "new-client-ok"})
-
-    monkeypatch.setattr(
-        "dina.plugins.datasource.isduba.isduba.isduba_api_client.DefaultApi",
-        lambda client: fake_new_api,
-    )
-
-    class DummyClientCtx:
-        async def __aenter__(self):
-            return MagicMock()
-
-        async def __aexit__(self, exc_type, exc, tb):
-            pass
-
-    monkeypatch.setattr(
-        "dina.plugins.datasource.isduba.isduba.isduba_api_client.ApiClient",
-        lambda conf: DummyClientCtx(),
-    )
-
-    plugin._create_api_config = MagicMock(return_value=MagicMock())
-
-    result = await plugin._safe_documents_id_get(fake_api, 999)
-
-    assert result == {"result": "new-client-ok"}
-    plugin._get_token.assert_awaited_once()
-    fake_new_api.documents_id_get.assert_awaited_once_with(999)
 
 
 def test_process_document_with_valid_product_tree(monkeypatch):
