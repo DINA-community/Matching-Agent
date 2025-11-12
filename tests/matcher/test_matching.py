@@ -66,6 +66,7 @@ def test_extract_field(matcher):
     assert matcher._extract_field({"version": 123}, "version") == {"raw": "123"}
     assert matcher._extract_field('{"something": 1}', "version") is None
     assert matcher._extract_field("", "version") is None
+    assert matcher._extract_field(123, None) is None
 
 
 def test_has_valid_json(matcher):
@@ -104,6 +105,7 @@ def test_tokenize_clean_and_ngram(matcher):
     ngrams = matcher._ngrams_from_tokens(["x", "y", "z"], 2)
     assert isinstance(ngrams, list)
     assert matcher._ngram_similarity(["a"], ["a"]) == 1.0
+    assert matcher._ngrams_from_tokens([], n=2) == []
 
 
 def test_ngram_similarity(matcher):
@@ -113,6 +115,9 @@ def test_ngram_similarity(matcher):
     matcher.ngram_weights = {2: 0.3, 3: 0.7}
     score = matcher._weighted_ngram_similarity(["a", "b", "c"], ["a", "b", "x"], True)
     assert score == 0.81
+    matcher.ngram_weights = {}
+    score = matcher._weighted_ngram_similarity([], [], True)
+    assert score == 0.0
 
 
 def test_token_similarity(matcher):
@@ -143,6 +148,14 @@ def test_range_in_range(matcher):
     )
     assert matcher._range_in_range(
         {"min": "1", "max": "2", "min_inclusive": True, "max_inclusive": False},
+        {"min": "2", "max": "3", "min_inclusive": True, "max_inclusive": True},
+    ) in (True, False)
+    assert matcher._range_in_range(
+        {"min": "1", "max": "2", "min_inclusive": True, "max_inclusive": False},
+        {"min": None, "max": None, "min_inclusive": True, "max_inclusive": True},
+    ) in (True, False)
+    assert matcher._range_in_range(
+        {"min": None, "max": None, "min_inclusive": True, "max_inclusive": False},
         {"min": "2", "max": "3", "min_inclusive": True, "max_inclusive": True},
     ) in (True, False)
 

@@ -61,11 +61,8 @@ class Matching:
     # ============================================================
 
     def _safe_load(self, val):
-        if not val or val is None:
+        if not val or val is None or val == {}:
             return None
-
-        if val == {}:
-            return val
 
         if isinstance(val, dict):
             return val
@@ -193,8 +190,6 @@ class Matching:
 
         # --- Tokenize ---
         tokens1, tokens2 = self._tokenize_freetext(s1, s2, ignore_order)
-        if not tokens1 or not tokens2:
-            return 0.0
 
         # --- Token-level similarity ---
         token_similarity = self._token_similarity(tokens1, tokens2)
