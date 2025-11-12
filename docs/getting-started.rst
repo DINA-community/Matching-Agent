@@ -54,9 +54,9 @@ Quick start
 
     When using the fully local development environment, the URLs and default credentials are as follows:
 
-    - NetBox UI: http://localhost:8800 (default: admin/admin)
-    - NetBox Keycloak instance: http://localhost:8080
-    - ISDuBa UI: http://localhost:5371 (default: user/user)
+    - NetBox UI: http://netbox.localhost/ (default: admin/admin)
+    - NetBox Keycloak instance: http://keycloak.localhost/
+    - ISDuBa UI: http://isduba.localhost/ (default: user/user)
     - The NetBox API token is printed by the ``netbox-setup`` container logs:
         .. code-block:: bash
 
@@ -70,14 +70,14 @@ Quick start
 
      - Copy: ``assets/plugin_configs/data_source/asset/sample/netbox.toml``
        to a new file in ``assets/plugin_configs/data_source/asset/`` (e.g. ``netbox_local.toml``)
-     - Set ``url`` (e.g. http://localhost:8800) and ``api_token`` (see token from setup logs)
+     - Set ``url`` (e.g. http://netbox.localhost/) and ``api_token`` (see token from setup logs)
 
    - ISDuBa fetcher (CSAF source):
 
      - Copy: ``assets/plugin_configs/data_source/csaf/sample/isduba.toml``
        to a new file in ``assets/plugin_configs/data_source/csaf/`` (e.g. ``isduba_local.toml``)
-     - Set ``url`` (e.g. http://localhost:5371), ``username``/``password`` (default user/user), and
-       ``keycloak_url`` (e.g. http://localhost:8080)
+     - Set ``url`` (e.g. http://isduba.localhost/), ``username``/``password`` (default user/user), and
+       ``keycloak_url`` (e.g. http://keycloak.localhost/)
 
 Running the services
 --------------------
