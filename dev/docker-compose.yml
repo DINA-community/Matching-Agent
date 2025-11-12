@@ -18,8 +18,6 @@ services:
   keycloak:
     image: keycloak/keycloak:26.0
     container_name: "isduba-keycloak"
-    ports:
-      - "8080:8080"
     command: ["start-dev"]
     environment:
       KC_DB: postgres
@@ -32,7 +30,7 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: secret
 
-      KC_HOSTNAME: http://localhost:8080
+      KC_HOSTNAME: http://keycloak.localhost
       # Optional, reduce memory usage
       JAVA_OPTS: >
         -XX:MaxHeapFreeRatio=10
@@ -53,6 +51,10 @@ services:
     depends_on:
       isduba-db:
         condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.keycloak.rule=Host(`keycloak.localhost`)"
+      - "traefik.http.services.keycloak.loadbalancer.server.port=8080"
 
   keycloak-setup:
     image: keycloak/keycloak:26.0
@@ -64,7 +66,7 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: secret
-      CLIENT_HOSTNAME_URL: http://localhost:5371
+      CLIENT_HOSTNAME_URL: http://isduba.localhost
     volumes:
       - ./isduba/docker/keycloak/init.sh:/opt/keycloak/init.sh
     depends_on:
@@ -97,17 +99,19 @@ services:
     networks:
       - isduba
     environment:
-      ISDUBA_CLIENT_KEYCLOAK_URL: http://localhost:8080
+      ISDUBA_CLIENT_KEYCLOAK_URL: http://keycloak.localhost
       ISDUBA_CLIENT_KEYCLOAK_REALM: "isduba"
       ISDUBA_CLIENT_KEYCLOAK_CLIENT_ID: "auth"
       ISDUBA_CLIENT_IDLE_TIMEOUT: "30m"
-    ports:
-      - "5371:8081"
     depends_on:
       isduba-db:
         condition: service_healthy
       keycloak:
         condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.isduba.rule=Host(`isduba.localhost`)"
+      - "traefik.http.services.isduba.loadbalancer.server.port=8081"
 
   # redis
   redis:
@@ -148,7 +152,7 @@ services:
       args:
         BUILD_VERSION: v0.0.0
     ports:
-      - "8800:8080"
+      - "8800:8800"
     depends_on:
       - postgres
       - redis
@@ -156,7 +160,7 @@ services:
     env_file: netbox/env/netbox.env
     user: "unit:root"
     healthcheck:
-      test: curl -f http://localhost:8080/login/ || exit 1
+      test: curl -f http://localhost:8800/login/ || exit 1
       start_period: 180s
       timeout: 3s
       interval: 15s
@@ -168,6 +172,10 @@ services:
       - netbox-media-files:/opt/netbox/netbox/media:rw
       - netbox-reports-files:/opt/netbox/netbox/reports:rw
       - netbox-scripts-files:/opt/netbox/netbox/scripts:rw
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.netbox.rule=Host(`netbox.localhost`)"
+      - "traefik.http.services.netbox.loadbalancer.server.port=8800"
 
   netbox-worker:
     <<: *netbox
@@ -186,6 +194,8 @@ services:
       interval: 15s
     networks:
       - netbox
+    labels:
+      - "traefik.enable=false"
 
   netbox-housekeeping:
     <<: *netbox
@@ -202,6 +212,8 @@ services:
       interval: 15s
     networks:
       - netbox
+    labels:
+      - "traefik.enable=false"
 
   netbox-setup:
     <<: *netbox
@@ -218,6 +230,8 @@ services:
       NETBOX_SUPERUSER_EMAIL: ${NETBOX_SUPERUSER_EMAIL:-admin@example.com}
     networks:
       - netbox
+    labels:
+      - "traefik.enable=false"
 
   # postgres
   postgres:
@@ -234,6 +248,28 @@ services:
     volumes:
       - netbox-postgres-data:/var/lib/postgresql/data
 
+  traefik:
+    image: traefik:v3.6.0
+    command:
+      - --api=true
+      - --api.insecure=true
+      - --api.debug=true
+      - --api.dashboard=true
+      - --providers.docker
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+    ports:
+      - "80:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - netbox
+      - isduba
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.localhost`)"
+      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
 
 volumes:
   postgres_data:
