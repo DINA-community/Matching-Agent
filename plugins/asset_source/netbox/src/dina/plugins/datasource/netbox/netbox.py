@@ -3,6 +3,7 @@ import time
 from datetime import timezone
 from typing import List, Any
 
+import httpx
 from pydantic import BaseModel, HttpUrl
 from sqlalchemy import Integer
 
@@ -540,7 +541,10 @@ class NetboxDataSource(DataSourcePlugin):
             for match in new_matches
         ]
 
-        await asyncio.gather(*requests)
+        try:
+            await asyncio.gather(*requests)
+        except httpx.HTTPError as e:
+            logger.error(f"Failed to notify new matches: {e}")
 
     @property
     def origin_uri(self):
