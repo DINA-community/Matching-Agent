@@ -18,7 +18,7 @@ import uvicorn
 from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.params import Query, Depends
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, HttpUrl, Field
 import polars as pl
 
 from dina.cachedb.database import CacheDB
@@ -28,7 +28,6 @@ from dina.common.log import configure_logging, get_logger, LoggingConfig
 import sys
 
 from dina.matcher.calculate_score import Score
-from dina.matcher.clean_text import Normalizer
 from dina.matcher.matching import Matching
 
 from dina.synchronizer.base import load_datasource_plugins
@@ -85,6 +84,54 @@ class MatcherConfig(BaseModel):
     Logging: LoggingConfig | None = None
 
 
+class DatabaseConfig(BaseModel):
+    freetext_fields_separator: str
+    freetext_fields: dict[str, float] = Field(default_factory=dict)
+    ordered_fields: dict[str, float] = Field(default_factory=dict)
+    other_fields: dict[str, float] = Field(default_factory=dict)
+    freetext_fields_weights: dict[str, float] = Field(default_factory=dict)
+
+
+class VersionConfig(BaseModel):
+    weights: dict[str, float] = Field(default_factory=dict)
+
+
+class CpeConfig(BaseModel):
+    csaf_cpe_field_name: str
+    weights: dict[str, float] = Field(default_factory=dict)
+
+
+class PurlConfig(BaseModel):
+    csaf_purl_field_name: str
+    weights: dict[str, float] = Field(default_factory=dict)
+
+
+class NgramConfig(BaseModel):
+    weights: dict[int, float] = Field(default_factory=dict)
+
+
+class LevenshteinConfig(BaseModel):
+    max_distance: int
+
+
+class ThresholdConfig(BaseModel):
+    vendor: int
+    product_family: int
+    product_name: int
+    keyword: int
+    version: int
+
+
+class MatchingConfig(BaseModel):
+    database: DatabaseConfig
+    version: VersionConfig
+    cpe: CpeConfig
+    purl: PurlConfig
+    ngram: NgramConfig
+    levenshtein: LevenshteinConfig
+    threshold: ThresholdConfig
+
+
 class MatchingState(enum.Enum):
     STOPPED = "stopped"
     STOP_REQUESTED = "stop_requested"
@@ -112,6 +159,11 @@ class Matcher:
         """
         with open("./assets/matcher.toml", "rb") as f:
             self.__config = Matcher.Config.model_validate(tomllib.load(f))
+
+        with open("./assets/plugin_configs/default/matching_config.toml", "rb") as f:
+            mc = MatchingConfig.model_validate(tomllib.load(f))
+
+        self.__matching_cfg_dict = mc.model_dump()
 
         # Configure logging based on matcher.toml
         configure_logging(self.__config.Matcher.Logging)
@@ -179,6 +231,7 @@ class Matcher:
                                     self.__matches,
                                     batch,
                                     self.__config.Matcher.match_threshold,
+                                    self.__matching_cfg_dict,
                                 )
                             )
                             if len(parallel_tasks) >= num_processes:
@@ -434,62 +487,38 @@ class Matcher:
 
 
 def match_pairs(
-    matches: queue.Queue, pairs: list[tuple[CsafProduct, Asset]], threshold: float
+    matches: queue.Queue,
+    pairs: list[tuple[CsafProduct, Asset]],
+    threshold: float,
+    matching_config: dict[str, Any],
 ):
     logger.debug(f"Matching batch with {len(pairs)} pairs")
     batch = []
     for csaf, asset in pairs:
-        # TODO: add product_type, sbom_urls and file
+        if not (csaf and csaf.product and asset and asset.product):
+            continue
+
         csaf_dict = {f"csaf_{k}": v for k, v in csaf.product.to_dict().items()}
         asset_dict = {f"asset_{k}": v for k, v in asset.product.to_dict().items()}
 
-        df = pl.DataFrame([{**csaf_dict, **asset_dict}])
+        df = pl.DataFrame([{**csaf_dict, **asset_dict}], strict=False)
 
-        freetext_fields = [
-            "name",
-            "hardware_name",
-            "manufacturer_name",
-            "device_family",
-        ]
+        matching = Matching(matching_config)
+        df_matches = matching.df_matching(df)
 
-        ordered_fields = ["version", "model", "model_numbers", "part_numbers"]
+        score = Score(matching_config)
+        result, reason, score_percent = score.calculate_overall_score(df_matches)
 
-        other_fields = ["cpe", "purl"]
-
-        pl.Config.set_fmt_str_lengths(2000)
-
-        normalizer = Normalizer(freetext_fields, ordered_fields, other_fields)
-        df_norm = normalizer.apply(df)
-
-        # for field in freetext_fields:
-        #     print(df_norm.select([f"csaf_{field}", f"asset_{field}"]))
-        #     print(df_norm.select([f"csaf_{field}_norm", f"asset_{field}_norm"]))
-
-        # for field in ordered_fields:
-        #     print(df_norm.select([f"csaf_{field}", f"asset_{field}"]))
-        #     print(df_norm.select([f"csaf_{field}_norm", f"asset_{field}_norm"]))
-
-        matching = Matching(freetext_fields, ordered_fields)
-        df_norm_matches = matching.df_matching(df_norm)
-
-        score = Score(freetext_fields, ordered_fields)
-        result, reason, score_procent = score.calculate_overall_score(df_norm_matches)
-
-        # for field in freetext_fields:
-        #     print(df_norm_matches.select([f"{field}_match"]))
-
-        # for field in ordered_fields:
-        #     print(df_norm_matches.select([f"{field}_match"]))
-
-        if score_procent < threshold:
+        if score_percent < threshold:
             continue
 
         match = Match()
         match.asset_id = asset.id
         match.csaf_product_id = csaf.id
-        match.score = score_procent
+        match.score = score_percent
         match.timestamp = datetime.datetime.now().timestamp()
         match.status = f"result: {result}, reason: {reason}"
+
         # match = Match()
         # match.asset_id = asset.id
         # match.csaf_product_id = csaf.id

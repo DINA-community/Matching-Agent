@@ -175,9 +175,13 @@ class BaseSynchronizer(ABC):
                 logger.warning("No preprocessor plugins specified in configuration")
                 raise KeyError("Missing preprocessor_plugins in configuration")
 
+            matching_config = Path(
+                "./assets/plugin_configs/default/matching_config.toml"
+            )
+
             for plugin_name in preprocessor_plugin_names:
                 plugin_instance = BaseSynchronizer._load_plugin_from_entrypoint(
-                    plugin_name, "dina.plugins.preprocessing", None
+                    plugin_name, "dina.plugins.preprocessing", matching_config
                 )
 
                 if plugin_instance and isinstance(plugin_instance, PreprocessorPlugin):

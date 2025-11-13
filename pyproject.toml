@@ -32,6 +32,11 @@ dependencies = [
     "pwdlib[argon2]>=0.3.0",
     "python-multipart>=0.0.20",
     "dotenv>=0.9.9",
+    "packaging>=24.1",
+    "numpy>=1.26.0",
+    "pytest>=8.4.1",
+    "pytest-cov>=6.2.1",
+    "pytest-asyncio>=0.25.0",
 ]
 
 [project.optional-dependencies]
@@ -78,7 +83,11 @@ exclude = [
 respect-gitignore = true
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = [
+    "tests",
+    "plugins/asset_source/*/tests",
+    "plugins/preprocessing/*/tests"
+]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
@@ -92,6 +101,8 @@ addopts = [
     "--cov-report=html",
     "--cov-report=term-missing"
 ]
+asyncio_mode = "auto"
+
 
 [dependency-groups]
 dev = [

@@ -212,17 +212,21 @@ class CacheDB:
                 # We want to check if anything that was fetched X seconds before the last run is still valid
                 stmt = (
                     select(Asset)
-                    .where(Asset.last_update < stale_timestamp)
+                    .where(
+                        Asset.last_update < stale_timestamp,
+                        Asset.origin_uri == str(source.origin_uri),
+                    )
                     .options(joinedload(Asset.product))
-                    .filter(Asset.origin_uri == str(source.origin_uri))
                 )
                 data.extend((await session.execute(stmt)).scalars().all())
 
                 csaf_stmt = (
                     select(CsafProduct)
-                    .where(CsafProduct.last_update < stale_timestamp)
+                    .where(
+                        CsafProduct.last_update < stale_timestamp,
+                        CsafProduct.origin_uri == str(source.origin_uri),
+                    )
                     .options(joinedload(CsafProduct.product))
-                    .filter(CsafProduct.origin_uri == str(source.origin_uri))
                 )
                 data.extend((await session.execute(csaf_stmt)).scalars().all())
 

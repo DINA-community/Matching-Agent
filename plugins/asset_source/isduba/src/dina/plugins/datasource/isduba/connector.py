@@ -37,12 +37,12 @@ def get_csaf_product_tree(
 
     product_list = [get_product_info(branch) for branch in branches]
 
-    relationships_list = get_relationships(product_tree)
+    # relationships_list = get_relationships(product_tree)
 
     return CsafProductTree(
         csaf_document=csaf_document,
         product_list=product_list,
-        relationships_list=relationships_list,
+        # relationships_list=relationships_list,
     )
 
 
@@ -84,12 +84,17 @@ def get_product_identification_helper(
         files = FileList()
 
         for entry in hashes:
-            file = File(
-                name=entry.get("filename"),
-                hash_algorithm=entry.get("algorithm"),
-                file_hash=entry.get("value"),
-            )
-            files.files.append(file)
+            filename = entry.get("filename")
+            file_hashes = entry.get("file_hashes", [])
+
+            for fh in file_hashes:
+                file = File(
+                    name=filename,
+                    hash_algorithm=fh.get("algorithm"),
+                    file_hash=fh.get("value"),
+                )
+                files.files.append(file)
+
         helper.files = files
 
     return helper
