@@ -1,5 +1,6 @@
 import numpy as np
 import polars as pl
+from polars.exceptions import ColumnNotFoundError
 
 
 class Score:
@@ -43,7 +44,7 @@ class Score:
             try:
                 val = df_norm.select([f"{field}_match"])
                 val = val.to_series()
-            except pl.ColumnNotFoundError:
+            except ColumnNotFoundError:
                 scores.append(np.nan)
                 continue
 
