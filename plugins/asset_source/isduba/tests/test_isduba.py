@@ -22,7 +22,7 @@ from examples import DOCS_META, DOCUMENTS_FULL
 
 @pytest.fixture
 def mock_config():
-    """Erstellt eine Fake-Plugin-Konfiguration für Tests."""
+    """Creates a fake plugin configuration for tests."""
     plugin_data = dict(
         url="https://fake.url",
         keycloak_url="https://fake.keycloak",
@@ -36,7 +36,7 @@ def mock_config():
 
 
 def _make_dummy_api(monkeypatch, docs_meta, docs_full):
-    """Mockt den isduba_api_client, sodass er Fake-Dokumente zurückgibt."""
+    """Mocks the isduba_api_client so that it returns fake documents."""
     fake_api = MagicMock()
     fake_api.documents_get = AsyncMock(
         return_value=SimpleNamespace(documents=docs_meta)
@@ -64,7 +64,7 @@ def _make_dummy_api(monkeypatch, docs_meta, docs_full):
 
 
 def _dummy_fetcher_view():
-    """Erstellt ein einfaches Mock-FetcherView-Objekt."""
+    """Creates a simple mock FetcherView object."""
     view = MagicMock()
     view.last_run = AsyncMock(return_value=datetime.now(timezone.utc))
     view.get_existing = AsyncMock(return_value=[])
@@ -78,6 +78,7 @@ def _dummy_fetcher_view():
 
 @pytest.mark.asyncio
 async def test_fetch_products_with_docs(monkeypatch, mock_config):
+    """Tests that fetch_products correctly returns a list of documents when API data is available."""
     plugin = IsdubaDataSource(mock_config)
     plugin._get_token = AsyncMock(return_value="fake-token")
     _make_dummy_api(monkeypatch, DOCS_META, DOCUMENTS_FULL)
@@ -93,6 +94,7 @@ async def test_fetch_products_with_docs(monkeypatch, mock_config):
 
 @pytest.mark.asyncio
 async def test_fetch_products_empty_response(monkeypatch, mock_config):
+    """Ensures fetch_products handles an empty API response gracefully."""
     plugin = IsdubaDataSource(mock_config)
     plugin._get_token = AsyncMock(return_value="fake-token")
     _make_dummy_api(monkeypatch, [], [])
@@ -105,6 +107,7 @@ async def test_fetch_products_empty_response(monkeypatch, mock_config):
 
 @pytest.mark.asyncio
 async def test_fetch_products_error_in_document(monkeypatch, mock_config):
+    """Verifies that fetch_products raises an exception when fetching a document fails."""
     plugin = IsdubaDataSource(mock_config)
     plugin._get_token = AsyncMock(return_value="fake-token")
 
@@ -223,10 +226,12 @@ def test_process_document_with_valid_product_tree(monkeypatch):
 
 
 def test_endpoint_info(mock_config):
+    """Checks that endpoint_info returns the expected API URL."""
     assert IsdubaDataSource(mock_config).endpoint_info() == HttpUrl("https://fake.url/")
 
 
 def test_build_resource_path_returns_path(mock_config):
+    """Tests that build_resource_path correctly returns the document path or an empty string."""
     plugin = IsdubaDataSource(mock_config)
     assert (
         plugin.build_resource_path({"path": "/api/documents/123"})
@@ -236,6 +241,7 @@ def test_build_resource_path_returns_path(mock_config):
 
 
 def test_create_api_config(mock_config):
+    """Verifies that _create_api_config builds a valid API client configuration."""
     plugin = IsdubaDataSource(mock_config)
     config = plugin._create_api_config("https://fake.url/", "token123")
     assert isinstance(config, isduba_api_client.Configuration)
@@ -249,7 +255,8 @@ def test_create_api_config(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_fetch_relationships_basic(monkeypatch, mock_config):
+async def test_fetch_relationships(monkeypatch, mock_config):
+    """Ensures fetch_relationships correctly returns Relationship objects."""
     plugin = IsdubaDataSource(mock_config)
     plugin._get_token = AsyncMock(return_value="fake-token")
 
