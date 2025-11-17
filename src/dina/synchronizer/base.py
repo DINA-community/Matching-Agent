@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime
+import enum
 import time
 import tomllib
 from abc import ABC
@@ -19,7 +20,7 @@ from typing import Annotated
 
 import fastapi
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, APIRouter
 from fastapi.params import Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, HttpUrl
@@ -81,6 +82,8 @@ class BaseSynchronizer(ABC):
             config_file: Path to the manager configuration file (e.g., assetman.toml).
         """
         self.__last_synchronization: float | None = None
+        self.__sync_start_time: float | None = None
+        self.__sync_state: SynchronizerState = SynchronizerState.STOPPED
         self.__last_cleanup: float | None = None
         self.cache_db: CacheDB = cache_db
         self.pending_products: list[Asset | CsafProduct] = []
@@ -222,19 +225,26 @@ class BaseSynchronizer(ABC):
                 < time.time()
             ):
                 try:
-                    start_time = datetime.datetime.now()
+                    self.__sync_start_time = datetime.datetime.now().timestamp()
                     fetcher_view = self.cache_db.fetcher_view(source.origin_uri)
+                    self.__sync_state = SynchronizerState.RUNNING
+
                     again = True
 
                     while again:
                         again = await self.fetch_products(fetcher_view, source)
                         await self.fetch_relationships(fetcher_view, source)
 
-                    await fetcher_view.set_last_run(start_time)
+                    await fetcher_view.set_last_run(
+                        datetime.datetime.fromtimestamp(self.__sync_start_time)
+                    )
                 except Exception as e:
                     logger.error(f"Error fetching data from {source.debug_info()}: {e}")
+                finally:
+                    self.__sync_state = SynchronizerState.STOPPED
+                    self.__sync_start_time = None
+                    self.__last_synchronization = time.time()
 
-                self.__last_synchronization = time.time()
             else:
                 await asyncio.sleep(1)
 
@@ -328,6 +338,9 @@ class BaseSynchronizer(ABC):
 
     async def __api_client(self):
         api = FastAPI()
+        task_route = APIRouter(
+            prefix="/task", dependencies=[Depends(AccessChecker(self.cache_db))]
+        )
 
         @api.post("/token")
         async def login_for_access_token(
@@ -349,14 +362,20 @@ class BaseSynchronizer(ABC):
             )
             return Token(access_token=token, token_type="bearer")
 
-        @api.post("/start", dependencies=[Depends(AccessChecker(self.cache_db))])
+        @task_route.post("/start")
         async def sync():
             self.__last_synchronization = None
             return {}
 
-        @api.get("/status", dependencies=[Depends(AccessChecker(self.cache_db))])
+        @task_route.get("/status")
         async def status() -> SynchronizerStatus:
-            return SynchronizerStatus(last_synchronization=self.__last_synchronization)
+            return SynchronizerStatus(
+                last_synchronization=self.__last_synchronization,
+                state=self.__sync_state,
+                start=self.__sync_start_time,
+            )
+
+        api.include_router(task_route)
 
         # TODO: Add security options
         config = uvicorn.Config(
@@ -430,5 +449,13 @@ def load_datasource_plugins(plugin_configs: Path) -> dict[HttpUrl, DataSourcePlu
     return plugins
 
 
+class SynchronizerState(enum.Enum):
+    STOPPED = "stopped"
+    STOP_REQUESTED = "stop_requested"
+    RUNNING = "running"
+
+
 class SynchronizerStatus(BaseModel):
+    state: SynchronizerState
+    start: float | None = None
     last_synchronization: float | None

@@ -314,6 +314,7 @@ class Asset(Base, MetaInfo):
         result = {
             "origin_uri": self.origin_uri,
             "origin_info": self.origin_info,
+            "uri": self.uri,
             "last_update": self.last_update,
         }
         if self.id is not None:

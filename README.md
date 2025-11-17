@@ -82,15 +82,15 @@ The API token is printed to the console.
 To configure the netbox fetcher plugin, copy the file [assets/plugin_configs/data_source/asset/sample/netbox.toml](assets/plugin_configs/data_source/asset/sample/netbox.toml) to `assets/plugin_configs/data_source/asset/netbox_local.toml`.
 The file can be named any way you like, but it must be a toml file.
 Replace the `api_token` with the API token printed by the netbox-setup container.
-Replace the `url` with the url of the netbox instance (http://localhost:8800).
+Replace the `url` with the url of the netbox instance (http://netbox.localhost/).
 
 To configure the ISDuBa fetcher plugin, copy the file [assets/plugin_configs/data_source/csaf/sample/isduba.toml](assets/plugin_configs/data_source/csaf/sample/isduba.toml) to `assets/plugin_configs/data_source/csaf/isduba_local.toml`.
 The file can be named any way you like, but it must be a toml file.
-Replace the `url` with the url of the ISDuBa instance http://localhost:5371.
+Replace the `url` with the url of the ISDuBa instance http://isduba.localhost/.
 Replace the `username` and `password` with the credentials of the ISDuBa user (user/user).
-Replace the `keycloak_url` with the url of the keycloak instance http://localhost:8080.
+Replace the `keycloak_url` with the url of the keycloak instance http://keycloak.localhost/.
 
-The ISDuBa interface can be reached at http://localhost:5371/ and the netbox interface at http://localhost:8800/.
+The ISDuBa interface can be reached at http://isduba.localhost/ and the netbox interface at http://netbox.localhost/.
 The default credentials are:
 - Netbox: admin / admin
 - ISDuBa: user / user

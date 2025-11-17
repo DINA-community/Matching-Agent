@@ -395,7 +395,8 @@ class Matcher:
 
         @task_route.post("/start")
         async def start(
-            assets: list[int] | None = None, csaf_products: list[int] | None = None
+            assets: Annotated[list[int] | None, Query()] = None,
+            csaf_products: Annotated[list[int] | None, Query()] = None,
         ):
             if assets is None:
                 assets = []
