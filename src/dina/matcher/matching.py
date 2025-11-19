@@ -182,7 +182,7 @@ class Matching:
         if (not s1 and not s2) or (s1 is None and s2 is None):
             return None
         if (not s1 or not s2) or (s1 is None or s2 is None):
-            return 0.0
+            return None
 
         # --- Exact match shortcut ---
         if s1 == s2:

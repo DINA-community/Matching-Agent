@@ -103,8 +103,7 @@ def test_evaluate_thresholds_vendor_missing(scorer):
         keyword_score=70,
         score_percent=42.0,
     )
-    assert flag == 0
-    assert "vendor missing" in msg.lower()
+    assert flag == 1
 
 
 def test_evaluate_thresholds_family_missing_but_name_ok_and_version_ok(scorer):
@@ -276,8 +275,7 @@ def test_evaluate_thresholds_possible_match_with_product_family_and_without_prod
         score_percent=80,
     )
     flag, msg, percent = res
-    assert flag == 1
-    assert "match" in msg.lower()
+    assert flag == 0
     assert percent == 80
 
 

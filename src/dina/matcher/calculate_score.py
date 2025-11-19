@@ -151,11 +151,8 @@ class Score:
     ):
         """Apply threshold-based match logic and return classification."""
 
-        # Check if vendor score is missing
-        if vendor_score is None:
-            return 0, "No Match vendor missing", score_percent
         # Check if vendor score meets threshold
-        elif vendor_score >= self.vendor_threshold:
+        if vendor_score is None or vendor_score >= self.vendor_threshold:
             # Check if product family score is missing
             if product_family_score is None:
                 # Check if product name score is missing
@@ -202,10 +199,13 @@ class Score:
                         score_percent,
                     )
             # Check if product family score meets threshold
-            elif product_family_score >= self.product_family_threshold:
+            elif (
+                product_name_score is None
+                or product_family_score >= self.product_family_threshold
+            ):
                 # Check if product name score is missing
                 if product_name_score is None:
-                    return 1, "Possible Match - Product Name missing", score_percent
+                    return 0, "No Match - Product Name missing", score_percent
                 # Check if product name score meets threshold
                 elif product_name_score >= self.product_name_threshold:
                     # Check if version score exists and meets threshold
