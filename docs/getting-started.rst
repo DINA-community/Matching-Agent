@@ -37,19 +37,27 @@ Quick start
 
         uv sync --extra netbox_fetcher --extra isduba_fetcher --extra preprocessor-identity
 
-3) Start local supporting services with Docker
-    You can choose one of these approaches:
+3) Start local supporting services
+    You can use the helper script (recommended) or run Docker Compose directly.
 
-    - Use externally installed NetBox / ISDuBa and only start a local database:
+    - Recommended: use the dev helper script to start/stop/recreate the local stack
 
     .. code-block:: bash
 
+        ./dev/start-local-env.sh                       # start services in background
+        ./dev/start-local-env.sh --recreate            # recreate containers
+        ./dev/start-local-env.sh --down                # stop and remove services
+        ./dev/start-local-env.sh --down --volumes      # stop and remove services AND named volumes
+        ./dev/start-local-env.sh --recreate --volumes  # full reset: down -v, then up
+
+    - Alternative: run Docker Compose directly
+
+    .. code-block:: bash
+
+        # Use externally installed NetBox/ISDuBa and only start a local database
         docker compose -f dev/docker-compose-silab.yml up -d
 
-    - Or run a fully local stack (NetBox, ISDuBa, DB):
-
-    .. code-block:: bash
-
+        # Or run a fully local stack (NetBox, ISDuBa, DB)
         docker compose -f dev/docker-compose.yml up -d
 
     When using the fully local development environment, the URLs and default credentials are as follows:
@@ -57,7 +65,8 @@ Quick start
     - NetBox UI: http://netbox.localhost/ (default: admin/admin)
     - NetBox Keycloak instance: http://keycloak.localhost/
     - ISDuBa UI: http://isduba.localhost/ (default: user/user)
-    - The NetBox API token is printed by the ``netbox-setup`` container logs:
+    - The NetBox API token is printed by the ``netbox-setup`` container logs. The script will attempt to
+      print it automatically; if needed, you can retrieve it manually:
         .. code-block:: bash
 
             docker compose -f dev/docker-compose.yml logs netbox-setup

@@ -54,26 +54,47 @@ git submodule update --init --recursive
 
 You can either build the docs with `make docs` and follow the instructions there or proceed with the instructions below.
 
-There are two possible ways to set up a development environment.
-First, you can use externally installed asset or csaf inventories and only set up a local database:
+#### Quick start: local dev environment script
+
+You can start, stop, and recreate the full local development stack (PostgreSQL, NetBox, ISDuBa, etc.) using the helper script in the `dev/` directory:
+
+```bash
+./dev/start-local-env.sh                       # start services in background
+./dev/start-local-env.sh --recreate            # recreate containers
+./dev/start-local-env.sh --down                # stop and remove services
+./dev/start-local-env.sh --down --volumes      # stop and remove services AND named volumes
+./dev/start-local-env.sh --recreate --volumes  # full reset: down -v, then up (fresh volumes)
+```
+
+Notes:
+- Requires Docker and Docker Compose (`docker compose`).
+- If you haven't initialized submodules yet, run `git submodule update --init --recursive`.
+- After startup, you can retrieve the NetBox API token from the setup container logs:
+  ```bash
+  docker compose -f dev/docker-compose.yml logs netbox-setup
+  ```
+
+The NetBox and ISDuBa services will be available at:
+- NetBox UI: http://netbox.localhost/ (default: admin / admin)
+- ISDuBa UI: http://isduba.localhost/ (default: user / user)
+
+#### Alternative: run docker compose directly
+
+There are two possible ways to set up a development environment using Docker Compose directly.
+First, you can use externally installed asset or CSAF inventories and only set up a local database:
 
 ```shell
 docker compose -f dev/docker-compose-silab.yml up -d
 ```
 
-You will need to configure the netbox and ISDuBa fetcher plugins according to your setup, similar to the instructions for the local environment below.
-
-Alternatively, you can set up a fully local environment with a netbox and ISDuBa installation:
+Alternatively, you can set up a fully local environment with a NetBox and ISDuBa installation:
 
 ```shell
 docker compose -f dev/docker-compose.yml up -d
 ```
-The netbox and ISDuBa containers will be available on the following ports:
-- Netbox: 8800
-- ISDuBa: 5371
 
-This also creates admin users for netbox and ISDuBa and an API-token for the netbox api.
-The API token can be read with the following command:
+If you use the fully local environment, the API token for NetBox is printed by the `netbox-setup` container. You can read it with:
+
 ```shell
 docker compose -f dev/docker-compose.yml logs netbox-setup
 ```
