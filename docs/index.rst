@@ -14,6 +14,7 @@ Contents
    getting-started
    authentication
    api
+   matcher-cli
 
 
 Indices and tables

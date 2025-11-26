@@ -54,6 +54,21 @@ git submodule update --init --recursive
 
 You can either build the docs with `make docs` and follow the instructions there or proceed with the instructions below.
 
+#### Matcher CLI
+
+A command-line interface is available to interact with the Matcher service (obtain tokens, list/get matches, start/stop tasks, clear caches). See the full guide:
+
+- docs/matcher-cli.rst
+
+Quick example (using uv):
+
+```bash
+uv run csaf_matcher_cli --base-url http://localhost:8998 -u admin \
+  matcher matches list --limit 20
+```
+
+Note: For interactive use, omit `-p/--password` to be securely prompted.
+
 #### Quick start: local dev environment script
 
 You can start, stop, and recreate the full local development stack (PostgreSQL, NetBox, ISDuBa, etc.) using the helper script in the `dev/` directory:
@@ -298,8 +313,12 @@ Quick start:
 2) Create or update a user in the CacheDB using the CLI:
 
 ```bash
-uv run csaf_matcher_cli user create -u admin -p admin
+uv run csaf_matcher_cli user create -u admin
 ```
+
+Note: For interactive use, do not pass passwords via `-p/--password`. The CLI will securely prompt
+for the password. Reserve `-p` only for non-interactive environments (e.g., CI) and source secrets
+from a secure provider.
 
 3) Obtain an access token (form fields `username` and `password`):
 

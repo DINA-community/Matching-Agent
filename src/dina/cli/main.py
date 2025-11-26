@@ -2,7 +2,7 @@ import argparse
 import asyncio
 import tomllib
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -21,9 +21,12 @@ class CLI:
 
     def _build_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(
-            prog="dina-cli",
+            prog="csaf_matcher_cli",
             description="DINA command-line utilities",
         )
+        # Allow passing common API args at the root level (before selecting a group)
+        # These are optional here; we'll validate when dispatching a specific group.
+        self._add_common_api_args(parser)
         subparsers = parser.add_subparsers(dest="command", required=True)
 
         # user subcommands
@@ -49,7 +52,6 @@ class CLI:
 
         # matcher subcommands
         matcher = subparsers.add_parser("matcher", help="Interact with Matcher API")
-        self._add_common_api_args(matcher)
         matcher_sub = matcher.add_subparsers(dest="matcher_command", required=True)
 
         # matcher token
@@ -136,7 +138,6 @@ class CLI:
         sync = subparsers.add_parser(
             "sync", help="Interact with a Synchronizer API (asset or CSAF)"
         )
-        self._add_common_api_args(sync)
         sync_sub = sync.add_subparsers(dest="sync_command", required=True)
 
         sync_token = sync_sub.add_parser("token", help="Obtain access token")
@@ -173,12 +174,17 @@ class CLI:
 
     # ------------- helpers -------------
     def _add_common_api_args(self, p: argparse.ArgumentParser) -> None:
+        """Add common API arguments without making them parser-required.
+
+        We validate their presence in the dispatch functions so callers can supply
+        them at the root level (before command/group).
+        """
         p.add_argument(
             "--base-url",
-            required=True,
+            required=False,
             help="Base URL of the API, e.g., http://localhost:8000",
         )
-        p.add_argument("--username", "-u", required=True)
+        p.add_argument("--username", "-u", required=False)
         p.add_argument(
             "--password",
             "-p",
@@ -223,14 +229,30 @@ class CLI:
 
     # ------------- matcher commands -------------
     async def _dispatch_matcher(self, args: argparse.Namespace) -> None:
-        base = args.base_url
+        # Validate required auth/base options (can be provided at root or group level)
+        missing: list[str] = []
+        base = getattr(args, "base_url", None)
+        if not base:
+            missing.append("--base-url")
+        username = getattr(args, "username", None)
+        if not username:
+            missing.append("-u/--username")
+        if missing:
+            self.parser.error(
+                "Missing required options for matcher: "
+                + ", ".join(missing)
+                + ". Pass them before 'matcher'."
+            )
+        # mypy: after validation, treat as str
+        base = cast(str, base)
+        username = cast(str, username)
         resolved_pwd = self._resolve_password(getattr(args, "password", None))
         if getattr(args, "action", None) == "matcher_token":
-            token = await self._get_token(base, args.username, resolved_pwd)
+            token = await self._get_token(base, username, resolved_pwd)
             print(token)
             return
 
-        token = await self._get_token(base, args.username, resolved_pwd)
+        token = await self._get_token(base, username, resolved_pwd)
         headers = self._auth_headers(token)
 
         async with httpx.AsyncClient(timeout=60.0, headers=headers) as client:
@@ -317,14 +339,29 @@ class CLI:
 
     # ------------- synchronizer commands -------------
     async def _dispatch_sync(self, args: argparse.Namespace) -> None:
-        base = args.base_url
+        # Validate required auth/base options (can be provided at root or group level)
+        missing: list[str] = []
+        base = getattr(args, "base_url", None)
+        if not base:
+            missing.append("--base-url")
+        username = getattr(args, "username", None)
+        if not username:
+            missing.append("-u/--username")
+        if missing:
+            self.parser.error(
+                "Missing required options for sync: "
+                + ", ".join(missing)
+                + ". Pass them before 'sync'."
+            )
+        base = cast(str, base)
+        username = cast(str, username)
         resolved_pwd = self._resolve_password(getattr(args, "password", None))
         if getattr(args, "action", None) == "sync_token":
-            token = await self._get_token(base, args.username, resolved_pwd)
+            token = await self._get_token(base, username, resolved_pwd)
             print(token)
             return
 
-        token = await self._get_token(base, args.username, resolved_pwd)
+        token = await self._get_token(base, username, resolved_pwd)
         headers = self._auth_headers(token)
 
         async with httpx.AsyncClient(timeout=60.0, headers=headers) as client:
