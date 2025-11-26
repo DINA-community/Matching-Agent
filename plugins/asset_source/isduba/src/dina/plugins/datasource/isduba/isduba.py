@@ -38,6 +38,7 @@ class IsdubaDataSource(DataSourcePlugin):
         verify_ssl: bool
         url: HttpUrl
         keycloak_url: HttpUrl
+        keycloak_realm: str
 
     def __init__(self, config):
         config.DataSource.Plugin = IsdubaDataSource.Config.model_validate(
@@ -176,7 +177,7 @@ class IsdubaDataSource(DataSourcePlugin):
 
     async def _get_token(self, keycloak_uri: HttpUrl) -> str:
         """Retrieve an access token via Keycloak."""
-        token_url = f"{keycloak_uri.unicode_string()}/realms/isduba/protocol/openid-connect/token"
+        token_url = f"{keycloak_uri.unicode_string()}/realms/{self.Config.keycloak_realm}/protocol/openid-connect/token"
         response = httpx.post(
             token_url,
             data={
