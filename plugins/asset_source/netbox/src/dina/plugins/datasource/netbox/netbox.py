@@ -218,6 +218,25 @@ class NetboxDataSource(DataSourcePlugin):
                         }
                     )
 
+        if software:
+            missing_manufacturer_ids = {
+                sw.manufacturer.id
+                for sw in software.values()
+                if sw.manufacturer.id not in manufacturers
+            }
+            if missing_manufacturer_ids:
+                if manufacturers_result := await dcim_manufacturers_list.asyncio(
+                    client=self.client,
+                    id=list(missing_manufacturer_ids),
+                    ordering="-id",
+                ):
+                    manufacturers.update(
+                        {
+                            manufacturer.id: manufacturer
+                            for manufacturer in manufacturers_result.results
+                        }
+                    )
+
         existing_device_assets = {
             asset.origin_info["device_id"]: asset
             for asset in await fetcher_view.get_existing(
