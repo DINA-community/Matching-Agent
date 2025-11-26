@@ -239,7 +239,10 @@ class BaseSynchronizer(ABC):
                         datetime.datetime.fromtimestamp(self.__sync_start_time)
                     )
                 except Exception as e:
-                    logger.error(f"Error fetching data from {source.debug_info()}: {e}")
+                    logger.error(
+                        f"Error fetching data from {source.debug_info()}: {e}",
+                        exc_info=True,
+                    )
                 finally:
                     self.__sync_state = SynchronizerState.STOPPED
                     self.__sync_start_time = None

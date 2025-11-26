@@ -548,22 +548,34 @@ class NetboxDataSource(DataSourcePlugin):
         return result
 
     async def notify_new_matches(self, new_matches: List[Match]):
-        requests = [
-            plugins_csaf_csafmatch_list_create.asyncio(
-                client=self.client,
-                body=CsafMatchRequest(
-                    csaf_document=match.csaf_product.uri,  # type: ignore
-                    device=match.asset.origin_info.get("device_id", UNSET),
-                    software=match.asset.origin_info.get("software_id", UNSET),
-                ),
-            )
-            for match in new_matches
-        ]
+        class BulkBody:
+            def __init__(self, items: List[Any]):
+                self.items = items
 
-        try:
-            await asyncio.gather(*requests)
-        except httpx.HTTPError as e:
-            logger.error(f"Failed to notify new matches: {e}")
+            def to_dict(self):
+                return [item.to_dict() for item in self.items]
+
+        batch_size = 100
+        for i in range(0, len(new_matches), batch_size):
+            batch = new_matches[i : i + batch_size]
+            try:
+                await plugins_csaf_csafmatch_list_create.asyncio(
+                    client=self.client,
+                    body=BulkBody(
+                        [
+                            CsafMatchRequest(
+                                csaf_document=match.csaf_product.uri,  # type: ignore
+                                device=match.asset.origin_info.get("device_id", UNSET),
+                                software=match.asset.origin_info.get(
+                                    "software_id", UNSET
+                                ),
+                            )
+                            for match in batch
+                        ]
+                    ),  # type: ignore
+                )
+            except (httpx.HTTPError, UnexpectedStatus) as e:
+                logger.error(f"Failed to notify new matches: {e}")
 
     @property
     def origin_uri(self):
