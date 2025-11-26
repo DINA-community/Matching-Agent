@@ -323,8 +323,8 @@ class Matcher:
             origin_uri: HttpUrl | None = None,
             time_lte: float | None = None,
             time_gte: float | None = None,
-            assets: Annotated[list[int] | None, Query()] = None,
-            csaf_products: Annotated[list[int] | None, Query()] = None,
+            assets: Annotated[list[HttpUrl] | None, Query()] = None,
+            csaf_documents: Annotated[list[HttpUrl] | None, Query()] = None,
             threshold: float | None = None,
         ) -> list[APIMatch]:
             """Get a list of matches between CSAF advisories and assets.
@@ -335,8 +335,8 @@ class Matcher:
                 origin_uri (HttpUrl | None): Filter matches to only include matches from a specific origin.
                 time_lte (float | None): Filter matches to only include matches with a timestamp less than or equal to the specified value.
                 time_gte (float | None): Filter matches to only include matches with a timestamp greater than or equal to the specified value.
-                assets (list[int] | None): Filter matches to only include matches with assets from the specified list of asset IDs.
-                csaf_products (list[int] | None): Filter matches to only include matches with csaf_products from the specified list of csaf_product IDs.
+                assets (list[int] | None): Filter matches to only include matches with assets from the specified list of assets.
+                csaf_documents (list[int] | None): Filter matches to only include matches with csaf_products from the specified set of documents.
                 threshold (float | None): Filter matches to only include matches with a score greater than or equal to the specified value.
 
             Returns:
@@ -356,7 +356,7 @@ class Matcher:
                 time_lte=time_lte,
                 time_gte=time_gte,
                 assets=assets,
-                csaf_products=csaf_products,
+                csaf_products=csaf_documents,
                 threshold=threshold,
             )
             return [

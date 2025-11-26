@@ -525,8 +525,8 @@ class CacheDB:
         ids: list[int] | None = None,
         time_lte: float | None = None,
         time_gte: float | None = None,
-        assets: list[int] | None = None,
-        csaf_products: list[int] | None = None,
+        assets: list[HttpUrl] | None = None,
+        csaf_products: list[HttpUrl] | None = None,
         threshold: float | None = None,
     ) -> list[Match]:
         origin_uri = str(origin_uri) if origin_uri else None  # type: ignore
@@ -554,9 +554,9 @@ class CacheDB:
             if time_gte is not None:
                 stmt = stmt.where(Match.timestamp >= time_gte)
             if assets is not None:
-                stmt = stmt.filter(Match.asset_id.in_(assets))
+                stmt = stmt.where(Asset.uri.in_([str(a) for a in assets]))
             if csaf_products is not None:
-                stmt = stmt.filter(Match.csaf_product_id.in_(csaf_products))
+                stmt = stmt.where(CsafProduct.uri.in_([str(p) for p in csaf_products]))
             if threshold is not None:
                 stmt = stmt.where(Match.score >= threshold)
             if limit is not None:
