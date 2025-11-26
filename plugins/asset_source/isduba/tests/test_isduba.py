@@ -26,6 +26,7 @@ def mock_config():
     plugin_data = dict(
         url="https://fake.url",
         keycloak_url="https://fake.keycloak",
+        keycloak_realm="isduba",
         username="srcm",
         password="srcm",
         verify_ssl=False,
