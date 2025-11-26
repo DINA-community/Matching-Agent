@@ -1,5 +1,6 @@
 import asyncio
 from pathlib import Path
+import argparse
 
 from dina.cachedb.database import CacheDB
 from dina.common.log import configure_logging, get_logger
@@ -19,23 +20,23 @@ class CSAFSynchronizer(BaseSynchronizer):
     This class extends the BaseManager to provide functionality specific to CSAF management.
     """
 
-    def __init__(self):
+    def __init__(self, config_path: Path = Path("./assets/csafsync.toml")):
         """
         Initialize the CSAF Manager.
         """
         cache_db = CacheDB()
         super().__init__(
             cache_db,
-            Path("./assets/csafsync.toml"),
+            config_path,
         )
         # Configure logging
         configure_logging(self.config.Logging)
 
 
-async def run_csaf_manager():
+async def run_csaf_manager(config_path: Path = Path("./assets/csafsync.toml")):
     """Run the CSAF Manager."""
     # Create and initialize the CSAF Manager
-    csaf_manager = CSAFSynchronizer()
+    csaf_manager = CSAFSynchronizer(config_path=config_path)
 
     try:
         await csaf_manager.setup()
@@ -53,8 +54,17 @@ async def run_csaf_manager():
 def main():
     """Entry point for the CSAF Manager."""
     try:
+        parser = argparse.ArgumentParser(description="Run the CSAF Synchronizer")
+        parser.add_argument(
+            "--config",
+            type=Path,
+            default=Path("./assets/csafsync.toml"),
+            help="Path to CSAF synchronizer configuration TOML file",
+        )
+        args = parser.parse_args()
+
         # Run the CSAF Manager
-        asyncio.run(run_csaf_manager())
+        asyncio.run(run_csaf_manager(config_path=args.config))
     except KeyboardInterrupt:
         logger.info("CSAF Manager stopped by user")
     except Exception as e:

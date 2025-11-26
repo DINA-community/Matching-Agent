@@ -26,6 +26,7 @@ from dina.cachedb.model import Match, CsafProduct, Asset
 from dina.common.auth import AccessChecker, Token, SessionData, create_access_token
 from dina.common.log import configure_logging, get_logger, LoggingConfig
 import sys
+import argparse
 
 from dina.matcher.calculate_score import Score
 from dina.matcher.clean_text import Normalizer
@@ -106,11 +107,11 @@ class Matcher:
     class Config(BaseModel):
         Matcher: MatcherConfig
 
-    def __init__(self) -> None:
+    def __init__(self, config_path: Path = Path("./assets/matcher.toml")) -> None:
         """
         Initialize the Matcher.
         """
-        with open("./assets/matcher.toml", "rb") as f:
+        with open(config_path, "rb") as f:
             self.__config = Matcher.Config.model_validate(tomllib.load(f))
 
         # Configure logging based on matcher.toml
@@ -500,10 +501,10 @@ def match_pairs(
     matches.put(batch)
 
 
-async def run_matcher():
+async def run_matcher(config_path: Path = Path("./assets/matcher.toml")):
     """Run the Matcher."""
     # Create and initialize the Matcher
-    matcher = Matcher()
+    matcher = Matcher(config_path=config_path)
     try:
         # Find matches
         await matcher.run()
@@ -519,8 +520,17 @@ async def run_matcher():
 def main():
     """Entry point for the Matcher."""
     try:
+        parser = argparse.ArgumentParser(description="Run the Matching service")
+        parser.add_argument(
+            "--config",
+            type=Path,
+            default=Path("./assets/matcher.toml"),
+            help="Path to matcher configuration TOML file",
+        )
+        args = parser.parse_args()
+
         # Run the Matcher
-        asyncio.run(run_matcher())
+        asyncio.run(run_matcher(config_path=args.config))
     except KeyboardInterrupt:
         logger.info("Matcher stopped by user")
     except Exception as e:

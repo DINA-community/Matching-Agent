@@ -1,5 +1,6 @@
 import asyncio
 from pathlib import Path
+import argparse
 
 from dina.cachedb.database import CacheDB
 from dina.common.log import configure_logging, get_logger
@@ -19,23 +20,23 @@ class AssetSynchronizer(BaseSynchronizer):
     This class extends the BaseManager to provide functionality specific to asset management.
     """
 
-    def __init__(self):
+    def __init__(self, config_path: Path = Path("./assets/assetsync.toml")):
         """
         Initialize the Asset Manager.
         """
         cache_db = CacheDB()
         super().__init__(
             cache_db,
-            Path("./assets/assetsync.toml"),
+            config_path,
         )
         # Configure logging
         configure_logging(self.config.Logging)
 
 
-async def run_asset_manager():
+async def run_asset_manager(config_path: Path = Path("./assets/assetsync.toml")):
     """Run the Asset Manager."""
     # Create and initialize the Asset Manager
-    asset_manager = AssetSynchronizer()
+    asset_manager = AssetSynchronizer(config_path=config_path)
 
     try:
         await asset_manager.setup()
@@ -53,8 +54,17 @@ async def run_asset_manager():
 def main():
     """Entry point for the Asset Manager."""
     try:
+        parser = argparse.ArgumentParser(description="Run the Asset Synchronizer")
+        parser.add_argument(
+            "--config",
+            type=Path,
+            default=Path("./assets/assetsync.toml"),
+            help="Path to asset synchronizer configuration TOML file",
+        )
+        args = parser.parse_args()
+
         # Run the Asset Manager
-        asyncio.run(run_asset_manager())
+        asyncio.run(run_asset_manager(config_path=args.config))
     except KeyboardInterrupt:
         logger.info("Asset Manager stopped by user")
     except Exception as e:
