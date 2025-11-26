@@ -8,6 +8,7 @@ Prerequisites
 -------------
 - uv (https://docs.astral.sh/uv/)
 - Docker and Docker Compose (optional, for local services like NetBox/ISDuBa and PostgreSQL)
+- Java Runtime Environment (JRE/JDK) required only when building/using the ISDuBa plugin (recommended: OpenJDK 17+)
 
 Quick start
 -----------
@@ -36,6 +37,11 @@ Quick start
     .. code-block:: bash
 
         uv sync --extra netbox_fetcher --extra isduba_fetcher --extra preprocessor-identity
+
+    .. note::
+       The ISDuBa CSAF source (``isduba_fetcher``) requires a Java runtime at build time. Ensure ``java`` is available on
+       your system ``PATH`` (or set ``JAVA_HOME``) before running the above command. Without Java, installation of the
+       ISDuBa plugin will fail.
 
 3) Start local supporting services
     You can use the helper script (recommended) or run Docker Compose directly.

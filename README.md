@@ -54,6 +54,21 @@ git submodule update --init --recursive
 
 You can either build the docs with `make docs` and follow the instructions there or proceed with the instructions below.
 
+#### Plugin build prerequisite (ISDuBa)
+
+If you plan to use the ISDuBa CSAF source (the `isduba_fetcher` extra or the ISDuBa plugin workspace), a Java runtime is required during the build/install step. Make sure a Java Runtime Environment is available on your machine before running `uv sync` with the ISDuBa extras:
+
+- Recommended: OpenJDK 17 (or newer)
+- Ensure `java` is on your `PATH` (or set `JAVA_HOME` accordingly)
+
+Example:
+
+```bash
+uv sync --extra isduba_fetcher
+```
+
+Without Java present, the ISDuBa plugin build will fail.
+
 #### Matcher CLI
 
 A command-line interface is available to interact with the Matcher service (obtain tokens, list/get matches, start/stop tasks, clear caches). See the full guide:
