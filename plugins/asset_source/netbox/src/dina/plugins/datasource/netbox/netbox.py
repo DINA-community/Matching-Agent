@@ -1,6 +1,6 @@
 import asyncio
 import time
-from datetime import timezone
+from datetime import timezone, datetime
 from typing import List, Any
 
 import httpx
@@ -569,6 +569,11 @@ class NetboxDataSource(DataSourcePlugin):
                                 software=match.asset.origin_info.get(
                                     "software_id", UNSET
                                 ),
+                                product_name_id=match.csaf_product.origin_info.get(
+                                    "product_name_id", UNSET
+                                ),
+                                score=match.score,
+                                time=datetime.fromtimestamp(match.timestamp),
                             )
                             for match in batch
                         ]
