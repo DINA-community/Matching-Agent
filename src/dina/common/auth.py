@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 import jwt
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 from fastapi import HTTPException, status
 from fastapi.params import Depends
 from fastapi.security import OAuth2PasswordBearer
@@ -12,7 +12,7 @@ from pydantic import BaseModel, ValidationError
 
 from dina.cachedb.database import CacheDB
 
-load_dotenv()
+load_dotenv(find_dotenv(usecwd=True))
 
 SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 if SECRET_KEY is None:

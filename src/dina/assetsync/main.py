@@ -28,6 +28,7 @@ class AssetSynchronizer(BaseSynchronizer):
         super().__init__(
             cache_db,
             config_path,
+            root_path="/assetsync",
         )
         # Configure logging
         configure_logging(self.config.Logging)

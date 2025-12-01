@@ -73,18 +73,20 @@ class PluginLoadError(Exception):
 class BaseSynchronizer(ABC):
     starttime = 0
 
-    def __init__(self, cache_db: CacheDB, config_file: Path):
+    def __init__(self, cache_db: CacheDB, config_file: Path, root_path: str = ""):
         """Initialize the BaseManager.
 
         Args:
             cache_db: The cache database to use.
             data_source_plugin_configs: Path to a directory containing data source plugin configuration files.
             config_file: Path to the manager configuration file (e.g., assetman.toml).
+            root_path: The root path for the API when behind a reverse proxy (e.g., "/assetsync").
         """
         self.__last_synchronization: float | None = None
         self.__sync_start_time: float | None = None
         self.__sync_state: SynchronizerState = SynchronizerState.STOPPED
         self.__last_cleanup: float | None = None
+        self.__root_path: str = root_path
         self.cache_db: CacheDB = cache_db
         self.pending_products: list[Asset | CsafProduct] = []
         self.pending_relationships: dict[HttpUrl, list[Relationship]] = defaultdict(
@@ -340,7 +342,7 @@ class BaseSynchronizer(ABC):
         await self.cache_db.disconnect()
 
     async def __api_client(self):
-        api = FastAPI()
+        api = FastAPI(root_path=self.__root_path)
         task_route = APIRouter(
             prefix="/task", dependencies=[Depends(AccessChecker(self.cache_db))]
         )

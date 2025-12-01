@@ -1,0 +1,90 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cachedb}
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secret}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  matcher:
+    build:
+      context: ..
+      dockerfile: docker/matcher.Dockerfile
+    image: dina-matcher:local
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      LOG_LEVEL: ${MATCHER_LOG_LEVEL:-INFO}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8998/docs > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  assetsync:
+    build:
+      context: ..
+      dockerfile: docker/assetsync.Dockerfile
+    image: dina-assetsync:local
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      LOG_LEVEL: ${ASSETSYNC_LOG_LEVEL:-INFO}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8992/docs > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  csafsync:
+    build:
+      context: ..
+      dockerfile: docker/csafsync.Dockerfile
+    image: dina-csafsync:local
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      LOG_LEVEL: ${CSAFSYNC_LOG_LEVEL:-INFO}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8991/docs > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  # TLS reverse proxy that exposes the three APIs over HTTPS with a self-signed certificate
+  gateway:
+    build:
+      context: ./nginx
+    image: dina-gateway:local
+    restart: unless-stopped
+    depends_on:
+      matcher:
+        condition: service_healthy
+      assetsync:
+        condition: service_healthy
+      csafsync:
+        condition: service_healthy
+    environment:
+      TLS_CN: ${TLS_CN:-localhost}
+    ports:
+      - "${HTTPS_PORT:-8443}:8443"
+    volumes:
+      - gateway-certs:/etc/nginx/certs
+
+volumes:
+  postgres-data:
+  gateway-certs:

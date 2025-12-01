@@ -281,7 +281,7 @@ class Matcher:
             await asyncio.sleep(0.1)
 
     async def __serve_api(self):
-        api = FastAPI()
+        api = FastAPI(root_path="/matcher")
 
         sub_route = APIRouter(
             prefix="/subscribe", dependencies=[Depends(AccessChecker(self.__cache_db))]

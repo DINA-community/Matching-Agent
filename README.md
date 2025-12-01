@@ -229,6 +229,76 @@ password = "secret"
 
 The API documentation can be found at `http://host:port/docs`.
 
+## Production Docker setup
+
+This repository ships a simple production‑ready Docker setup that runs the three services (assetsync, csafsync, matcher) with a shared PostgreSQL database and exposes all three APIs over HTTPS using a self‑signed certificate.
+
+Contents:
+- docker/assetsync.Dockerfile, docker/csafsync.Dockerfile, docker/matcher.Dockerfile (built with uv inside the image)
+- docker/assets/*.toml – service configs pre‑configured for Docker (DB points to the `postgres` service)
+- docker/nginx – lightweight TLS reverse proxy that terminates HTTPS and routes to the three services
+- docker/docker-compose.yml – production compose file
+- docker/.env.example – environment defaults you can copy to `.env`
+
+### Quick start
+
+1) Create an environment file
+
+```
+cd docker
+cp .env.example .env
+# IMPORTANT: Adjust passwords/ports and TLS_CN (used as certificate CN)
+```
+
+2) Build and start the stack
+
+```
+docker compose up -d --build
+```
+
+This starts:
+- postgres (16‑alpine)
+- assetsync, csafsync, matcher (Python images built from source)
+- gateway (NGINX, generates a self‑signed TLS cert on first run)
+
+3) Access the APIs via HTTPS
+
+- Matcher: https://localhost:8443/matcher/
+- Assetsync: https://localhost:8443/assetsync/
+- CSAFsync: https://localhost:8443/csafsync/
+
+OpenAPI docs (if enabled in the service) are typically available at `/docs` under each prefix, for example:
+
+- https://localhost:8443/matcher/docs
+- https://localhost:8443/assetsync/docs
+- https://localhost:8443/csafsync/docs
+
+Note: Your browser/HTTP client will warn about the self‑signed certificate. You can trust it locally or override verification as appropriate.
+
+### Configuration notes
+
+- The services run with Docker‑specific TOML configs from `docker/assets/*.toml`. They point to the `postgres` service using the credentials from `docker/.env`. The toml files need to be adjusted to match your environment. I.e., the asset sources need to be configured to point to the sources of the environment where you are deploying the services.
+- The services listen on the following internal ports (routed by the gateway):
+  - matcher: 8998
+  - assetsync: 8992
+  - csafsync: 8991
+- The HTTPS gateway listens on port `8443` by default and can be changed via `HTTPS_PORT` in `docker/.env`.
+- To regenerate a self‑signed certificate, remove the `gateway-certs` volume and restart the `gateway` service:
+
+```
+docker compose down
+docker volume rm matching-agent_gateway-certs || true
+docker compose up -d
+```
+
+### Stop and remove
+
+```
+docker compose down
+# Add -v to remove named volumes as well
+docker compose down -v
+```
+
 ### Asset Synchronizer configuration (assets/assetsync.toml)
 
 Example (defaults in repo):

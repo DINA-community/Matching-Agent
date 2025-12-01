@@ -28,6 +28,7 @@ class CSAFSynchronizer(BaseSynchronizer):
         super().__init__(
             cache_db,
             config_path,
+            root_path="/csafsync",
         )
         # Configure logging
         configure_logging(self.config.Logging)

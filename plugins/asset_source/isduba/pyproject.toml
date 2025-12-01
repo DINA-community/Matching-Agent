@@ -16,8 +16,16 @@ dependencies = [
     "aiohttp-retry"
 ]
 
+[tool.hatch.build.targets.sdist]
+include= [
+    "assets",
+    "src",
+    "build_hook.py",
+    "README.md"
+]
 [tool.hatch.build.targets.wheel]
 packages = ["src/dina"]
+artifacts = ["src/dina/plugins/datasource/isduba/generated"]
 
 # A datasource plugin must specify the correct DataSource class as an entry-point.
 [project.entry-points."dina.plugins.datasource"]

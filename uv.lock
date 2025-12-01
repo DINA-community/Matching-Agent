@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = "==3.13.*"
 
 [manifest]
@@ -349,15 +349,10 @@ dependencies = [
     { name = "pwdlib", extra = ["argon2"] },
     { name = "pydantic" },
     { name = "pyjwt" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
     { name = "python-dateutil" },
     { name = "python-multipart" },
     { name = "rapidfuzz" },
-    { name = "ruff" },
     { name = "sqlalchemy", extra = ["asyncio"] },
-    { name = "testcontainers" },
     { name = "uvicorn" },
 ]
 
@@ -384,9 +379,11 @@ dev = [
     { name = "mypy" },
     { name = "pre-commit" },
     { name = "pytest" },
+    { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "ruff" },
     { name = "sphinx" },
+    { name = "testcontainers" },
 ]
 
 [package.metadata]
@@ -409,21 +406,14 @@ requires-dist = [
     { name = "openapi-python-client" },
     { name = "packaging", specifier = ">=24.1" },
     { name = "polars", specifier = ">=0.20.30" },
-    { name = "psycopg", specifier = ">=3.2.9" },
-    { name = "psycopg", extras = ["async"], specifier = ">=3.2.9" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.9" },
     { name = "pwdlib", extras = ["argon2"], specifier = ">=0.3.0" },
     { name = "pydantic", specifier = ">=2.11.7" },
     { name = "pyjwt", specifier = ">=2.10.1" },
-    { name = "pytest", specifier = ">=8.4.1" },
-    { name = "pytest-asyncio", specifier = ">=0.25.0" },
-    { name = "pytest-cov", specifier = ">=6.2.1" },
     { name = "python-dateutil" },
     { name = "python-multipart", specifier = ">=0.0.20" },
     { name = "rapidfuzz", specifier = ">=3.9.7" },
-    { name = "ruff", specifier = ">=0.12.0" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.0" },
-    { name = "testcontainers", extras = ["test"], specifier = ">=4.8.2" },
     { name = "uvicorn", specifier = ">=0.35.0" },
 ]
 provides-extras = ["netbox-fetcher", "isduba-fetcher", "sample", "preprocessing-identity", "preprocessing-default"]
@@ -434,9 +424,12 @@ dev = [
     { name = "mypy", specifier = ">=1.16.0" },
     { name = "pre-commit", specifier = ">=4.2.0" },
     { name = "pytest", specifier = ">=8.4.1" },
+    { name = "pytest-asyncio", specifier = ">=0.25.0" },
     { name = "pytest-cov", specifier = ">=6.2.1" },
     { name = "ruff", specifier = ">=0.11.13" },
+    { name = "ruff", specifier = ">=0.12.0" },
     { name = "sphinx", specifier = ">=7.3.7" },
+    { name = "testcontainers", specifier = ">=4.8.2" },
 ]
 
 [[package]]
