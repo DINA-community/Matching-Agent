@@ -3,9 +3,9 @@ services:
     image: postgres:15
     container_name: cachedb-postgres
     environment:
-      POSTGRES_DB: cachedb
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: ${CACHEDB_POSTGRES_DB:-cachedb}
+      POSTGRES_USER: ${CACHEDB_POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${CACHEDB_POSTGRES_PASSWORD:-secret}
     ports:
       - "2345:5432"
     volumes:
@@ -23,11 +23,11 @@ services:
       KC_DB_SCHEMA: public
       KC_DB_URL: jdbc:postgresql://isduba-db/keycloak
 
-      KC_DB_USERNAME: keycloak
-      KC_DB_PASSWORD: keycloak
+      KC_DB_USERNAME: ${KC_DB_USERNAME:-keycloak}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD:-keycloak}
 
-      KC_BOOTSTRAP_ADMIN_USERNAME: admin
-      KC_BOOTSTRAP_ADMIN_PASSWORD: secret
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:-secret}
 
       KC_HOSTNAME: http://keycloak.localhost
       # Optional, reduce memory usage
@@ -63,8 +63,8 @@ services:
     networks:
       - isduba
     environment:
-      KC_BOOTSTRAP_ADMIN_USERNAME: admin
-      KC_BOOTSTRAP_ADMIN_PASSWORD: secret
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:-secret}
       CLIENT_HOSTNAME_URL: http://isduba.localhost
     volumes:
       - ./isduba/docker/keycloak/init.sh:/opt/keycloak/init.sh
@@ -77,7 +77,7 @@ services:
     image: library/postgres:16-alpine
     restart: always
     environment:
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${ISDUBA_POSTGRES_PASSWORD:-postgres}
     networks:
       - isduba
     healthcheck:
