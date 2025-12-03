@@ -43,7 +43,7 @@ print_post_instructions() {
 
 Services are starting. Useful info:
 - NetBox UI:     http://netbox.localhost/  (admin / admin)
-- ISDuBa UI:     http://isduba.localhost/  (user / user)
+- ISDuBA UI:     http://isduba.localhost/  (user / user)
 
 To get the NetBox API token printed by the setup container:
   $COMPOSE_CMD -f $COMPOSE_FILE logs netbox-setup

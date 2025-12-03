@@ -7,8 +7,8 @@ its components. It assumes you will use uv for Python dependency management, as 
 Prerequisites
 -------------
 - uv (https://docs.astral.sh/uv/)
-- Docker and Docker Compose (optional, for local services like NetBox/ISDuBa and PostgreSQL)
-- Java Runtime Environment (JRE/JDK) required only when building/using the ISDuBa plugin (recommended: OpenJDK 17+)
+- Docker and Docker Compose (optional, for local services like NetBox/ISDuBA and PostgreSQL)
+- Java Runtime Environment (JRE/JDK) required only when building/using the ISDuBA plugin (recommended: OpenJDK 17+)
 
 Quick start
 -----------
@@ -39,9 +39,9 @@ Quick start
         uv sync --extra netbox_fetcher --extra isduba_fetcher --extra preprocessor-identity
 
     .. note::
-       The ISDuBa CSAF source (``isduba_fetcher``) requires a Java runtime at build time. Ensure ``java`` is available on
+       The ISDuBA CSAF source (``isduba_fetcher``) requires a Java runtime at build time. Ensure ``java`` is available on
        your system ``PATH`` (or set ``JAVA_HOME``) before running the above command. Without Java, installation of the
-       ISDuBa plugin will fail.
+       ISDuBA plugin will fail.
 
 3) Start local supporting services
     You can use the helper script (recommended) or run Docker Compose directly.
@@ -60,17 +60,17 @@ Quick start
 
     .. code-block:: bash
 
-        # Use externally installed NetBox/ISDuBa and only start a local database
+        # Use externally installed NetBox/ISDuBA and only start a local database
         docker compose -f dev/docker-compose-silab.yml up -d
 
-        # Or run a fully local stack (NetBox, ISDuBa, DB)
+        # Or run a fully local stack (NetBox, ISDuBA, DB)
         docker compose -f dev/docker-compose.yml up -d
 
     When using the fully local development environment, the URLs and default credentials are as follows:
 
     - NetBox UI: http://netbox.localhost/ (default: admin/admin)
     - NetBox Keycloak instance: http://keycloak.localhost/
-    - ISDuBa UI: http://isduba.localhost/ (default: user/user)
+    - ISDuBA UI: http://isduba.localhost/ (default: user/user)
     - The NetBox API token is printed by the ``netbox-setup`` container logs. The script will attempt to
       print it automatically; if needed, you can retrieve it manually:
         .. code-block:: bash
@@ -87,7 +87,7 @@ Quick start
        to a new file in ``assets/plugin_configs/data_source/asset/`` (e.g. ``netbox_local.toml``)
      - Set ``url`` (e.g. http://netbox.localhost/) and ``api_token`` (see token from setup logs)
 
-   - ISDuBa fetcher (CSAF source):
+   - ISDuBA fetcher (CSAF source):
 
      - Copy: ``assets/plugin_configs/data_source/csaf/sample/isduba.toml``
        to a new file in ``assets/plugin_configs/data_source/csaf/`` (e.g. ``isduba_local.toml``)

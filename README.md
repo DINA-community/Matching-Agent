@@ -54,9 +54,9 @@ git submodule update --init --recursive
 
 You can either build the docs with `make docs` and follow the instructions there or proceed with the instructions below.
 
-#### Plugin build prerequisite (ISDuBa)
+#### Plugin build prerequisite (ISDuBA)
 
-If you plan to use the ISDuBa CSAF source (the `isduba_fetcher` extra or the ISDuBa plugin workspace), a Java runtime is required during the build/install step. Make sure a Java Runtime Environment is available on your machine before running `uv sync` with the ISDuBa extras:
+If you plan to use the ISDuBA CSAF source (the `isduba_fetcher` extra or the ISDuBA plugin workspace), a Java runtime is required during the build/install step. Make sure a Java Runtime Environment is available on your machine before running `uv sync` with the ISDuBA extras:
 
 - Recommended: OpenJDK 17 (or newer)
 - Ensure `java` is on your `PATH` (or set `JAVA_HOME` accordingly)
@@ -67,7 +67,7 @@ Example:
 uv sync --extra isduba_fetcher
 ```
 
-Without Java present, the ISDuBa plugin build will fail.
+Without Java present, the ISDuBA plugin build will fail.
 
 #### Matcher CLI
 
@@ -86,7 +86,7 @@ Note: For interactive use, omit `-p/--password` to be securely prompted.
 
 #### Quick start: local dev environment script
 
-You can start, stop, and recreate the full local development stack (PostgreSQL, NetBox, ISDuBa, etc.) using the helper script in the `dev/` directory:
+You can start, stop, and recreate the full local development stack (PostgreSQL, NetBox, ISDuBA, etc.) using the helper script in the `dev/` directory:
 
 ```bash
 ./dev/start-local-env.sh                       # start services in background
@@ -104,9 +104,9 @@ Notes:
   docker compose -f dev/docker-compose.yml logs netbox-setup
   ```
 
-The NetBox and ISDuBa services will be available at:
+The NetBox and ISDuBA services will be available at:
 - NetBox UI: http://netbox.localhost/ (default: admin / admin)
-- ISDuBa UI: http://isduba.localhost/ (default: user / user)
+- ISDuBA UI: http://isduba.localhost/ (default: user / user)
 
 #### Alternative: run docker compose directly
 
@@ -117,7 +117,7 @@ First, you can use externally installed asset or CSAF inventories and only set u
 docker compose -f dev/docker-compose-silab.yml up -d
 ```
 
-Alternatively, you can set up a fully local environment with a NetBox and ISDuBa installation:
+Alternatively, you can set up a fully local environment with a NetBox and ISDuBA installation:
 
 ```shell
 docker compose -f dev/docker-compose.yml up -d
@@ -135,19 +135,19 @@ The file can be named any way you like, but it must be a toml file.
 Replace the `api_token` with the API token printed by the netbox-setup container.
 Replace the `url` with the url of the netbox instance (http://netbox.localhost/).
 
-To configure the ISDuBa fetcher plugin, copy the file [assets/plugin_configs/data_source/csaf/sample/isduba.toml](assets/plugin_configs/data_source/csaf/sample/isduba.toml) to `assets/plugin_configs/data_source/csaf/isduba_local.toml`.
+To configure the ISDuBA fetcher plugin, copy the file [assets/plugin_configs/data_source/csaf/sample/isduba.toml](assets/plugin_configs/data_source/csaf/sample/isduba.toml) to `assets/plugin_configs/data_source/csaf/isduba_local.toml`.
 The file can be named any way you like, but it must be a toml file.
-Replace the `url` with the url of the ISDuBa instance http://isduba.localhost/.
-Replace the `username` and `password` with the credentials of the ISDuBa user (user/user).
+Replace the `url` with the url of the ISDuBA instance http://isduba.localhost/.
+Replace the `username` and `password` with the credentials of the ISDuBA user (user/user).
 Replace the `keycloak_url` with the url of the keycloak instance http://keycloak.localhost/.
 
-The ISDuBa interface can be reached at http://isduba.localhost/ and the netbox interface at http://netbox.localhost/.
+The ISDuBA interface can be reached at http://isduba.localhost/ and the netbox interface at http://netbox.localhost/.
 The default credentials are:
 - Netbox: admin / admin
-- ISDuBa: user / user
+- ISDuBA: user / user
 
-Before starting the synchronizers, make sure to create some assets and csaf advisories in the netbox and ISDuBa instances.
-Follow the corresponding instructions in the netbox and ISDuBa documentation.
+Before starting the synchronizers, make sure to create some assets and csaf advisories in the netbox and ISDuBA instances.
+Follow the corresponding instructions in the netbox and ISDuBA documentation.
 
 Next, install the python dependencies with uv by running in your terminal or inside pycharm (double tap `<Ctrl>` and enter the
 command) to set up the local python environment:
