@@ -81,7 +81,7 @@ services:
     environment:
       TLS_CN: ${TLS_CN:-localhost}
     ports:
-      - "${HTTPS_PORT:-8443}:8443"
+      - "0.0.0.0:${HTTPS_PORT:-443}:443"
     volumes:
       - gateway-certs:/etc/nginx/certs
 
