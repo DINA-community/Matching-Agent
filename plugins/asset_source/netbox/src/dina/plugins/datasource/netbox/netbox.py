@@ -555,6 +555,24 @@ class NetboxDataSource(DataSourcePlugin):
             def to_dict(self):
                 return [item.to_dict() for item in self.items]
 
+        # Monkey patch the response parser to always return None.
+        from dina.plugins.datasource.netbox.generated.api_client.models import CsafMatch
+
+        def parse_response_monkey(
+            *, client, response: httpx.Response
+        ) -> CsafMatch | None:
+            if response.status_code == 201:
+                return None
+
+            if client.raise_on_unexpected_status:
+                from dina.plugins.datasource.netbox.generated.api_client import errors
+
+                raise errors.UnexpectedStatus(response.status_code, response.content)
+            else:
+                return None
+
+        plugins_csaf_csafmatch_list_create._parse_response = parse_response_monkey
+
         batch_size = 100
         for i in range(0, len(new_matches), batch_size):
             batch = new_matches[i : i + batch_size]
