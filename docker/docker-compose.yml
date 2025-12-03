@@ -79,6 +79,7 @@ services:
       csafsync:
         condition: service_healthy
     environment:
+      HTTPS_PORT: ${HTTPS_PORT:-443}
       TLS_CN: ${TLS_CN:-localhost}
     ports:
       - "0.0.0.0:${HTTPS_PORT:-443}:443"

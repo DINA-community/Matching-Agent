@@ -10,6 +10,4 @@ RUN chmod +x /entrypoint.sh
 
 VOLUME ["/etc/nginx/certs"]
 
-EXPOSE 8443
-
 ENTRYPOINT ["/entrypoint.sh"]
