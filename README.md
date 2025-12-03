@@ -172,7 +172,7 @@ uv run ruff check
 ## Configuration and APIs
 
 This project provides three long-running components: two synchronizers and the matcher. Each reads a TOML
-configuration file from the assets/ directory and exposes a small HTTP API.
+configuration file from the `assets/` directory and exposes a small HTTP API.
 
 - Asset Synchronizer (assetsync)
   - Config file: assets/assetsync.toml
