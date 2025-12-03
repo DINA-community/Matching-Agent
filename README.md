@@ -35,9 +35,11 @@ For more details about the synchronizer infrastructure, see the Synchronizer Inf
 
 ## Getting Started
 
-### Installation on Ubuntu
+The following steps are intended for setting up a development environment on Ubuntu.
+For production use refer to the [Production Docker setup](#production-docker-setup) section below.
+For other distributions or operating systems, you may need to adjust the instructions accordingly.
 
-1. Install [uv](https://docs.astral.sh/uv/), docker and docker compose in any way that suits you.
+1. Install [uv](https://docs.astral.sh/uv/), git, docker and docker compose in any way that suits you.
 2. Clone the repository.
 
 ```shell
@@ -50,11 +52,9 @@ cd Matching-Agent
 git submodule update --init --recursive
 ```
 
-### after installation
+You now can either build the docs with `make docs` and follow the instructions there or proceed with the instructions below.
 
-You can either build the docs with `make docs` and follow the instructions there or proceed with the instructions below.
-
-#### Plugin build prerequisite (ISDuBA)
+### Plugin build prerequisite (ISDuBA)
 
 If you plan to use the ISDuBA CSAF source (the `isduba_fetcher` extra or the ISDuBA plugin workspace), a Java runtime is required during the build/install step. Make sure a Java Runtime Environment is available on your machine before running `uv sync` with the ISDuBA extras:
 
@@ -69,22 +69,7 @@ uv sync --extra isduba_fetcher
 
 Without Java present, the ISDuBA plugin build will fail.
 
-#### Matcher CLI
-
-A command-line interface is available to interact with the Matcher service (obtain tokens, list/get matches, start/stop tasks, clear caches). See the full guide:
-
-- docs/matcher-cli.rst
-
-Quick example (using uv):
-
-```bash
-uv run csaf_matcher_cli --base-url http://localhost:8998 -u admin \
-  matcher matches list --limit 20
-```
-
-Note: For interactive use, omit `-p/--password` to be securely prompted.
-
-#### Quick start: local dev environment script
+### Quick start: local dev environment script
 
 You can start, stop, and recreate the full local development stack (PostgreSQL, NetBox, ISDuBA, etc.) using the helper script in the `dev/` directory:
 
@@ -108,7 +93,7 @@ The NetBox and ISDuBA services will be available at:
 - NetBox UI: http://netbox.localhost/ (default: admin / admin)
 - ISDuBA UI: http://isduba.localhost/ (default: user / user)
 
-#### Alternative: run docker compose directly
+### Alternative: run docker compose directly
 
 There are two possible ways to set up a development environment using Docker Compose directly.
 First, you can use externally installed asset or CSAF inventories and only set up a local database:
@@ -161,22 +146,24 @@ If you want to install only the base package, just run `uv sync`.
 The plugins can be installed with `uv sync --extra <PLUGIN_NAME>` later on.
 To install multiple extras, provie multiple `--extra` arguments.
 
-### Setting up git pre-commit hooks
+### Matcher CLI
 
-Before commiting anything, make sure you have set up your git pre-commit hooks correctly.
-To do so, simply run the following:
+A command-line interface is available to interact with the Matcher service (obtain tokens, list/get matches, start/stop tasks, clear caches). See the full guide:
 
-```shell
-uv run pre-commit install
+- docs/matcher-cli.rst
+
+Quick example (using uv):
+
+```bash
+uv run csaf_matcher_cli --base-url http://localhost:8998 -u admin \
+  matcher matches list --limit 20
 ```
 
-To manually run the pre-commit hooks (in case you want to check without commiting), run the following:
+Note: For interactive use, omit `-p/--password` to be securely prompted.
 
-```shell
-uv run pre-commit run --all-files
-```
+## Contributing
 
-If you want to run the linter manually, run the following:
+If you want to contribute to the project, please read the [Contributing Guide](CONTRIBUTING.md).
 
 ```shell
 uv run ruff check
