@@ -15,6 +15,7 @@ Contents
    authentication
    api
    matcher-cli
+   production-setup
 
 
 Indices and tables
