@@ -46,7 +46,7 @@ services:
         ]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 100
     depends_on:
       isduba-db:
         condition: service_healthy
@@ -84,7 +84,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 100
     volumes:
       - ./isduba/docker/db/init.sh:/docker-entrypoint-initdb.d/init.sh
 
@@ -122,9 +122,9 @@ services:
     healthcheck: &redis-healthcheck
       test: '[ $$(valkey-cli --pass "$${REDIS_PASSWORD}" ping) = ''PONG'' ]'
       start_period: 5s
-      timeout: 3s
-      interval: 1s
-      retries: 5
+      timeout: 5s
+      interval: 5s
+      retries: 100
     env_file: netbox/env/redis.env
     networks:
       - netbox
@@ -161,8 +161,9 @@ services:
     healthcheck:
       test: curl -f http://localhost:8800/login/ || exit 1
       start_period: 180s
-      timeout: 3s
+      timeout: 5s
       interval: 15s
+      retries: 100
     networks:
       - netbox
     volumes:
@@ -189,8 +190,9 @@ services:
     healthcheck:
       test: ps -aux | grep -v grep | grep -q rqworker || exit 1
       start_period: 20s
-      timeout: 3s
+      timeout: 5s
       interval: 15s
+      retries: 100
     networks:
       - netbox
     labels:
@@ -207,8 +209,9 @@ services:
     healthcheck:
       test: ps -aux | grep -v grep | grep -q housekeeping || exit 1
       start_period: 20s
-      timeout: 3s
+      timeout: 5s
       interval: 15s
+      retries: 100
     networks:
       - netbox
     labels:
@@ -240,7 +243,7 @@ services:
       start_period: 20s
       timeout: 30s
       interval: 10s
-      retries: 5
+      retries: 100
     networks:
       - netbox
     env_file: netbox/env/postgres.env
