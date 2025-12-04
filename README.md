@@ -159,7 +159,8 @@ uv run csaf_matcher_cli --base-url http://localhost:8998 -u admin \
   matcher matches list --limit 20
 ```
 
-Note: For interactive use, omit `-p/--password` to be securely prompted.
+Note: For non-interactive use, provide the password with `-p/--password`. 
+This should never be done when typing in the password, since this leaves the password in the shell history, posing a security risk.
 
 ## Contributing
 
