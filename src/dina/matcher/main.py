@@ -147,7 +147,7 @@ class MatcherStatus(BaseModel):
 
 class MatchingTask(BaseModel):
     assets: list[HttpUrl]
-    csaf_products: list[HttpUrl]
+    csaf_documents: list[HttpUrl]
 
 
 class Matcher:
@@ -208,7 +208,7 @@ class Matcher:
                         task = self.__matching_tasks.pop()
                     except IndexError:
                         # If no task is queued, try to match all assets and all csaf products.
-                        task = MatchingTask(assets=[], csaf_products=[])
+                        task = MatchingTask(assets=[], csaf_documents=[])
                     logger.info(f"Starting matching task: {task}")
                     self.__matching_state = MatchingState.RUNNING
                     self.__matching_start_time = time.time()
@@ -217,7 +217,7 @@ class Matcher:
                     with concurrent.futures.ProcessPoolExecutor() as pool:
                         loop = asyncio.get_event_loop()
                         async for batch in self.__cache_db.fetch_pairs_batches(
-                            task.assets, task.csaf_products, batch_size_sqrt=20
+                            task.assets, task.csaf_documents, batch_size_sqrt=20
                         ):
                             if self.__matching_state == MatchingState.STOP_REQUESTED:
                                 break
@@ -405,7 +405,7 @@ class Matcher:
                 csaf_documents = []
             logger.info("Starting matching task")
             self.__matching_tasks.append(
-                MatchingTask(assets=assets, csaf_products=csaf_documents)
+                MatchingTask(assets=assets, csaf_documents=csaf_documents)
             )
 
         @task_route.get("/status")
