@@ -1,6 +1,6 @@
 services:
   postgres-cachedb:
-    image: postgres:15
+    image: postgres:17-alpine
     container_name: cachedb-postgres
     environment:
       POSTGRES_DB: ${CACHEDB_POSTGRES_DB:-cachedb}
