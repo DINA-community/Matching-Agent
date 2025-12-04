@@ -115,6 +115,12 @@ docker compose -f dev/docker-compose.yml logs netbox-setup
 ```
 The API token is printed to the console.
 
+The ISDuBA interface can be reached at http://isduba.localhost/ and the netbox interface at http://netbox.localhost/.
+The default credentials are:
+- Netbox: admin / admin
+- ISDuBA: user / user
+
+### Configure plugins
 To configure the netbox fetcher plugin, copy the file [assets/plugin_configs/data_source/asset/sample/netbox.toml](assets/plugin_configs/data_source/asset/sample/netbox.toml) to `assets/plugin_configs/data_source/asset/netbox_local.toml`.
 The file can be named any way you like, but it must be a toml file.
 Replace the `api_token` with the API token printed by the netbox-setup container.
@@ -126,16 +132,10 @@ Replace the `url` with the url of the ISDuBA instance http://isduba.localhost/.
 Replace the `username` and `password` with the credentials of the ISDuBA user (user/user).
 Replace the `keycloak_url` with the url of the keycloak instance http://keycloak.localhost/.
 
-The ISDuBA interface can be reached at http://isduba.localhost/ and the netbox interface at http://netbox.localhost/.
-The default credentials are:
-- Netbox: admin / admin
-- ISDuBA: user / user
-
 Before starting the synchronizers, make sure to create some assets and csaf advisories in the netbox and ISDuBA instances.
 Follow the corresponding instructions in the netbox and ISDuBA documentation.
 
-Next, install the python dependencies with uv by running in your terminal or inside pycharm (double tap `<Ctrl>` and enter the
-command) to set up the local python environment:
+Next, install the python dependencies with uv by running in your terminal or inside pycharm (double tap `<Ctrl>` and enter the command) to set up the local python environment:
 
 ```shell
 uv sync --all-extras
@@ -145,6 +145,8 @@ This will install all the available plugins in the `plugins/` directory in addit
 If you want to install only the base package, just run `uv sync`.
 The plugins can be installed with `uv sync --extra <PLUGIN_NAME>` later on.
 To install multiple extras, provie multiple `--extra` arguments.
+
+Your development environment is now ready to use.
 
 ### Matcher CLI
 
