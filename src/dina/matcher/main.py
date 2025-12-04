@@ -146,8 +146,8 @@ class MatcherStatus(BaseModel):
 
 
 class MatchingTask(BaseModel):
-    assets: list[int]
-    csaf_products: list[int]
+    assets: list[HttpUrl]
+    csaf_products: list[HttpUrl]
 
 
 class Matcher:
@@ -396,8 +396,8 @@ class Matcher:
 
         @task_route.post("/start")
         async def start(
-            assets: Annotated[list[int] | None, Query()] = None,
-            csaf_products: Annotated[list[int] | None, Query()] = None,
+            assets: Annotated[list[HttpUrl] | None, Query()] = None,
+            csaf_products: Annotated[list[HttpUrl] | None, Query()] = None,
         ):
             if assets is None:
                 assets = []
