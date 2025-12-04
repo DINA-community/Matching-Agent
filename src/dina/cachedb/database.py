@@ -1,16 +1,15 @@
 import datetime
-from typing import List, Optional, Type, Union, AsyncGenerator
+from typing import AsyncGenerator, List, Optional, Type, Union
 
 import sqlalchemy.exc
 from pydantic import BaseModel, HttpUrl
 from sqlalchemy import (
     and_,
     delete,
+    literal,
     or_,
     select,
     update,
-    literal,
-    func,
 )
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import (
@@ -18,7 +17,7 @@ from sqlalchemy.ext.asyncio import (
     AsyncSession,
     create_async_engine,
 )
-from sqlalchemy.orm import joinedload, contains_eager
+from sqlalchemy.orm import contains_eager, joinedload
 from sqlalchemy.sql.ddl import CreateSchema
 
 from dina.cachedb.fetcher_view import FetcherView
@@ -26,12 +25,12 @@ from dina.cachedb.model import (
     Asset,
     Base,
     CsafProduct,
-    Product,
-    csaf_product_relationship,
-    product_relationship,
     Match,
+    Product,
     SynchronizerMetadata,
     User,
+    csaf_product_relationship,
+    product_relationship,
 )
 from dina.common.log import get_logger
 from dina.synchronizer.plugin_base.data_source import (
@@ -415,17 +414,13 @@ class CacheDB:
         csaf_documents: list[HttpUrl],
         batch_size_sqrt: int = 50,
     ) -> AsyncGenerator[list[tuple[CsafProduct, Asset]]]:
+        query_was_empty = False
         async with AsyncSession(self.engine) as session:
-            csaf_offset = 0
+            last_csaf_product_id = 0
             csaf_limit = batch_size_sqrt
 
-            csaf_count = int(
-                (await session.execute(func.count(CsafProduct.id))).scalar()
-            )  # type: ignore
-            asset_count = int((await session.execute(func.count(Asset.id))).scalar())  # type: ignore
-
             while True:
-                logger.trace(f"Fetching csaf product offset: {csaf_offset}")
+                logger.trace(f"Fetching csaf product offset: {last_csaf_product_id}")
                 if csaf_documents:
                     csaf_query = select(CsafProduct).where(
                         CsafProduct.uri.in_([str(d) for d in csaf_documents])
@@ -433,12 +428,23 @@ class CacheDB:
                 else:
                     csaf_query = select(CsafProduct)
                 csaf_subquery = (
-                    csaf_query.limit(csaf_limit).offset(csaf_offset)
+                    csaf_query.order_by(CsafProduct.id)
+                    .limit(csaf_limit)
+                    .where(CsafProduct.id >= last_csaf_product_id)
                 ).subquery("csaf")
-                asset_offset = 0
+
+                if (
+                    query_was_empty
+                    and len((await session.execute(csaf_query)).scalars().all()) == 0
+                ):
+                    break
+                else:
+                    query_was_empty = False
+
+                last_asset_id = 0
                 asset_limit = batch_size_sqrt
                 while True:
-                    logger.trace(f"Fetching asset offset: {asset_offset}")
+                    logger.trace(f"Fetching asset offset: {last_asset_id}")
                     if assets:
                         asset_query = select(Asset).where(
                             Asset.uri.in_([str(a) for a in assets])
@@ -447,7 +453,8 @@ class CacheDB:
                         asset_query = select(Asset)
                     asset_subquery = (
                         asset_query.limit(asset_limit)
-                        .offset(asset_offset)
+                        .order_by(Asset.id)
+                        .where(Asset.id >= last_asset_id)
                         .subquery("assets")
                     )
                     pairs = (
@@ -494,16 +501,13 @@ class CacheDB:
                         )
                     )
 
-                    result = (await session.execute(query)).tuples().all()
-                    yield result  # type: ignore
-
-                    asset_offset += asset_limit
-                    if asset_offset >= asset_count:
+                    if result := (await session.execute(query)).tuples().all():
+                        last_asset_id = max(r[1].id for r in result) + 1
+                        last_csaf_product_id = max(r[0].id for r in result) + 1
+                        yield result  # type: ignore
+                    else:
+                        query_was_empty = True
                         break
-
-                csaf_offset += csaf_limit
-                if csaf_offset >= csaf_count:
-                    break
 
             return
 
@@ -522,7 +526,7 @@ class CacheDB:
     async def get_matches(
         self,
         limit: int | None = 100,
-        offset: int = 0,
+        last_match_id: int = 0,
         origin_uri: HttpUrl | None = None,
         ids: list[int] | None = None,
         time_lte: float | None = None,
@@ -550,7 +554,9 @@ class CacheDB:
                 )
             if ids is not None:
                 stmt = stmt.filter(Match.id.in_(ids))
-            stmt = stmt.order_by(Match.timestamp.desc(), Match.id.desc()).offset(offset)
+            stmt = stmt.order_by(Match.timestamp.desc(), Match.id.desc()).where(
+                Match.id >= last_match_id
+            )
             if time_lte is not None:
                 stmt = stmt.where(Match.timestamp <= time_lte)
             if time_gte is not None:

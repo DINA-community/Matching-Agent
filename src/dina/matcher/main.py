@@ -351,7 +351,7 @@ class Matcher:
             logger.info(f"Getting matches limit={limit} offset={offset}")
             matches = await self.__cache_db.get_matches(
                 limit=limit,
-                offset=offset,
+                last_match_id=offset,
                 origin_uri=origin_uri,
                 time_lte=time_lte,
                 time_gte=time_gte,
