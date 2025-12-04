@@ -1,6 +1,8 @@
 API Authentication Guide
 ========================
 
+.. include:: _includes/section-toc.rstinc
+
 This guide explains how to authenticate with the synchronizer APIs provided by the Matching Agent
 (e.g., Asset Synchronizer and CSAF Synchronizer). The APIs are implemented with FastAPI and
 use OAuth2 Password flow to issue short‑lived JWT bearer tokens.

@@ -18,3 +18,7 @@ uv run pre-commit run --all-files
 ```
 
 If you want to run the linter manually, run the following:
+
+```shell
+uv run ruff check
+```

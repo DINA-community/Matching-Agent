@@ -12,6 +12,7 @@ Contents
    :caption: Table of Contents
 
    getting-started
+   configuration
    authentication
    api
    matcher-cli

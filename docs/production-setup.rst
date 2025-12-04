@@ -1,6 +1,8 @@
 Production Deployment with Docker
 =================================
 
+.. include:: _includes/section-toc.rstinc
+
 This guide describes how to run the Matching Agent in a production‑like setup
 using the Docker assets located in the repository's ``docker/`` directory.
 
@@ -39,7 +41,10 @@ The Docker setup consists of:
 - ``docker/nginx/`` — gateway image build context (self‑signed TLS generation and routing config)
 
 Service configuration TOML files for containers are expected under ``docker/assets/``.
-Adjust them for your environment (data sources, credentials, hostnames).
+Adjust them for your environment (data sources, credentials, hostnames). For detailed
+settings of each component, see :ref:`Configuration <configuration>` (covers
+:ref:`assetsync <config-assetsync>`, :ref:`csafsync <config-csafsync>`, and
+:ref:`matcher <config-matcher>`).
 
 
 Prerequisites
@@ -180,4 +185,4 @@ See also
 - ``docker/docker-compose.yml`` for the full stack definition
 - ``docker/.env.example`` for configurable defaults
 - ``docker/nginx/nginx.conf`` for gateway routing
-- The service configuration files under ``assets/``
+- :ref:`Service configuration reference <configuration>`

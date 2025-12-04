@@ -1,6 +1,8 @@
 Matcher CLI
 ===========
 
+.. include:: _includes/section-toc.rstinc
+
 This page documents the command-line interface (CLI) used to interact with the Matcher and the
 related services. The CLI wraps the HTTP APIs exposed by the components and helps you authenticate,
 inspect matches, and control the matching task.
@@ -50,7 +52,7 @@ subsequent calls.
      uv run csaf_matcher_cli matcher --base-url http://localhost:8998 -u admin \
        token
 
-  If you omit ``-p/--password``, the CLI will prompt securely.
+  The password can also be provided with ``-p/--password`` instead of via the prompt.
 
   .. important::
 
