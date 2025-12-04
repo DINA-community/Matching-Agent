@@ -397,15 +397,15 @@ class Matcher:
         @task_route.post("/start")
         async def start(
             assets: Annotated[list[HttpUrl] | None, Query()] = None,
-            csaf_products: Annotated[list[HttpUrl] | None, Query()] = None,
+            csaf_documents: Annotated[list[HttpUrl] | None, Query()] = None,
         ):
             if assets is None:
                 assets = []
-            if csaf_products is None:
-                csaf_products = []
+            if csaf_documents is None:
+                csaf_documents = []
             logger.info("Starting matching task")
             self.__matching_tasks.append(
-                MatchingTask(assets=assets, csaf_products=csaf_products)
+                MatchingTask(assets=assets, csaf_products=csaf_documents)
             )
 
         @task_route.get("/status")
