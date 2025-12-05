@@ -582,16 +582,20 @@ class NetboxDataSource(DataSourcePlugin):
                     body=BulkBody(
                         [
                             CsafMatchRequest(
-                                csaf_document=match.csaf_product.uri,  # type: ignore
-                                device=match.asset.origin_info.get("device_id", UNSET),
-                                software=match.asset.origin_info.get(
+                                csaf_document=match.csaf_product.uri,
+                                device=(match.asset.origin_info or {}).get(
+                                    "device_id", UNSET
+                                ),
+                                software=(match.asset.origin_info or {}).get(
                                     "software_id", UNSET
                                 ),
-                                product_name_id=match.csaf_product.origin_info.get(
-                                    "product_name_id", UNSET
-                                ),
+                                product_name_id=(
+                                    match.csaf_product.origin_info or {}
+                                ).get("product_name_id", UNSET),
                                 score=match.score,
-                                time=datetime.fromtimestamp(match.timestamp),
+                                time=datetime.fromtimestamp(
+                                    match.timestamp or time.time()
+                                ),
                             )
                             for match in batch
                         ]
