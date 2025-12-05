@@ -300,6 +300,19 @@ To run the CSAF Synchronizer:
 uv run csafsync
 ```
 
+### Running the tests
+
+Tests can be executed using uv as well. All test targets are defined in the pyproject.toml, so you can run them with:
+
+```shell
+uv run pytest -v -s
+```
+
+To run a single test file:
+
+```shell
+uv run pytest -v  -s tests/matcher/test_matching.py
+```
 
 ## Authenticate with the API
 
