@@ -431,15 +431,17 @@ class CacheDB:
                     csaf_query.order_by(CsafProduct.id)
                     .limit(csaf_limit)
                     .where(CsafProduct.id >= last_csaf_product_id)
-                ).subquery("csaf")
+                )
 
                 if (
                     query_was_empty
-                    and len((await session.execute(csaf_query)).scalars().all()) == 0
+                    and len((await session.execute(csaf_subquery)).scalars().all()) == 0
                 ):
                     break
                 else:
                     query_was_empty = False
+
+                csaf_subquery = csaf_subquery.subquery("csaf")
 
                 last_asset_id = 0
                 asset_limit = batch_size_sqrt
