@@ -311,6 +311,12 @@ uv run pytest -v -s
 To run a single test file:
 
 ```shell
+uv run pytest -v -s <path-to-test>
+```
+
+Example:
+
+```shell
 uv run pytest -v  -s tests/matcher/test_matching.py
 ```
 
