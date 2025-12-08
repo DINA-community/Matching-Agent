@@ -158,3 +158,46 @@ The detailed configuration for each component has moved to a dedicated section:
 - :ref:`Matcher configuration <config-matcher>`
 
 See that page for example TOML files and parameter descriptions.
+
+Running Tests
+-------------
+
+The Matching Agent project contains tests in several locations:
+
+- ``tests/`` — core unit and integration tests
+- ``plugins/asset_source/<plugin>/tests/`` — tests for asset-source plugins
+- ``plugins/preprocessing/<plugin>/tests/`` — tests for preprocessing plugins
+
+
+Running all tests
+^^^^^^^^^^^^^^^^^
+
+To run the full test suite:
+
+.. code-block:: bash
+
+    uv run pytest -v -s
+
+
+Running a single test or file
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+You can execute an individual test file by passing its path:
+
+.. code-block:: bash
+
+    uv run pytest -v -s <path-to-test>
+
+Example:
+
+.. code-block:: bash
+
+    uv run pytest -v -s tests/matcher/test_matching.py
+
+
+Plugin-specific tests
+^^^^^^^^^^^^^^^^^^^^^
+
+Plugin tests are included automatically when the corresponding plugin is installed
+(e.g. via ``uv sync --extra <plugin>``).  
+If a plugin is not installed, its tests will be skipped.
