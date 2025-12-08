@@ -18,7 +18,7 @@ WIP).
 | Asset Synchronization  | ✅ Done | Basic asset data syncing implemented                                          |
 | CSAF Synchronization   | ✅ Done | CSAF advisory data syncing implemented                                        |
 | Asset-CSAF Matching    | ✅ Done | A simple Matcher that matches everything with maximum score.                  |
-| Sophisticated Matching | 🚧 WIP | A sophisticated matching algorithm that properly assigns match probabilities. | 
+| Sophisticated Matching | 🚧 WIP | A sophisticated matching algorithm that properly assigns match probabilities. |
 | REST API               | 🚧 WIP | Groundwork has been done. Need to specify API                                 |
 | Webhook Notifications  | 🚧 WIP | Notification system being developed                                           |
 | Plugin System          | ✅ Done | Extensible plugin architecture ready                                          |
@@ -36,40 +36,54 @@ For more details about the synchronizer infrastructure, see the Synchronizer Inf
 ## Getting Started
 
 The following steps are intended for setting up a development environment on Ubuntu.
-For production use refer to the [Production Docker setup](#production-docker-setup) section below.
 For other distributions or operating systems, you may need to adjust the instructions accordingly.
 
-1. Install [uv](https://docs.astral.sh/uv/), git, docker and docker compose in any way that suits you.
-2. Clone the repository.
+### Requirements
+
+- [uv](https://docs.astral.sh/uv/)
+- git
+- docker
+- docker compose
+- OpenJDK 17 (or newer)
 
 ```shell
-git clone -b feat/initial_structure https://github.com/DINA-community/Matching-Agent.git
+git clone -b feat/initial_structure --recurse-submodules https://github.com/DINA-community/Matching-Agent.git
 cd Matching-Agent
 ```
 
-3. (optional) If you want to use the docker-compose setup, also clone the submodules:
-```shell
-git submodule update --init --recursive
-```
-
-You now can either build the docs with `make docs` and follow the instructions there or proceed with the instructions below.
+> Note: You now can either build the docs with `make docs` and follow the instructions there or proceed with the instructions below.
 
 ### Plugin build prerequisite (ISDuBA)
 
-If you plan to use the ISDuBA CSAF source (the `isduba_fetcher` extra or the ISDuBA plugin workspace), a Java runtime is required during the build/install step. Make sure a Java Runtime Environment is available on your machine before running `uv sync` with the ISDuBA extras:
+If you plan to use the ISDuBA CSAF source (default plugin name `isduba_fetcher`), a Java runtime is required during the build/install step. Make sure a Java Runtime Environment is available on your machine before running `uv sync` with the ISDuBA extras. Otherwise it will fail:
 
 - Recommended: OpenJDK 17 (or newer)
-- Ensure `java` is on your `PATH` (or set `JAVA_HOME` accordingly)
-
-Example:
+- Ensure `java` is on your `PATH` (or set `JAVA_HOME` accordingly).
 
 ```bash
-uv sync --extra isduba_fetcher
+uv sync --extra <plugin name>
 ```
 
-Without Java present, the ISDuBA plugin build will fail.
+## Installation
 
-### Quick start: local dev environment script
+the following steps have to be done in order to use the software:
+
+Developer:
+
+- [Setup](#setup)
+- [Configuration](#configuration)
+  - [Plugins](#configure-plugins)
+  - [API](#configure-apis)
+
+Production Use:
+
+For production use refer to the [Production Docker setup](#production-docker-setup).
+
+### Setup
+
+The setup for installing the environment for using the application can be done [Script](#setup-by-script) or in docker directly [Docker](#setup-by-docker).
+
+#### Setup by Script
 
 You can start, stop, and recreate the full local development stack (PostgreSQL, NetBox, ISDuBA, etc.) using the helper script in the `dev/` directory:
 
@@ -81,19 +95,13 @@ You can start, stop, and recreate the full local development stack (PostgreSQL, 
 ./dev/start-local-env.sh --recreate --volumes  # full reset: down -v, then up (fresh volumes)
 ```
 
-Notes:
-- Requires Docker and Docker Compose (`docker compose`).
-- If you haven't initialized submodules yet, run `git submodule update --init --recursive`.
-- After startup, you can retrieve the NetBox API token from the setup container logs:
+After startup, the API token is printed. This information is needed for the [configuration of the NetBox plugin](#configure-plugins). You can retrieve the NetBox API token any time from the setup container logs:
+
   ```bash
   docker compose -f dev/docker-compose.yml logs netbox-setup
   ```
 
-The NetBox and ISDuBA services will be available at:
-- NetBox UI: http://netbox.localhost/ (default: admin / admin)
-- ISDuBA UI: http://isduba.localhost/ (default: user / user)
-
-### Alternative: run docker compose directly
+#### Setup by Docker
 
 There are two possible ways to set up a development environment using Docker Compose directly.
 First, you can use externally installed asset or CSAF inventories and only set up a local database:
@@ -113,27 +121,21 @@ If you use the fully local environment, the API token for NetBox is printed by t
 ```shell
 docker compose -f dev/docker-compose.yml logs netbox-setup
 ```
-The API token is printed to the console.
 
-The ISDuBA interface can be reached at http://isduba.localhost/ and the netbox interface at http://netbox.localhost/.
-The default credentials are:
-- Netbox: admin / admin
-- ISDuBA: user / user
+Copy the API token printed to the console and follow the instruction in [Chapter Configure Plugins](#configure-plugins)
 
-### Configure plugins
+### Configuration
+
+#### Configure Plugins
+
 To configure the netbox fetcher plugin, copy the file [assets/plugin_configs/data_source/asset/sample/netbox.toml](assets/plugin_configs/data_source/asset/sample/netbox.toml) to `assets/plugin_configs/data_source/asset/netbox_local.toml`.
 The file can be named any way you like, but it must be a toml file.
-Replace the `api_token` with the API token printed by the netbox-setup container.
-Replace the `url` with the url of the netbox instance (http://netbox.localhost/).
 
 To configure the ISDuBA fetcher plugin, copy the file [assets/plugin_configs/data_source/csaf/sample/isduba.toml](assets/plugin_configs/data_source/csaf/sample/isduba.toml) to `assets/plugin_configs/data_source/csaf/isduba_local.toml`.
 The file can be named any way you like, but it must be a toml file.
-Replace the `url` with the url of the ISDuBA instance http://isduba.localhost/.
-Replace the `username` and `password` with the credentials of the ISDuBA user (user/user).
-Replace the `keycloak_url` with the url of the keycloak instance http://keycloak.localhost/.
 
-Before starting the synchronizers, make sure to create some assets and csaf advisories in the netbox and ISDuBA instances.
-Follow the corresponding instructions in the netbox and ISDuBA documentation.
+Before starting the synchronizers, make sure to create some assets and csaf advisories in the NetBox and ISDuBA instances.
+Follow the corresponding instructions in the [NetBox](https://netboxlabs.com/docs/netbox/) and [ISDuBA documentation](https://github.com/ISDuBA/ISDuBA/blob/main/docs/README.md).
 
 Next, install the python dependencies with uv by running in your terminal or inside pycharm (double tap `<Ctrl>` and enter the command) to set up the local python environment:
 
@@ -144,48 +146,30 @@ uv sync --all-extras
 This will install all the available plugins in the `plugins/` directory in addition to the base package.
 If you want to install only the base package, just run `uv sync`.
 The plugins can be installed with `uv sync --extra <PLUGIN_NAME>` later on.
-To install multiple extras, provie multiple `--extra` arguments.
+To install multiple extras, provide multiple `--extra` arguments.
 
-Your development environment is now ready to use.
-
-### Matcher CLI
-
-A command-line interface is available to interact with the Matcher service (obtain tokens, list/get matches, start/stop tasks, clear caches). See the full guide:
-
-- docs/matcher-cli.rst
-
-Quick example (using uv):
-
-```bash
-uv run csaf_matcher_cli --base-url http://localhost:8998 -u admin \
-  matcher matches list --limit 20
-```
-
-Note: For non-interactive use, provide the password with `-p/--password`. 
-This should never be done when typing in the password, since this leaves the password in the shell history, posing a security risk.
-
-## Configuration and APIs
+### Configure APIs
 
 This project provides three long-running components: two synchronizers and the matcher. Each reads a TOML
 configuration file from the `assets/` directory and exposes a small HTTP API.
 
 - Asset Synchronizer (assetsync)
   - Config file: assets/assetsync.toml
-  - Default API: http://0.0.0.0:8000
+  - Default API: <http://0.0.0.0:8992>
 - CSAF Synchronizer (csafsync)
   - Config file: assets/csafsync.toml
-  - Default API: http://0.0.0.0:8001
+  - Default API: <http://0.0.0.0:8991>
 - Matcher
   - Config file: assets/matcher.toml
-  - Default API: http://0.0.0.0:8998
+  - Default API: <http://0.0.0.0:8998>
 
 You can change host and port for each service in the respective config under the [..Api] section.
 
-### Matcher configuration (assets/matcher.toml)
+#### Matcher configuration (assets/matcher.toml)
 
 Minimal example (defaults in repo):
 
-```
+```toml
 [Matcher]
 sync_interval = 60  # seconds between matching runs
 asset_plugins_path = "./assets/plugin_configs/data_source/asset"
@@ -209,14 +193,13 @@ password = "secret"
 - Matcher.Api.host/port: Address where the FastAPI server listens.
 - Matcher.Cachedb: Connection to the shared cache DB used by all components.
 
-The API documentation can be found at `http://host:port/docs`.
+The API documentation can be found at `http://<host:port>/docs`.
 
-
-### Asset Synchronizer configuration (assets/assetsync.toml)
+#### Asset Synchronizer configuration (assets/assetsync.toml)
 
 Example (defaults in repo):
 
-```
+```toml
 [Assetsync]
 # Asset-specific options go here (plugin-specific)
 
@@ -248,11 +231,11 @@ password = "secret"
 
 The API documentation can be found at `http://host:port/docs`.
 
-### CSAF Synchronizer configuration (assets/csafsync.toml)
+#### CSAF Synchronizer configuration (assets/csafsync.toml)
 
 Example (defaults in repo):
 
-```
+```toml
 [Csafsync]
 # CSAF-specific options go here (plugin-specific)
 
@@ -278,47 +261,10 @@ password = "secret"
 
 The API documentation can be found at `http://host:port/docs`.
 
-### Running the applications
+Your development environment is now ready to use. The NetBox and ISDuBA services will be available at:
 
-Targets can be run by typing `uv run <TARGET_NAME>` or by selecting it in the run configurations menu
-in Pycharm.
-For example, try running the following to start the matching agent.
-
-```shell
-uv run csaf_matcher
-```
-
-To run the Asset Synchronizer:
-
-```shell
-uv run assetsync
-```
-
-To run the CSAF Synchronizer:
-
-```shell
-uv run csafsync
-```
-
-### Running the tests
-
-Tests can be executed using uv as well. All test targets are defined in the pyproject.toml, so you can run them with:
-
-```shell
-uv run pytest -v -s
-```
-
-To run a single test file:
-
-```shell
-uv run pytest -v -s <path-to-test>
-```
-
-Example:
-
-```shell
-uv run pytest -v  -s tests/matcher/test_matching.py
-```
+- NetBox UI: <http://netbox.localhost/> (default: admin / admin)
+- ISDuBA UI: <http://isduba.localhost/> (default: user / user)
 
 ## Authenticate with the API
 
@@ -326,7 +272,7 @@ The synchronizer components (Asset/CSAF) and the Matcher expose a small FastAPI 
 
 Quick start:
 
-1) Make sure the component is running (e.g., Asset Synchronizer default at http://localhost:8992; configurable in `assets/assetsync.toml`).
+1) Make sure the component is running (e.g., Asset Synchronizer default at <http://localhost:8992>; configurable in `assets/assetsync.toml`).
 2) Create or update a user in the CacheDB using the CLI:
 
 ```bash
@@ -355,13 +301,55 @@ curl -sS "$BASE_URL/status" -H "Authorization: Bearer $TOKEN"
 ```
 
 Notes:
+
 - Token lifetime is controlled by `[Synchronizer.Api].access_token_expire_minutes` in the component’s TOML config.
 - Interactive API docs are available at `$BASE_URL/docs` (Swagger UI).
 
 For a detailed guide (including HTTPie and Python examples, troubleshooting, and security notes), see:
+
 - docs/authentication.rst
 
-## Production Docker setup
+### Running Applications
+
+Targets can be run by typing `uv run <TARGET_NAME>` or by selecting it in the run configurations menu
+in Pycharm.
+For example, try running the following to start the matching agent.
+
+```shell
+uv run csaf_matcher_cli --base-url http://localhost:8998 -u admin \
+  matcher matches list --limit 20
+```
+
+Note: For non-interactive use, provide the password with `-p/--password`.  
+This should never be done when typing in the password, since this leaves the password in the shell history, posing a security risk.
+
+To run the Asset Synchronizer:
+
+```shell
+uv run assetsync
+```
+
+To run the CSAF Synchronizer:
+
+```shell
+uv run csafsync
+```
+
+### Running Tests
+
+Tests can be executed using uv as well. All test targets are defined in the pyproject.toml, so you can run them with:
+
+```shell
+uv run pytest -v -s
+```
+
+To run a single test file:
+
+```shell
+uv run pytest -v  -s tests/matcher/test_matching.py
+```
+
+## Production Docker Setup
 
 This repository ships a simple production‑ready Docker setup that runs the three services (assetsync, csafsync, matcher) with a shared PostgreSQL database and exposes all three APIs over HTTPS using a self‑signed certificate.
 
