@@ -408,108 +408,83 @@ class CacheDB:
             )
             await session.execute(update_stmt)
 
+    async def _fetch_batch_ids(
+        self,
+        session: AsyncSession,
+        model: type[CsafProduct] | type[Asset],
+        uris: list[HttpUrl],
+        last_id: int,
+        limit: int,
+    ) -> list[int]:
+        stmt = (
+            select(model.id).where(model.id >= last_id).order_by(model.id).limit(limit)
+        )
+        if uris:
+            stmt = stmt.where(model.uri.in_([str(u) for u in uris]))
+        return (await session.execute(stmt)).scalars().all()  # type: ignore
+
     async def fetch_pairs_batches(
         self,
         assets: list[HttpUrl],
         csaf_documents: list[HttpUrl],
         batch_size_sqrt: int = 50,
     ) -> AsyncGenerator[list[tuple[CsafProduct, Asset]]]:
-        query_was_empty = False
         async with AsyncSession(self.engine) as session:
-            last_csaf_product_id = 0
-            csaf_limit = batch_size_sqrt
+            next_csaf_product_id = 0
 
             while True:
-                logger.trace(f"Fetching csaf product offset: {last_csaf_product_id}")
-                if csaf_documents:
-                    csaf_query = select(CsafProduct).where(
-                        CsafProduct.uri.in_([str(d) for d in csaf_documents])
-                    )
-                else:
-                    csaf_query = select(CsafProduct)
-                csaf_subquery = (
-                    csaf_query.order_by(CsafProduct.id)
-                    .limit(csaf_limit)
-                    .where(CsafProduct.id >= last_csaf_product_id)
+                logger.trace(f"Fetching csaf product offset: {next_csaf_product_id}")
+                csaf_ids = await self._fetch_batch_ids(
+                    session,
+                    CsafProduct,
+                    csaf_documents,
+                    next_csaf_product_id,
+                    batch_size_sqrt,
                 )
-
-                if (
-                    query_was_empty
-                    and len((await session.execute(csaf_subquery)).scalars().all()) == 0
-                ):
+                if not csaf_ids:
                     break
-                else:
-                    query_was_empty = False
+                next_csaf_product_id = csaf_ids[-1] + 1
 
-                csaf_subquery = csaf_subquery.subquery("csaf")
-
-                last_asset_id = 0
-                asset_limit = batch_size_sqrt
+                next_asset_id = 0
                 while True:
-                    logger.trace(f"Fetching asset offset: {last_asset_id}")
-                    if assets:
-                        asset_query = select(Asset).where(
-                            Asset.uri.in_([str(a) for a in assets])
-                        )
-                    else:
-                        asset_query = select(Asset)
-                    asset_subquery = (
-                        asset_query.limit(asset_limit)
-                        .order_by(Asset.id)
-                        .where(Asset.id >= last_asset_id)
-                        .subquery("assets")
-                    )
-                    pairs = (
-                        select(
-                            Match.id.label("match_id"),
-                            Match.timestamp.label("match_timestamp"),
-                            asset_subquery.c.id.label("asset_id"),
-                            asset_subquery.c.last_update.label("asset_timestamp"),
-                            csaf_subquery.c.id.label("csaf_id"),
-                            csaf_subquery.c.last_update.label("csaf_timestamp"),
-                        )
-                        .select_from(asset_subquery)
-                        .join(csaf_subquery, literal(value=True))
-                        .join(
-                            Match,
-                            and_(
-                                Match.asset_id == asset_subquery.c.id,
-                                Match.csaf_product_id == csaf_subquery.c.id,
-                            ),
-                            full=True,
-                        )
-                        .distinct(asset_subquery.c.id, csaf_subquery.c.id)
-                        .order_by(
-                            asset_subquery.c.id,
-                            csaf_subquery.c.id,
-                            Match.timestamp.desc(),
-                        )
-                    ).subquery("pairs")
+                    logger.trace(f"Fetching asset offset: {next_asset_id}")
 
+                    asset_ids = await self._fetch_batch_ids(
+                        session, Asset, assets, next_asset_id, batch_size_sqrt
+                    )
+                    if not asset_ids:
+                        break
+
+                    next_asset_id = asset_ids[-1] + 1
+
+                    # Find pairs within this block that need matching
                     query = (
                         select(CsafProduct, Asset)
-                        .select_from(pairs)
+                        .select_from(CsafProduct)
+                        .join(Asset, literal(True))
+                        .where(CsafProduct.id.in_(csaf_ids))
+                        .where(Asset.id.in_(asset_ids))
+                        .outerjoin(
+                            Match,
+                            and_(
+                                Match.asset_id == Asset.id,
+                                Match.csaf_product_id == CsafProduct.id,
+                            ),
+                        )
                         .where(
                             or_(
-                                pairs.c.match_id.is_(None),
-                                pairs.c.match_timestamp < pairs.c.asset_timestamp,
-                                pairs.c.match_timestamp < pairs.c.csaf_timestamp,
+                                Match.id.is_(None),
+                                Match.timestamp < Asset.last_update,
+                                Match.timestamp < CsafProduct.last_update,
                             )
                         )
-                        .join(CsafProduct, CsafProduct.id == pairs.c.csaf_id)
-                        .join(Asset, Asset.id == pairs.c.asset_id)
                         .options(
                             joinedload(CsafProduct.product), joinedload(Asset.product)
                         )
                     )
 
                     if result := (await session.execute(query)).tuples().all():
-                        last_asset_id = max(r[1].id for r in result) + 1
-                        last_csaf_product_id = max(r[0].id for r in result) + 1
                         yield result  # type: ignore
-                    else:
-                        query_was_empty = True
-                        break
 
             return
 
