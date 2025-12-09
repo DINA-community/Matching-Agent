@@ -87,6 +87,7 @@ services:
       retries: 100
     volumes:
       - ./isduba/docker/db/init.sh:/docker-entrypoint-initdb.d/init.sh
+      - postgres_volume:/var/lib/postgresql/data
 
   isduba-server:
     container_name: "isduba-server"
@@ -287,6 +288,8 @@ volumes:
     driver: local
   netbox-scripts-files:
     driver: local
+  postgres_volume:
+
 
 
 networks:

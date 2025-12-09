@@ -207,3 +207,5 @@ src/.DS_Store
 
 
 logs/
+Troubleshoot.md
+.vscode/

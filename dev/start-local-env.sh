@@ -51,7 +51,10 @@ To get the NetBox API token printed by the setup container:
 To see container status:
   $COMPOSE_CMD -f $COMPOSE_FILE ps
 
-To stop everything later:
+To stop services later:
+  $COMPOSE_CMD -f $COMPOSE_FILE stop
+
+To stop and delete services later:
   $COMPOSE_CMD -f $COMPOSE_FILE down
 To stop and also delete named volumes (data reset):
   $COMPOSE_CMD -f $COMPOSE_FILE down -v

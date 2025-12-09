@@ -14,11 +14,12 @@ Prerequisites
 
 Quick start
 -----------
-1) Clone the repository
+1) Clone the repository:
 
    .. code-block:: bash
 
-      git clone https://github.com/DINA-community/Matching-Agent.git
+      git clone --recurse-submodules https://github.com/DINA-community/Matching-Agent.git
+
       cd Matching-Agent
 
 2) Create the Python environment and install dependencies
@@ -75,9 +76,9 @@ Quick start
     - ISDuBA UI: http://isduba.localhost/ (default: user/user)
     - The NetBox API token is printed by the ``netbox-setup`` container logs. The script will attempt to
       print it automatically; if needed, you can retrieve it manually:
-        .. code-block:: bash
+      .. code-block:: bash
 
-            docker compose -f dev/docker-compose.yml logs netbox-setup
+        docker compose -f dev/docker-compose.yml logs netbox-setup
 
 4) Configure plugins
 

@@ -7,7 +7,7 @@
 # Assetsync specific configuration
 
 [Synchronizer]
-# Synchronization inetrval in seconds.
+# Synchronization interval in seconds.
 # The synchronizer will perform a fetching task every X seconds.
 sync_interval = 86400
 # Path to the directory containing asset data source plugin configuration TOML files
@@ -23,7 +23,7 @@ preprocessor_plugins = ["identity", "default"]
 [Synchronizer.Api]
 # The address to serve on
 # 0.0.0.0 means all interfaces
-host = "0.0.0.0"
+host = "127.0.0.1"
 
 # The port to serve on.
 port = 8992
