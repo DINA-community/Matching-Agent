@@ -1,4 +1,4 @@
-"""M...."""
+"""Necessary Plugins for the application in NetBox"""
 
 PLUGINS = ["csaf", "d3c"]
 
