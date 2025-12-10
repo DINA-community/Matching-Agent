@@ -293,6 +293,20 @@ To run the CSAF Synchronizer:
 uv run csafsync
 ```
 
+### Running Tests
+
+Tests can be executed using uv as well. All test targets are defined in the pyproject.toml, so you can run them with:
+
+```shell
+uv run pytest -v -s
+```
+
+To run a single test file:
+
+```shell
+uv run pytest -v  -s tests/matcher/test_matching.py
+```
+
 ## Production Docker Setup
 
 This repository ships a simple production‑ready Docker setup that runs the three services (assetsync, csafsync, matcher) with a shared PostgreSQL database and exposes all three APIs over HTTPS using a self‑signed certificate.
