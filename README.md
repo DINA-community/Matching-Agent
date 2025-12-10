@@ -311,6 +311,9 @@ uv run pytest -v  -s tests/matcher/test_matching.py
 
 This repository ships a simple production‑ready Docker setup that runs the three services (assetsync, csafsync, matcher) with a shared PostgreSQL database and exposes all three APIs over HTTPS using a self‑signed certificate.
 
+For instructions on how to set up the environment, see the corresponding section in the docs.
+The docs are built with `make docs` and can be found in the `docs/_build/html/production-setup.html` directory.
+
 > Note Under development see [Issue #9](https://github.com/DINA-community/Matching-Agent/issues/9)
 
 ## Contributing
