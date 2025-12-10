@@ -44,9 +44,6 @@ Make sure you have the following requirements installed:
 - docker (28.5 or newer)
 - docker compose (2.40 or newer)
 - OpenJDK 17 (or newer) (optional, required for ISDuBA CSAF source). Ensure `java` is on your `PATH` (or set `JAVA_HOME` accordingly).
-- Sphinx (for docs)
-
-You can either build the docs with `uv run make docs` and follow the instructions there or proceed with the instructions below.
 
 The following steps are intended for setting up a development environment on Ubuntu.
 For other distributions or operating systems, you may need to adjust the instructions accordingly.
@@ -58,6 +55,8 @@ git clone -b feat/initial_structure --recurse-submodules https://github.com/DINA
 cd Matching-Agent
 uv sync --extra isduba_fetcher # If you plan to use the ISDuBA CSAF source (default plugin name `isduba_fetcher`)
 ```
+
+You can either build the docs with `make docs` and follow the instructions there or proceed with the instructions below.
 
 ## Installation
 
