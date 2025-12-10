@@ -23,7 +23,7 @@ preprocessor_plugins = ["identity", "default"]
 [Synchronizer.Api]
 # The address to serve on
 # 0.0.0.0 means all interfaces
-host = "127.0.0.1"
+host = "0.0.0.0"
 
 # The port to serve on.
 port = 8992

@@ -1,8 +1,8 @@
-"""Necessary Plugins for the application in NetBox"""
+"""Necessary Plugins for the application in NetBox."""
 
 PLUGINS = ["csaf", "d3c"]
 
-# Configuration for local use of synchronisers and isduba'
+# # Configuration for local use of synchronisers and isduba'
 # PLUGINS_CONFIG = {
 #   "d3c": {
 #     'top_level_menu': True
@@ -16,20 +16,20 @@ PLUGINS = ["csaf", "d3c"]
 #     },
 #     'synchronisers': {
 #         'username': 'admin',
-#         'password': 'admin2',
+#         'password': '<password>',
 #         'verify_ssl': False,
 #         'urls': [
 #             {
 #                 'name': 'ISDuBA Sync',
-#                 'url': 'http://localhost:8991/',
+#                 'url': 'http://host.local:8991/',
 #             },
 #             {
 #                 'name': 'Netbox Sync',
-#                 'url': 'http://localhost:8992/',
+#                 'url': 'http://host.local:8992/',
 #             },
 #             {
 #                 'name': 'CSAF Matcher',
-#                 'url': 'http://localhost:8998/',
+#                 'url': 'http://host.local:8998/',
 #             }
 #         ]
 #     }

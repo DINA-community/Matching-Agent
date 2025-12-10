@@ -1,5 +1,7 @@
 [Matcher]
+# Seconds between matching runs
 sync_interval = 86400
+# Threshold for showing matches
 match_threshold = 0
 # Path to asset data source plugin configs used for the assetsync
 asset_plugins_path = "./assets/plugin_configs/data_source/asset"

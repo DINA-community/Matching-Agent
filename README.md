@@ -15,13 +15,13 @@ WIP).
 
 | Feature                | Status | Notes                                                                         |
 |------------------------|--------|:------------------------------------------------------------------------------|
-| Asset Synchronization  | ✅ Done | Basic asset data syncing implemented                                          |
-| CSAF Synchronization   | ✅ Done | CSAF advisory data syncing implemented                                        |
-| Asset-CSAF Matching    | ✅ Done | A simple Matcher that matches everything with maximum score.                  |
+| Asset Synchronization  | ✅ Done | Basic asset data syncing implemented                                         |
+| CSAF Synchronization   | ✅ Done | CSAF advisory data syncing implemented                                       |
+| Asset-CSAF Matching    | ✅ Done | A simple Matcher that matches everything with maximum score.                 |
 | Sophisticated Matching | 🚧 WIP | A sophisticated matching algorithm that properly assigns match probabilities. |
 | REST API               | 🚧 WIP | Groundwork has been done. Need to specify API                                 |
 | Webhook Notifications  | 🚧 WIP | Notification system being developed                                           |
-| Plugin System          | ✅ Done | Extensible plugin architecture ready                                          |
+| Plugin System          | ✅ Done | Extensible plugin architecture ready                                         |
 
 ## Project Structure
 
@@ -35,10 +35,6 @@ For more details about the synchronizer infrastructure, see the Synchronizer Inf
 
 ## Getting Started
 
-You now can either build the docs with `make docs` and follow the instructions there or proceed with the instructions below.
-The following steps are intended for setting up a development environment on Ubuntu.
-For other distributions or operating systems, you may need to adjust the instructions accordingly.
-
 ### Requirements
 
 Make sure you have the following requirements installed:
@@ -48,8 +44,14 @@ Make sure you have the following requirements installed:
 - docker (28.5 or newer)
 - docker compose (2.40 or newer)
 - OpenJDK 17 (or newer) (optional, required for ISDuBA CSAF source). Ensure `java` is on your `PATH` (or set `JAVA_HOME` accordingly).
+- Sphinx (for docs)
 
-Afterward, clone the repository:
+You can either build the docs with `uv run make docs` and follow the instructions there or proceed with the instructions below.
+
+The following steps are intended for setting up a development environment on Ubuntu.
+For other distributions or operating systems, you may need to adjust the instructions accordingly.
+
+First, clone the repository:
 
 ```shell
 git clone -b feat/initial_structure --recurse-submodules https://github.com/DINA-community/Matching-Agent.git
@@ -139,6 +141,7 @@ configuration file from the `assets/` directory and exposes a small HTTP API.
   - Default API: <http://0.0.0.0:8998>
 
 You can change host and port for each service in the respective config under the [..Api] section.
+The API documentation can be found at `http://<host:port>/docs`.
 
 #### Matcher configuration (assets/matcher.toml)
 
@@ -147,6 +150,7 @@ Minimal example (defaults in repo):
 ```toml
 [Matcher]
 sync_interval = 60  # seconds between matching runs
+match_threshold = 0
 asset_plugins_path = "./assets/plugin_configs/data_source/asset"
 csaf_plugins_path = "./assets/plugin_configs/data_source/csaf"
 
@@ -163,12 +167,11 @@ password = "secret"
 ```
 
 - Matcher.sync_interval: Minimal delay between matching cycles.
+- Matcher.match_threshold: Value for showing possible matches
 - Matcher.asset_plugins_path: Path to the directory containing asset-specific plugin configuration files.
 - Matcher.csaf_plugins_path: Path to the directory containing CSAF-specific plugin configuration files.
 - Matcher.Api.host/port: Address where the FastAPI server listens.
 - Matcher.Cachedb: Connection to the shared cache DB used by all components.
-
-The API documentation can be found at `http://<host:port>/docs`.
 
 #### Asset Synchronizer configuration (assets/assetsync.toml)
 
@@ -204,8 +207,6 @@ password = "secret"
 - Cachedb: Connection to the shared cache DB.
 - Data source plugins: Configuration TOML files are loaded from assets/plugin_configs/asset_source/…
 
-The API documentation can be found at `http://host:port/docs`.
-
 #### CSAF Synchronizer configuration (assets/csafsync.toml)
 
 Example (defaults in repo):
@@ -234,48 +235,47 @@ password = "secret"
 
 - Same meaning as for the Asset Synchronizer
 
-The API documentation can be found at `http://host:port/docs`.
-
-Your development environment is now ready to use. If using the fully local environment, the NetBox and ISDuBA services will be available at:
-
-- NetBox UI: <http://netbox.localhost/> (default: admin / admin)
-- ISDuBA UI: <http://isduba.localhost/> (default: user / user)
-
 ## Authenticate with the API
 
 The synchronizer components (Asset/CSAF) and the Matcher expose a small FastAPI HTTP API that uses OAuth2 Password flow to issue short‑lived JWT bearer tokens.
 
 Quick start:
 
-1) Make sure the component is running (e.g., Matcher default at <http://localhost:8998>; configurable in `assets/matcher.toml`) after executing the setup and configuration.
+1) Make sure the component is running (e.g., Matcher default at <http://localhost:8998/docs>; configurable in `assets/matcher.toml`) after executing the setup and configuration.
 2) Create or update a user in the CacheDB using the CLI:
 
 ```bash
 uv run csaf_matcher_cli user create -u admin
 ```
 
-**Note**: For interactive use, do not pass passwords via `-p/--password`. The CLI will securely prompt
-for the password. Reserve `-p` only for non-interactive environments (e.g., CI) and source secrets
-from a secure provider.
+### Local Setup
 
-You can now use the CLI to interact with the API endpoints.
-For example, to list matches with a limit of 20:
+When using the local setup, the password has to be stored in `\dev\configuration\plugins.py`
 
-```shell
-uv run csaf_matcher_cli --base-url http://localhost:8998 -u admin \
-  matcher matches list --limit 20
+```python
+    'synchronisers': {
+        'username': 'admin',
+        'password': '<password>',
+        ...
+    }
 ```
 
-For a detailed guide (including HTTPie and Python examples, troubleshooting, and security notes), see:
+For a detailed guide (including HTTP and Python examples, troubleshooting, and security notes), see:
 
 - docs/authentication.rst
 - docs/matcher-cli.rst
 
 ### Running Applications
 
+Your development environment is now ready to use. If using the fully local environment, the NetBox and ISDuBA services will be available at:
+
+- NetBox UI: <http://netbox.localhost/> (default: admin / admin)
+- ISDuBA UI: <http://isduba.localhost/> (default: user / user)
+
 Targets can be run by typing `uv run <TARGET_NAME>` or by selecting it in the run configurations menu
 in Pycharm.
-For example, try running the following to start the matching agent.
+
+To run the Matching Agent:
 
 ```shell
 uv run csaf_matcher
@@ -293,26 +293,11 @@ To run the CSAF Synchronizer:
 uv run csafsync
 ```
 
-### Running Tests
-
-Tests can be executed using uv as well. All test targets are defined in the pyproject.toml, so you can run them with:
-
-```shell
-uv run pytest -v -s
-```
-
-To run a single test file:
-
-```shell
-uv run pytest -v  -s tests/matcher/test_matching.py
-```
-
 ## Production Docker Setup
 
 This repository ships a simple production‑ready Docker setup that runs the three services (assetsync, csafsync, matcher) with a shared PostgreSQL database and exposes all three APIs over HTTPS using a self‑signed certificate.
 
-For instructions on how to set up the environment, see the corresponding section in the docs.
-The docs are built with `make docs` and can be found in the `docs/_build/html/production-setup.html` directory.
+> Note Under development see [Issue #9](https://github.com/DINA-community/Matching-Agent/issues/9)
 
 ## Contributing
 
