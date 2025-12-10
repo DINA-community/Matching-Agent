@@ -105,14 +105,25 @@ Before starting the services, make sure to configure the plugins and the APIs ac
 
 ### Configure Plugins
 
-To configure the netbox fetcher plugin, copy the file [assets/plugin_configs/data_source/asset/sample/netbox.toml](assets/plugin_configs/data_source/asset/sample/netbox.toml) to `assets/plugin_configs/data_source/asset/netbox_local.toml` and adjust the values to your environment.
+To configure the Netbox fetcher plugin, copy the file [`assets/plugin_configs/data_source/asset/sample/netbox.toml`](assets/plugin_configs/data_source/asset/sample/netbox.toml) to `assets/plugin_configs/data_source/asset/netbox_local.toml` and adjust the values to your environment.
 The file can be named any way you like, but it must be a toml file.
 
-To configure the ISDuBA fetcher plugin, copy the file [assets/plugin_configs/data_source/csaf/sample/isduba.toml](assets/plugin_configs/data_source/csaf/sample/isduba.toml) to `assets/plugin_configs/data_source/csaf/isduba_local.toml` and adjust the values to your environment.
+
+```shell
+cp assets/plugin_configs/data_source/asset/sample/netbox.toml assets/plugin_configs/data_source/asset/netbox_local.toml
+vim assets/plugin_configs/data_source/asset/netbox_local.toml
+```
+
+To configure the ISDuBA fetcher plugin, copy the file [`assets/plugin_configs/data_source/csaf/sample/isduba.toml`](assets/plugin_configs/data_source/csaf/sample/isduba.toml) to `assets/plugin_configs/data_source/csaf/isduba_local.toml` and adjust the values to your environment.
 The file can be named any way you like, but it must be a toml file.
 
-Before starting the synchronizers, make sure to create some assets and csaf advisories in the NetBox and ISDuBA instances.
+Before starting the synchronizers, make sure to create some assets and CSAF documents in the NetBox and ISDuBA instances.
 Follow the corresponding instructions in the [NetBox](https://netboxlabs.com/docs/netbox/) and [ISDuBA documentation](https://github.com/ISDuBA/ISDuBA/blob/main/docs/README.md).
+
+```shell
+cp assets/plugin_configs/data_source/csaf/sample/isduba.toml assets/plugin_configs/data_source/csaf/isduba_local.toml
+vim assets/plugin_configs/data_source/csaf/isduba_local.toml
+```
 
 Next, install the python dependencies with uv by running in your terminal or inside pycharm (double tap `<Ctrl>` and enter the command) to set up the local python environment:
 
@@ -166,12 +177,12 @@ username = "admin"
 password = "secret"
 ```
 
-- Matcher.sync_interval: Minimal delay between matching cycles.
-- Matcher.match_threshold: Value for showing possible matches
-- Matcher.asset_plugins_path: Path to the directory containing asset-specific plugin configuration files.
-- Matcher.csaf_plugins_path: Path to the directory containing CSAF-specific plugin configuration files.
-- Matcher.Api.host/port: Address where the FastAPI server listens.
-- Matcher.Cachedb: Connection to the shared cache DB used by all components.
+- `Matcher.sync_interval`: Minimal delay between matching cycles.
+- `Matcher.match_threshold`: Value for showing possible matches
+- `Matcher.asset_plugins_path`: Path to the directory containing asset-specific plugin configuration files.
+- `Matcher.csaf_plugins_path`: Path to the directory containing CSAF-specific plugin configuration files.
+- `Matcher.Api.host/port`: Address where the FastAPI server listens.
+- `Matcher.Cachedb`: Connection to the shared cache DB used by all components.
 
 #### Asset Synchronizer configuration (assets/assetsync.toml)
 
@@ -199,13 +210,13 @@ username = "admin"
 password = "secret"
 ```
 
-- Synchronizer.sync_interval: Minimal delay between fetch cycles.
-- Synchronizer.preprocessor_plugins: List and order of preprocessing plugins.
-- Synchronizer.plugin_configs_path: Path to the directory containing plugin configuration files.
-- Synchronizer.cleanup_grace_period: Time in seconds from the last synchronization after which assets are considered stale and will be deleted.
-- Synchronizer.Api.host/port: Address for the synchronizer API.
-- Cachedb: Connection to the shared cache DB.
-- Data source plugins: Configuration TOML files are loaded from assets/plugin_configs/asset_source/…
+- `Synchronizer.sync_interval`: Minimal delay between fetch cycles.
+- `Synchronizer.preprocessor_plugins`: List and order of preprocessing plugins.
+- `Synchronizer.plugin_configs_path`: Path to the directory containing plugin configuration files.
+- `Synchronizer.cleanup_grace_period`: Time in seconds from the last synchronization after which assets are considered stale and will be deleted.
+- `Synchronizer.Api.host/port`: Address for the synchronizer API.
+- `Cachedb`: Connection to the shared cache DB.
+- `Data source plugins`: Configuration TOML files are loaded from assets/plugin_configs/asset_source/…
 
 #### CSAF Synchronizer configuration (assets/csafsync.toml)
 
@@ -235,6 +246,13 @@ password = "secret"
 
 - Same meaning as for the Asset Synchronizer
 
+#### Netbox CSAF Plugin configuration
+
+The Netbox CSAF plugin needs to authenticate with the Matcher API.
+Follow the instructions in the [Netbox CSAF Plugin README](https://github.com/DINA-community/CSAF-Netbox-Plugin).
+
+When using the local setup, the plugin config is located at `\dev\configuration\plugins.py`.
+
 ## Authenticate with the API
 
 The synchronizer components (Asset/CSAF) and the Matcher expose a small FastAPI HTTP API that uses OAuth2 Password flow to issue short‑lived JWT bearer tokens.
@@ -246,18 +264,6 @@ Quick start:
 
 ```bash
 uv run csaf_matcher_cli user create -u admin
-```
-
-### Local Setup
-
-When using the local setup, the password has to be stored in `\dev\configuration\plugins.py`
-
-```python
-    'synchronisers': {
-        'username': 'admin',
-        'password': '<password>',
-        ...
-    }
 ```
 
 For a detailed guide (including HTTP and Python examples, troubleshooting, and security notes), see:
@@ -272,8 +278,7 @@ Your development environment is now ready to use. If using the fully local envir
 - NetBox UI: <http://netbox.localhost/> (default: admin / admin)
 - ISDuBA UI: <http://isduba.localhost/> (default: user / user)
 
-Targets can be run by typing `uv run <TARGET_NAME>` or by selecting it in the run configurations menu
-in Pycharm.
+Targets can be run by typing `uv run <TARGET_NAME>` or by selecting it in the run configurations menu in Pycharm.
 
 To run the Matching Agent:
 
