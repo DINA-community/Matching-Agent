@@ -6,8 +6,8 @@
 plugin_name = "isduba_fetcher"
 
 [DataSource.Plugin]
-url = "http://endpoint.sample.com/"
-keycloak_url = "http://keycloak.sample.com/"
+url = "http://isduba.example.org/"
+keycloak_url = "http://keycloak.example.org/"
 keycloak_realm = "isduba"
 username = "username"
 password = "password"

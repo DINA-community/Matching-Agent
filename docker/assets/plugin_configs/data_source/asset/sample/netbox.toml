@@ -7,6 +7,6 @@ plugin_name = "netbox_fetcher"
 
 [DataSource.Plugin]
 # The api url from which the netbox fetcher plugin shall fetch the data
-api_url = "http://example.com/"
+api_url = "http://netbox.example.org/"
 # The api token the fetcher plugin will use to authenticate with the endpoint.
 api_token = "sample_token"
