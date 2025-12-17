@@ -1,0 +1,26 @@
+[Assetsync]
+
+[Synchronizer]
+sync_interval = 86400
+plugin_configs_path = "./assets/plugin_configs/data_source/asset/"
+cleanup_grace_period = 86400
+cleanup_interval = 60
+preprocessor_plugins = ["identity", "default"]
+
+[Synchronizer.Api]
+host = "127.0.0.1"
+port = 8992
+access_token_expire_minutes = 10
+
+[Cachedb]
+host = "postgres"
+port = 5432
+database = "cachedb"
+username = "admin"
+password = "secret"
+
+[Logging]
+level = "INFO"
+file = "./logs/assetsync/assetsync.log"
+max_bytes = 10485760
+backup_count = 5

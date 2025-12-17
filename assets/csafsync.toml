@@ -1,0 +1,51 @@
+# A sample csaf synchronizer config.
+# The csaf synchronizer config must always contain an [Csafsync] entry.
+# The preprocessor plugins to use must be explicitly specified.
+# If no preprocessing is needed, use the default identity preprocessor.
+
+[Csafsync]
+# Csaf specific configuration
+
+[Synchronizer]
+# Synchronization inetrval in seconds.
+# The synchronizer will perform a fetching task every X seconds.
+sync_interval = 86400
+# Path to the directory containing CSAF data source plugin configuration TOML files
+plugin_configs_path = "./assets/plugin_configs/data_source/csaf"
+# Number of seconds before last successful run; entries older than (last_run - cleanup_grace_period)
+cleanup_grace_period = 86400
+cleanup_interval = 60
+
+# A list of preprocessor plugins. The order in which they are provided
+# here is the order in which they are executed on the data.
+preprocessor_plugins = ["identity", "default"]
+
+[Synchronizer.Api]
+# The address to serve on
+# 0.0.0.0 means all interfaces
+host = "0.0.0.0"
+
+# The port to serve on.
+port = 8991
+
+access_token_expire_minutes = 10
+
+[Cachedb]
+host = "localhost"
+port = 2345
+database = "cachedb"
+username = "admin"
+password = "secret"
+
+# Optional logging configuration for the matcher component
+# If omitted, logs go to console with INFO level (or LOG_LEVEL env).
+[Logging]
+# File log level (console level is controlled via LOG_LEVEL env):
+# Accepted: "TRACE", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
+level = "TRACE"
+# When set, logs will also be written to this file with rotation
+file = "./logs/csafsync/csafsync.log"
+# Rotate when the file exceeds this many bytes (10 MiB default)
+max_bytes = 10485760
+# How many rotated files to keep
+backup_count = 5

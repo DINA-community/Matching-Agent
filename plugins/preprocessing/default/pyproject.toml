@@ -1,0 +1,26 @@
+[project]
+name = "dina.plugins.preprocessing.default"
+version = "0.1.0"
+description = "The default preprocessor"
+readme = "README.md"
+authors = [
+    { name = "Mark Giraud", email = "mark.giraud@iosb.fraunhofer.de" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "dina.matcher",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dina"]
+
+# A datasource plugin must specify the correct DataSource class as an entry-point.
+[project.entry-points."dina.plugins.preprocessing"]
+default = "dina.plugins.preprocessing.default.default:DefaultPreprocessor"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+"dina.matcher" = { workspace = true }

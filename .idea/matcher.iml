@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="PYTHON_MODULE" version="4">
+  <component name="NewModuleRootManager">
+    <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$/plugins/asset_source/netbox/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/plugins/asset_source/sample/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/plugins/preprocessing/identity/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/plugins/asset_source/isduba/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/plugins/preprocessing/default/src" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/dist" />
+      <excludeFolder url="file://$MODULE_DIR$/matcher.egg-info" />
+      <excludeFolder url="file://$MODULE_DIR$/logs" />
+    </content>
+    <orderEntry type="jdk" jdkName="uv (Matching-Agent)" jdkType="Python SDK" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+  <component name="PackageRequirementsSettings">
+    <option name="requirementsPath" value="" />
+  </component>
+</module>

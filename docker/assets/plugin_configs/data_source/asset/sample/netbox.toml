@@ -1,0 +1,12 @@
+# Netbox plugin configuration
+
+[DataSource]
+# The plugin name is the name used to install the extra feature when installing the asset synchronizer.
+# When developing a package, please note that the package name must be `dina.plugins.datasource.<plugin_name>`
+plugin_name = "netbox_fetcher"
+
+[DataSource.Plugin]
+# The api url from which the netbox fetcher plugin shall fetch the data
+api_url = "http://netbox.example.org/"
+# The api token the fetcher plugin will use to authenticate with the endpoint.
+api_token = "sample_token"

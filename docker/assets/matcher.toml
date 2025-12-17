@@ -1,0 +1,23 @@
+[Matcher]
+sync_interval = 86400
+match_threshold = 0
+asset_plugins_path = "./assets/plugin_configs/data_source/asset"
+csaf_plugins_path = "./assets/plugin_configs/data_source/csaf"
+
+[Matcher.Api]
+host = "0.0.0.0"
+port = 8998
+access_token_expire_minutes = 10
+
+[Matcher.Cachedb]
+host = "postgres"
+port = 5432
+database = "cachedb"
+username = "admin"
+password = "secret"
+
+[Matcher.Logging]
+level = "INFO"
+file = "./logs/matcher/matcher.log"
+max_bytes = 10485760
+backup_count = 5
