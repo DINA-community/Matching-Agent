@@ -51,7 +51,7 @@ For other distributions or operating systems, you may need to adjust the instruc
 First, clone the repository:
 
 ```shell
-git clone -b feat/initial_structure --recurse-submodules https://github.com/DINA-community/Matching-Agent.git
+git clone --recurse-submodules https://github.com/DINA-community/Matching-Agent.git
 cd Matching-Agent
 uv sync --extra isduba_fetcher # If you plan to use the ISDuBA CSAF source (default plugin name `isduba_fetcher`)
 ```
