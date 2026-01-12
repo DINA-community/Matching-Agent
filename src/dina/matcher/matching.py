@@ -241,10 +241,20 @@ class Matching:
             tokens2.sort()
         return tokens1, tokens2
 
-    def _token_similarity(self, tokens1: list[str], tokens2: list[str]) -> float:
+    def _token_similarity(self, tok1: list[str], tok2: list[str]) -> float:
         """Compute token-level Levenshtein similarity."""
         token_scores = []
         similar_pairs = 0
+
+        tokens1: list[str] = []
+        tokens2: list[str] = []
+
+        if len(tok1) > len(tok2):
+            tokens1 = tok2
+            tokens2 = tok1
+        else:
+            tokens1 = tok1
+            tokens2 = tok2
 
         for t1 in tokens1:
             best_score = 0.0
@@ -269,8 +279,20 @@ class Matching:
 
         scores, weights = [], []
 
+        max_len = 0
+
+        if len(tokens1) > len(tokens2):
+            max_len = len(tokens2)
+        else:
+            max_len = len(tokens1)
+
         for n, w in self.ngram_weights.items():
-            if not isinstance(n, int) or not isinstance(w, float):
+            if (isinstance(n, str) and not n.isdigit()) and not isinstance(w, float):
+                continue
+
+            n = int(n)
+
+            if n > max_len:
                 continue
 
             ngram1 = self._ngrams_from_tokens(
@@ -345,8 +367,17 @@ class Matching:
         if not tokens1 or not tokens2:
             return 0.0
 
-        tokens1 = self._clean_tokens(tokens1)
-        tokens2 = self._clean_tokens(tokens2)
+        tok1 = self._clean_tokens(tokens1)
+        tok2 = self._clean_tokens(tokens2)
+        tokens1 = []
+        tokens2 = []
+
+        if len(tok1) > len(tok2):
+            tokens1 = tok2
+            tokens2 = tok1
+        else:
+            tokens1 = tok1
+            tokens2 = tok2
 
         scores = []
         for t1 in tokens1:
