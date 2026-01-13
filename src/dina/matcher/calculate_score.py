@@ -92,6 +92,28 @@ class Score:
                 else 0.0
             )
 
+        get_trace(
+            "[TRACE][Score][Summary]\n"
+            "  vendor_score         = {} (>= {})\n"
+            "  product_name_score   = {} (>= {})\n"
+            "  product_family_score = {} (>= {})\n"
+            "  version_score        = {} (>= {})\n"
+            "  keyword_score        = {} (>= {})\n"
+            "  final_score_percent  = {:.2f}".format(
+                fmt(vendor_score),
+                self.vendor_threshold,
+                fmt(product_name_score),
+                self.product_name_threshold,
+                fmt(product_family_score),
+                self.product_family_threshold,
+                fmt(version_score),
+                self.version_threshold,
+                fmt(keyword_score),
+                self.keyword_threshold,
+                score_percent,
+            )
+        )
+
         return self._evaluate_thresholds(
             vendor_score,
             product_name_score,
@@ -265,3 +287,11 @@ class Score:
                 score_percent,
             )
         return 0, "Loop Error", score_percent
+
+
+def fmt(v):
+    return "None" if v is None else "{:.2f}".format(v)
+
+
+def get_trace(*args, **kwargs):
+    print(*args, **kwargs)
