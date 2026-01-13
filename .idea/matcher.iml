@@ -8,6 +8,11 @@
       <sourceFolder url="file://$MODULE_DIR$/plugins/preprocessing/identity/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/plugins/asset_source/isduba/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/plugins/preprocessing/default/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/plugins/asset_source/isduba" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/plugins/asset_source/netbox" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/plugins/asset_source/sample" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/plugins/preprocessing/default" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/plugins/preprocessing/identity" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/dist" />
       <excludeFolder url="file://$MODULE_DIR$/matcher.egg-info" />

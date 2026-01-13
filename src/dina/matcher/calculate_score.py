@@ -2,6 +2,10 @@ import numpy as np
 import polars as pl
 from polars.exceptions import ColumnNotFoundError
 
+from dina.common.log import get_logger
+
+logger = get_logger(__name__)
+
 
 class Score:
     def __init__(self, matching_config: dict):
@@ -92,26 +96,24 @@ class Score:
                 else 0.0
             )
 
-        get_trace(
-            "[TRACE][Score][Summary]\n"
-            "  vendor_score         = {} (>= {})\n"
-            "  product_name_score   = {} (>= {})\n"
-            "  product_family_score = {} (>= {})\n"
-            "  version_score        = {} (>= {})\n"
-            "  keyword_score        = {} (>= {})\n"
-            "  final_score_percent  = {:.2f}".format(
-                fmt(vendor_score),
-                self.vendor_threshold,
-                fmt(product_name_score),
-                self.product_name_threshold,
-                fmt(product_family_score),
-                self.product_family_threshold,
-                fmt(version_score),
-                self.version_threshold,
-                fmt(keyword_score),
-                self.keyword_threshold,
-                score_percent,
-            )
+        logger.trace(
+            "  vendor_score         = %s (>= %s)\n"
+            "  product_name_score   = %s (>= %s)\n"
+            "  product_family_score = %s (>= %s)\n"
+            "  version_score        = %s (>= %s)\n"
+            "  keyword_score        = %s (>= %s)\n"
+            "  final_score_percent  = %.2f",
+            fmt(vendor_score),
+            self.vendor_threshold,
+            fmt(product_name_score),
+            self.product_name_threshold,
+            fmt(product_family_score),
+            self.product_family_threshold,
+            fmt(version_score),
+            self.version_threshold,
+            fmt(keyword_score),
+            self.keyword_threshold,
+            score_percent,
         )
 
         return self._evaluate_thresholds(
@@ -291,7 +293,3 @@ class Score:
 
 def fmt(v):
     return "None" if v is None else "{:.2f}".format(v)
-
-
-def get_trace(*args, **kwargs):
-    print(*args, **kwargs)

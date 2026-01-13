@@ -1,7 +1,9 @@
 import logging as lg
+import multiprocessing
 import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from typing import Optional
 
 import colorlog
 from pydantic import BaseModel
@@ -25,6 +27,7 @@ class LoggingConfig(BaseModel):
 
 def configure_logging(
     config: LoggingConfig | None = None,
+    queue: Optional[multiprocessing.Queue] = None,
 ):
     """
     Configure logging with colors and optional rotating file handler.
@@ -34,7 +37,8 @@ def configure_logging(
     - File handler level is controlled by the `level` parameter (e.g., from matcher.toml).
 
     Args:
-        config (LoggingConfig): Logging configuration.
+        :param config:
+        :param queue:
     """
     # Define custom TRACE level
     TRACE_LEVEL = 5
@@ -56,49 +60,53 @@ def configure_logging(
     # Configure root logger
     lg.root.handlers.clear()
 
-    # Console handler with colors
-    console_handler = colorlog.StreamHandler()
-    console_handler.setLevel(console_level)
-    console_handler.setFormatter(
-        colorlog.ColoredFormatter(
-            "%(log_color)s%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            log_colors={
-                "DEBUG": "cyan",
-                "INFO": "green",
-                "WARNING": "yellow",
-                "ERROR": "red",
-                "CRITICAL": "red,bg_white",
-            },
+    if multiprocessing.current_process().name == "MainProcess":
+        # Console handler with colors
+        console_handler = colorlog.StreamHandler()
+        console_handler.setLevel(console_level)
+        console_handler.setFormatter(
+            colorlog.ColoredFormatter(
+                "%(log_color)s%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                log_colors={
+                    "DEBUG": "cyan",
+                    "INFO": "green",
+                    "WARNING": "yellow",
+                    "ERROR": "red",
+                    "CRITICAL": "red,bg_white",
+                },
+            )
         )
-    )
-    lg.root.addHandler(console_handler)
+        lg.root.addHandler(console_handler)
 
-    # Optional rotating file handler
+        # Optional rotating file handler
 
-    if config is not None:
-        # Resolve file handler level from parameter (default INFO)
-        if config.level is None:
-            file_level = lg.INFO
-        elif isinstance(config.level, str):
-            file_level = getattr(lg, config.level.upper(), lg.INFO)
-        else:
-            file_level = int(config.level)
-        path = config.file
-        try:
-            if path.parent and not path.parent.exists():
-                path.parent.mkdir(parents=True, exist_ok=True)
-        except Exception:
-            # If directory creation fails, still proceed with console logging
-            pass
-        file_handler = RotatingFileHandler(
-            path, maxBytes=config.max_bytes, backupCount=config.backup_count
-        )
-        file_handler.setLevel(file_level)
-        file_formatter = lg.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
-        file_handler.setFormatter(file_formatter)
-        lg.root.addHandler(file_handler)
+        if config is not None:
+            # Resolve file handler level from parameter (default INFO)
+            if config.level is None:
+                file_level = lg.INFO
+            elif isinstance(config.level, str):
+                file_level = getattr(lg, config.level.upper(), lg.INFO)
+            else:
+                file_level = int(config.level)
+            path = config.file
+            try:
+                if path.parent and not path.parent.exists():
+                    path.parent.mkdir(parents=True, exist_ok=True)
+            except Exception:
+                # If directory creation fails, still proceed with console logging
+                pass
+            file_handler = RotatingFileHandler(
+                path, maxBytes=config.max_bytes, backupCount=config.backup_count
+            )
+            file_handler.setLevel(file_level)
+            file_formatter = lg.Formatter(
+                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            )
+            file_handler.setFormatter(file_formatter)
+            lg.root.addHandler(file_handler)
+    elif queue is not None:
+        queue_handler = lg.handlers.QueueHandler(queue)
+        lg.root.addHandler(queue_handler)
 
     # Let handlers decide what to emit
     lg.root.setLevel(lg.NOTSET)

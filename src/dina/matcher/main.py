@@ -1,3 +1,4 @@
+from __future__ import annotations
 import asyncio
 import concurrent.futures
 import datetime
@@ -190,12 +191,28 @@ class Matcher:
     async def run(self):
         """Run the matcher."""
         await self.__cache_db.connect(self.__config.Matcher.Cachedb)
+        log_queue = self.__manager.Queue()
         async with asyncio.TaskGroup() as tg:
             tg.create_task(self.__serve_api())
-            tg.create_task(self.__matching_task())
+            tg.create_task(self.__matching_task(log_queue))
+            tg.create_task(self.__log_task(log_queue))
             tg.create_task(self.__store_matches_task())
 
-    async def __matching_task(self) -> None:
+    async def __log_task(self, log_queue: multiprocessing.Queue) -> None:
+        while True:
+            records = []
+            try:
+                # Get up to 1000 log records
+                for _ in range(1000):
+                    records.append(log_queue.get(block=False))
+            except Empty:
+                pass
+            finally:
+                for record in records:
+                    logger.handle(record)
+                await asyncio.sleep(0.01)
+
+    async def __matching_task(self, log_queue: multiprocessing.Queue) -> None:
         while True:
             if (
                 self.__last_matching is None
@@ -230,6 +247,8 @@ class Matcher:
                                     pool,
                                     match_pairs,
                                     self.__matches,
+                                    log_queue,
+                                    self.__config.Matcher.Logging,
                                     batch,
                                     self.__config.Matcher.match_threshold,
                                     self.__matching_cfg_dict,
@@ -489,10 +508,13 @@ class Matcher:
 
 def match_pairs(
     matches: queue.Queue,
+    log_queue: multiprocessing.Queue,
+    logging_config: LoggingConfig,
     pairs: list[tuple[CsafProduct, Asset]],
     threshold: float,
     matching_config: dict[str, Any],
 ):
+    configure_logging(logging_config, log_queue)
     logger.debug(f"Matching batch with {len(pairs)} pairs")
     batch = []
     for csaf, asset in pairs:
@@ -520,12 +542,6 @@ def match_pairs(
         match.timestamp = datetime.datetime.now().timestamp()
         match.status = f"result: {result}, reason: {reason}"
 
-        # match = Match()
-        # match.asset_id = asset.id
-        # match.csaf_product_id = csaf.id
-        # match.score = 100
-        # match.timestamp = datetime.datetime.now().timestamp()
-        # match.status = ""
         batch.append(match)
     matches.put(batch)
 
