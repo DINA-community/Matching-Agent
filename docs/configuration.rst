@@ -5,29 +5,17 @@ Configuration
 
 .. include:: _includes/section-toc.rstinc
 
-This section describes the service configuration files used by the Matching Agent components.
-You can reference these details from both the getting started guide and the production setup guide.
-
+This section describes the service configuration file ``assets/config.toml`` used by the Matching Agent components.
+All components (Asset Synchronizer, CSAF Synchronizer, and Matcher) share this single configuration file, but use different sections within it.
 
 .. _config-assetsync:
 
 Asset Synchronizer Configuration
 --------------------------------
 The Asset Synchronizer (assetsync) fetches asset/product data from configured data sources and stores
-them in the cache database. Configuration file: ``assets/assetsync.toml``
+them in the cache database. It uses the ``[Assetsync]`` section in ``assets/config.toml``.
 
 .. code-block:: toml
-
-   [Synchronizer]
-   sync_interval = 3600
-   plugin_configs_path = "./assets/plugin_configs/data_source/asset"
-   preprocessor_plugins = ["identity"]
-   cleanup_interval = 86400
-   cleanup_grace_period = 604800
-
-   [Synchronizer.Api]
-   host = "0.0.0.0"
-   port = 8992
 
    [Cachedb]
    host = "localhost"
@@ -36,10 +24,21 @@ them in the cache database. Configuration file: ``assets/assetsync.toml``
    username = "admin"
    password = "secret"
 
+   [Assetsync.Synchronizer]
+   sync_interval = 3600
+   plugin_configs_path = "./assets/plugin_configs/data_source/asset"
+   preprocessor_plugins = ["identity"]
+   cleanup_interval = 86400
+   cleanup_grace_period = 604800
+
+   [Assetsync.Api]
+   host = "0.0.0.0"
+   port = 8992
+
 Parameters
 ~~~~~~~~~~
 
-- ``[Synchronizer]`` section:
+- ``[Assetsync.Synchronizer]`` section:
 
   - ``sync_interval`` (int): Interval in seconds between synchronization runs. Assets are fetched
     from all configured data sources at this frequency.
@@ -53,7 +52,7 @@ Parameters
   - ``cleanup_grace_period`` (int): Grace period in seconds before deleting assets that are no longer
     present in the source. Default: 604800 (7 days).
 
-- ``[Synchronizer.Api]`` section:
+- ``[Assetsync.Api]`` section:
 
   - ``host`` (str): Hostname/IP address the HTTP API server binds to. Use "0.0.0.0" to listen on all interfaces.
   - ``port`` (int): TCP port for the HTTP API server.
@@ -72,32 +71,25 @@ Parameters
 CSAF Synchronizer Configuration
 --------------------------------
 The CSAF Synchronizer (csafsync) fetches CSAF security advisories from configured data sources and
-stores them in the cache database. Configuration file: ``assets/csafsync.toml``
+stores them in the cache database. It uses the ``[Csafsync]`` section in ``assets/config.toml``.
 
 .. code-block:: toml
 
-   [Synchronizer]
+   [Csafsync.Synchronizer]
    sync_interval = 3600
    plugin_configs_path = "./assets/plugin_configs/data_source/csaf"
    preprocessor_plugins = []
    cleanup_interval = 86400
    cleanup_grace_period = 604800
 
-   [Synchronizer.Api]
+   [Csafsync.Api]
    host = "0.0.0.0"
    port = 8991
-
-   [Cachedb]
-   host = "localhost"
-   port = 2345
-   database = "cachedb"
-   username = "admin"
-   password = "secret"
 
 Parameters
 ~~~~~~~~~~
 
-The parameters are identical to the Asset Synchronizer configuration (see above), except:
+The parameters are identical to the Asset Synchronizer configuration (see above), except they are located under the ``[Csafsync]`` prefix:
 
 - ``plugin_configs_path`` points to CSAF data source configurations instead of asset sources.
 - ``port`` defaults to 8991 for the CSAF sync API.
@@ -108,7 +100,7 @@ The parameters are identical to the Asset Synchronizer configuration (see above)
 Matcher Configuration
 ---------------------
 The Matcher service periodically matches assets against CSAF advisories to identify vulnerabilities.
-Configuration file: ``assets/matcher.toml``
+It uses the ``[Matcher]`` section in ``assets/config.toml``.
 
 .. code-block:: toml
 
@@ -120,13 +112,6 @@ Configuration file: ``assets/matcher.toml``
    [Matcher.Api]
    host = "0.0.0.0"
    port = 8998
-
-   [Matcher.Cachedb]
-   host = "localhost"
-   port = 2345
-   database = "cachedb"
-   username = "admin"
-   password = "secret"
 
 Parameters
 ~~~~~~~~~~
@@ -144,11 +129,3 @@ Parameters
 
   - ``host`` (str): Hostname/IP address the HTTP API server binds to. Use "0.0.0.0" to listen on all interfaces.
   - ``port`` (int): TCP port for the HTTP API server.
-
-- ``[Matcher.Cachedb]`` section:
-
-  - ``host`` (str): PostgreSQL database hostname.
-  - ``port`` (int): PostgreSQL database port.
-  - ``database`` (str): Name of the database to use.
-  - ``username`` (str): Database user for authentication.
-  - ``password`` (str): Database password for authentication.

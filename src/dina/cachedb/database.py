@@ -49,13 +49,14 @@ class CacheDB:
         username: str
         password: str
 
-    def __init__(self) -> None:
+    def __init__(self, config: Config) -> None:
         super().__init__()
         self.engine: Optional[AsyncEngine] = None
+        self.config = config
 
-    async def connect(self, config: Config) -> None:
+    async def connect(self) -> None:
         self.engine = create_async_engine(
-            f"postgresql+psycopg://{config.username}:{config.password}@{config.host}:{config.port}/{config.database}",
+            f"postgresql+psycopg://{self.config.username}:{self.config.password}@{self.config.host}:{self.config.port}/{self.config.database}",
         )
         async with self.engine.begin() as conn:
             await conn.execute(CreateSchema("cacheDB", if_not_exists=True))

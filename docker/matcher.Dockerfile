@@ -74,4 +74,4 @@ WORKDIR /app
 RUN echo "JWT_SECRET_KEY=$(openssl rand -hex 32)" >> .env
 
 ## Default command can be overridden in docker-compose
-CMD ["csaf_matcher", "--config", "/app/assets/matcher.toml"]
+CMD ["csaf_matcher", "--config", "/app/assets/config.toml"]

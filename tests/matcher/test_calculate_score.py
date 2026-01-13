@@ -3,6 +3,9 @@ import pytest
 import polars as pl
 
 from dina.matcher.calculate_score import Score
+from dina.common.log import configure_logging
+
+configure_logging()
 
 
 @pytest.fixture
