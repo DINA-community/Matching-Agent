@@ -288,26 +288,22 @@ class NetboxDataSource(DataSourcePlugin):
                 asset.product.serial_numbers = [device.serial]
 
             asset.product.model = device_type.model
+            product = asset.product
             if isinstance(device_type.part_number, str):
-                asset.product.part_numbers = [device_type.part_number]
+                product.part_numbers = [device_type.part_number]
             if isinstance(device_type.custom_fields, DeviceTypeCustomFields):
-                asset.product.model_numbers = [
-                    device_type.custom_fields.additional_properties["model_number"]
-                ]
-                asset.product.hardware_name = (
-                    device_type.custom_fields.additional_properties["hardware_name"]
-                )
-                asset.product.version = [
-                    device_type.custom_fields.additional_properties["hardware_version"]
-                ]
-                asset.product.device_family = (
-                    device_type.custom_fields.additional_properties["device_family"]
-                )
-                asset.product.cpe = device_type.custom_fields.additional_properties[
-                    "cpe"
-                ]
+                props = device_type.custom_fields.additional_properties
 
-            asset.product.manufacturer_name = manufacturer.name
+                model_num = props.get("model_number")
+                product.model_numbers = [model_num] if model_num is not None else []
+                product.hardware_name = props.get("hardware_name")
+
+                versions = props.get("hardware_version")
+                product.version = versions if versions is not None else []
+                product.device_family = props.get("device_family")
+                product.cpe = props.get("cpe")
+
+            product.manufacturer_name = manufacturer.name
             assets.append(asset)
 
         for sw in software.values():
