@@ -224,12 +224,11 @@ class Matcher:
                     categorized_matches[HttpUrl(match.asset.origin_uri)].append(match)
                 # Let asset plugins notify subscribers of new matches
                 for origin, matches in categorized_matches.items():
-                    if self.__data_source_plugins[
-                        origin
-                    ].config.DataSource.publish_matches:
-                        await self.__data_source_plugins[origin].notify_new_matches(
-                            matches
-                        )
+                    if ds := self.__data_source_plugins.get(origin):
+                        if ds.config.DataSource.publish_matches:
+                            await self.__data_source_plugins[origin].notify_new_matches(
+                                matches
+                            )
             await asyncio.sleep(0.1)
 
     async def __serve_api(self):
