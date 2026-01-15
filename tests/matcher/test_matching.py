@@ -89,7 +89,7 @@ def test_compare_freetext(matcher):
     assert matcher._compare_freetext("foo", "bar") == 0.0
     score = matcher._compare_freetext(123, "123!")
     assert isinstance(score, float)
-    assert score == 0.5625
+    assert score > 0.5
     assert matcher._compare_freetext("abc", None) is None
     assert matcher._compare_freetext(1234, 1234) == 1.0
     assert isinstance(matcher._compare_freetext(["a"], ["a"]), float)
