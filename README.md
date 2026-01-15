@@ -72,7 +72,9 @@ To set up a development environment, follow the steps below.
 
 ### Fully Local Setup
 
-You can start, stop, and recreate the full local development stack (PostgreSQL, NetBox, ISDuBA, etc.) using the helper script in the `dev/` directory:
+You can start, stop, and recreate the full local development stack (PostgreSQL, NetBox, ISDuBA, etc.) using the helper script in the `dev/` directory.
+In order for the script to work, you need to set the correct environment variables in the `.env` file.
+To configure the environment variables, copy the `.env.example` file to `.env` and modify the values as needed.
 
 ```bash
 ./dev/start-local-env.sh                       # start services in background

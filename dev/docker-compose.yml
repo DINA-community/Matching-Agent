@@ -3,9 +3,9 @@ services:
     image: postgres:17-alpine
     container_name: cachedb-postgres
     environment:
-      POSTGRES_DB: ${CACHEDB_POSTGRES_DB:-cachedb}
-      POSTGRES_USER: ${CACHEDB_POSTGRES_USER:-admin}
-      POSTGRES_PASSWORD: ${CACHEDB_POSTGRES_PASSWORD:-secret}
+      POSTGRES_DB: ${CACHEDB_POSTGRES_DB}
+      POSTGRES_USER: ${CACHEDB_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${CACHEDB_POSTGRES_PASSWORD}
     ports:
       - "2345:5432"
     volumes:
@@ -23,13 +23,13 @@ services:
       KC_DB_SCHEMA: public
       KC_DB_URL: jdbc:postgresql://isduba-db/keycloak
 
-      KC_DB_USERNAME: ${KC_DB_USERNAME:-keycloak}
-      KC_DB_PASSWORD: ${KC_DB_PASSWORD:-keycloak}
+      KC_DB_USERNAME: ${KC_DB_USERNAME}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD}
 
-      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}
-      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:-secret}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
 
-      KC_HOSTNAME: http://keycloak.localhost
+      KC_HOSTNAME: ${KC_HOSTNAME}
       # Optional, reduce memory usage
       JAVA_OPTS: >
         -XX:MaxHeapFreeRatio=10
@@ -63,9 +63,9 @@ services:
     networks:
       - isduba
     environment:
-      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}
-      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:-secret}
-      CLIENT_HOSTNAME_URL: http://isduba.localhost
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
+      CLIENT_HOSTNAME_URL: ${ISDUBA_CLIENT_HOSTNAME_URL}
     volumes:
       - ./isduba/docker/keycloak/init.sh:/opt/keycloak/init.sh
     depends_on:
@@ -77,7 +77,7 @@ services:
     image: library/postgres:16-alpine
     restart: always
     environment:
-      POSTGRES_PASSWORD: ${ISDUBA_POSTGRES_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${ISDUBA_POSTGRES_PASSWORD}
     networks:
       - isduba
     healthcheck:
@@ -95,14 +95,14 @@ services:
       context: ./isduba
       dockerfile: ../isduba/docker/server/Dockerfile
       args:
-        BUILD_VERSION: v0.0.0
+        BUILD_VERSION: ${BUILD_VERSION}
     networks:
       - isduba
     environment:
-      ISDUBA_CLIENT_KEYCLOAK_URL: http://keycloak.localhost
-      ISDUBA_CLIENT_KEYCLOAK_REALM: "isduba"
-      ISDUBA_CLIENT_KEYCLOAK_CLIENT_ID: "auth"
-      ISDUBA_CLIENT_IDLE_TIMEOUT: "30m"
+      ISDUBA_CLIENT_KEYCLOAK_URL: ${ISDUBA_CLIENT_KEYCLOAK_URL}
+      ISDUBA_CLIENT_KEYCLOAK_REALM: ${ISDUBA_CLIENT_KEYCLOAK_REALM}
+      ISDUBA_CLIENT_KEYCLOAK_CLIENT_ID: ${ISDUBA_CLIENT_KEYCLOAK_CLIENT_ID}
+      ISDUBA_CLIENT_IDLE_TIMEOUT: ${ISDUBA_CLIENT_IDLE_TIMEOUT}
     depends_on:
       isduba-db:
         condition: service_healthy
@@ -150,7 +150,7 @@ services:
       context: ./
       dockerfile: netbox.Dockerfile
       args:
-        BUILD_VERSION: v0.0.0
+        BUILD_VERSION: ${BUILD_VERSION}
     ports:
       - "8800:8800"
     depends_on:
@@ -230,9 +230,9 @@ services:
         condition: service_healthy
     entrypoint: ["bash", "/opt/netbox/init-scripts/netbox-token.sh"]
     environment:
-      DJANGO_SUPERUSER_PASSWORD: ${NETBOX_SUPERUSER_PASSWORD:-admin}
-      NETBOX_SUPERUSER_NAME: ${NETBOX_SUPERUSER_NAME:-admin}
-      NETBOX_SUPERUSER_EMAIL: ${NETBOX_SUPERUSER_EMAIL:-admin@example.com}
+      DJANGO_SUPERUSER_PASSWORD: ${NETBOX_SUPERUSER_PASSWORD}
+      NETBOX_SUPERUSER_NAME: ${NETBOX_SUPERUSER_NAME}
+      NETBOX_SUPERUSER_EMAIL: ${NETBOX_SUPERUSER_EMAIL}
     networks:
       - netbox
     labels:
