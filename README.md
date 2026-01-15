@@ -137,113 +137,92 @@ To install multiple extras, provide multiple `--extra` arguments.
 
 ### Configure APIs
 
-This project provides three long-running components: two synchronizers and the matcher. Each reads a TOML
-configuration file from the `assets/` directory and exposes a small HTTP API.
+This project provides three long-running components: two synchronizers and the matcher. All components read a shared TOML
+configuration file from `assets/config.toml` and expose their respective HTTP APIs.
 
 - Asset Synchronizer (assetsync)
-  - Config file: assets/assetsync.toml
   - Default API: <http://0.0.0.0:8992>
 - CSAF Synchronizer (csafsync)
-  - Config file: assets/csafsync.toml
   - Default API: <http://0.0.0.0:8991>
 - Matcher
-  - Config file: assets/matcher.toml
   - Default API: <http://0.0.0.0:8998>
 
-You can change host and port for each service in the respective config under the [..Api] section.
+You can change host and port for each service in the `assets/config.toml` config under the respective `[..Api]` section.
 The API documentation can be found at `http://<host:port>/docs`.
 
-#### Matcher configuration (assets/matcher.toml)
+#### Configuration (assets/config.toml)
 
-Minimal example (defaults in repo):
+The `assets/config.toml` file contains configuration for all three components:
 
 ```toml
+[Cachedb]
+host = "localhost"
+port = 2345
+database = "cachedb"
+username = "admin"
+password = "secret"
+
 [Matcher]
-sync_interval = 60  # seconds between matching runs
+# Seconds between matching runs
+sync_interval = 86400
+# Threshold for showing matches
 match_threshold = 0
+# Path to asset data source plugin configs used for the assetsync
 asset_plugins_path = "./assets/plugin_configs/data_source/asset"
+# Path to CSAF data source plugin configs used for the csafsync
 csaf_plugins_path = "./assets/plugin_configs/data_source/csaf"
 
 [Matcher.Api]
 host = "0.0.0.0"
 port = 8998
 
-[Matcher.Cachedb]
-host = "localhost"
-port = 2345
-database = "cachedb"
-username = "admin"
-password = "secret"
+[Assetsync]
+# Assetsync specific configuration
+
+[Assetsync.Synchronizer]
+sync_interval = 86400
+plugin_configs_path = "./assets/plugin_configs/data_source/asset/"
+cleanup_grace_period = 86400
+cleanup_interval = 60
+preprocessor_plugins = ["identity", "default"]
+
+[Assetsync.Api]
+host = "0.0.0.0"
+port = 8992
+
+[Csafsync]
+# Csaf specific configuration
+
+[Csafsync.Synchronizer]
+sync_interval = 86400
+plugin_configs_path = "./assets/plugin_configs/data_source/csaf"
+cleanup_grace_period = 86400
+cleanup_interval = 60
+preprocessor_plugins = ["identity", "default"]
+
+[Csafsync.Api]
+host = "0.0.0.0"
+port = 8991
 ```
 
 - `Matcher.sync_interval`: Minimal delay between matching cycles.
 - `Matcher.match_threshold`: Value for showing possible matches
 - `Matcher.asset_plugins_path`: Path to the directory containing asset-specific plugin configuration files.
 - `Matcher.csaf_plugins_path`: Path to the directory containing CSAF-specific plugin configuration files.
-- `Matcher.Api.host/port`: Address where the FastAPI server listens.
-- `Matcher.Cachedb`: Connection to the shared cache DB used by all components.
+- `Matcher.Api.host/port`: Address where the Matcher FastAPI server listens.
+- `Assetsync.Synchronizer.Api.host/port`: Address where the Asset Synchronizer FastAPI server listens.
+- `Csafsync.Synchronizer.Api.host/port`: Address where the CSAF Synchronizer FastAPI server listens.
+- `Cachedb`: Connection to the shared cache DB used by all components.
 
-#### Asset Synchronizer configuration (assets/assetsync.toml)
+Both synchronizers share the following configuration (Assetsync.Synchronizer and Csafsync.Synchronizer):
 
-Example (defaults in repo):
+- `.Synchronizer.sync_interval`: Minimal delay between fetch cycles.
+- `.Synchronizer.preprocessor_plugins`: List and order of preprocessing plugins.
+- `.Synchronizer.plugin_configs_path`: Path to the directory containing plugin configuration files.
+- `.Synchronizer.cleanup_grace_period`: Time in seconds from the last synchronization after which assets are considered stale and will be deleted.
+- `.Api.host/port`: Address for the synchronizer API.
 
-```toml
-[Assetsync]
-# Asset-specific options go here (plugin-specific)
-
-[Synchronizer]
-sync_interval = 60
-preprocessor_plugins = ["identity"]
-plugin_configs_path = "./assets/plugin_configs/data_source/asset"
-cleanup_grace_period = 3600
-
-[Synchronizer.Api]
-host = "0.0.0.0"
-port = 8992
-
-[Cachedb]
-host = "localhost"
-port = 2345
-database = "cachedb"
-username = "admin"
-password = "secret"
-```
-
-- `Synchronizer.sync_interval`: Minimal delay between fetch cycles.
-- `Synchronizer.preprocessor_plugins`: List and order of preprocessing plugins.
-- `Synchronizer.plugin_configs_path`: Path to the directory containing plugin configuration files.
-- `Synchronizer.cleanup_grace_period`: Time in seconds from the last synchronization after which assets are considered stale and will be deleted.
-- `Synchronizer.Api.host/port`: Address for the synchronizer API.
-- `Cachedb`: Connection to the shared cache DB.
-- `Data source plugins`: Configuration TOML files are loaded from assets/plugin_configs/asset_source/…
-
-#### CSAF Synchronizer configuration (assets/csafsync.toml)
-
-Example (defaults in repo):
-
-```toml
-[Csafsync]
-# CSAF-specific options go here (plugin-specific)
-
-[Synchronizer]
-sync_interval = 60
-preprocessor_plugins = ["identity"]
-plugin_configs_path = "./assets/plugin_configs/data_source/csaf"
-cleanup_grace_period = 3600
-
-[Synchronizer.Api]
-host = "0.0.0.0"
-port = 8991
-
-[Cachedb]
-host = "localhost"
-port = 2345
-database = "cachedb"
-username = "admin"
-password = "secret"
-```
-
-- Same meaning as for the Asset Synchronizer
+The configuration for the plugins is located in the `assets/plugin_configs` directory.
 
 #### Netbox CSAF Plugin configuration
 

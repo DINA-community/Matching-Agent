@@ -3,10 +3,13 @@ from fastapi.testclient import TestClient
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 import asyncio
+
+from dina.common.config import Config
 from dina.synchronizer.base import (
     BaseSynchronizer,
     PluginLoadError,
     load_datasource_plugins,
+    SynchronizerConfig,
 )
 from dina.synchronizer.plugin_base.preprocessor import PreprocessorPlugin
 import uvicorn
@@ -42,10 +45,34 @@ def fake_cache_db():
 
 
 @pytest.fixture
+def temp_config(tmp_path):
+    """
+    Generates a temporary SynchronizerConfig for BaseSynchronizer tests.
+    """
+    plugin_dir = tmp_path / "plugins"
+    plugin_dir.mkdir()
+
+    config_dict = {
+        "Synchronizer": {
+            "sync_interval": 10,
+            "cleanup_grace_period": 20,
+            "cleanup_interval": 30,
+            "preprocessor_plugins": ["dummy_pre"],
+            "plugin_configs_path": plugin_dir,
+        },
+        "Api": {
+            "host": "127.0.0.1",
+            "port": 9999,
+            "access_token_expire_minutes": 30,
+        },
+    }
+    return SynchronizerConfig.model_validate(config_dict)
+
+
+@pytest.fixture
 def temp_config_file(tmp_path):
     """
-    Generates a temporary TOML config file for BaseSynchronizer tests.
-    The content matches the expected production schema.
+    Generates a temporary TOML config file for Config.load tests.
     """
     plugin_dir = tmp_path / "plugins"
     plugin_dir.mkdir()
@@ -53,18 +80,6 @@ def temp_config_file(tmp_path):
     file = tmp_path / "config.toml"
     file.write_text(
         f"""
-        [Synchronizer]
-        sync_interval = 10
-        cleanup_grace_period = 20
-        cleanup_interval = 30
-        preprocessor_plugins = ["dummy_pre"]
-        plugin_configs_path = "{plugin_dir.as_posix()}"
-
-        [Synchronizer.Api]
-        host = "127.0.0.1"
-        port = 9999
-        access_token_expire_minutes = 30
-
         [Cachedb]
         username = "test"
         password = "test"
@@ -72,6 +87,40 @@ def temp_config_file(tmp_path):
         port = 5432
         database = "db"
         driver = "postgres"
+
+        [Assetsync.Synchronizer]
+        sync_interval = 10
+        cleanup_grace_period = 20
+        cleanup_interval = 30
+        preprocessor_plugins = ["dummy_pre"]
+        plugin_configs_path = "{plugin_dir.as_posix()}"
+
+        [Assetsync.Synchronizer.Api]
+        host = "127.0.0.1"
+        port = 9999
+        access_token_expire_minutes = 30
+
+        [Csafsync.Synchronizer]
+        sync_interval = 10
+        cleanup_grace_period = 20
+        cleanup_interval = 30
+        preprocessor_plugins = ["dummy_pre"]
+        plugin_configs_path = "{plugin_dir.as_posix()}"
+
+        [Csafsync.Synchronizer.Api]
+        host = "127.0.0.1"
+        port = 9999
+        access_token_expire_minutes = 30
+
+        [Matcher]
+        sync_interval = 10
+        match_threshold = 0.5
+        asset_plugins_path = "{plugin_dir.as_posix()}"
+        csaf_plugins_path = "{plugin_dir.as_posix()}"
+        [Matcher.Api]
+        host = "127.0.0.1"
+        port = 9999
+        access_token_expire_minutes = 30
         """
     )
     return file
@@ -87,7 +136,7 @@ def test_load_config_missing_file():
     Verifies that loading a non-existent config file raises FileNotFoundError.
     """
     with pytest.raises(FileNotFoundError):
-        BaseSynchronizer.load_config(Path("missing.toml"))
+        Config.load(Path("missing.toml"))
 
 
 def test_load_plugin_not_found():
@@ -207,11 +256,11 @@ def patched_synchronizer(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_fetch_products(fake_cache_db, temp_config_file, patched_synchronizer):
+async def test_fetch_products(fake_cache_db, temp_config, patched_synchronizer):
     """
     Ensures product fetching stores items in pending_products queue.
     """
-    sync = BaseSynchronizer(fake_cache_db, temp_config_file)
+    sync = BaseSynchronizer(fake_cache_db, temp_config)
 
     source = MagicMock()
     source.origin_uri = "http://test"
@@ -227,12 +276,12 @@ async def test_fetch_products(fake_cache_db, temp_config_file, patched_synchroni
 
 @pytest.mark.asyncio
 async def test_preprocess_data_task_runs_once(
-    fake_cache_db, temp_config_file, monkeypatch, patched_synchronizer
+    fake_cache_db, temp_config, monkeypatch, patched_synchronizer
 ):
     """
     Ensures preprocess_data_task stops after KeyboardInterrupt and processes exactly one batch.
     """
-    sync = BaseSynchronizer(fake_cache_db, temp_config_file)
+    sync = BaseSynchronizer(fake_cache_db, temp_config)
 
     item = MagicMock()
     sync.pending_products.append(item)
@@ -254,12 +303,12 @@ async def test_preprocess_data_task_runs_once(
 
 @pytest.mark.asyncio
 async def test_store_data_task(
-    fake_cache_db, temp_config_file, monkeypatch, patched_synchronizer
+    fake_cache_db, temp_config, monkeypatch, patched_synchronizer
 ):
     """
     Ensures store_data_task stores preprocessed data and then stops after interrupt.
     """
-    sync = BaseSynchronizer(fake_cache_db, temp_config_file)
+    sync = BaseSynchronizer(fake_cache_db, temp_config)
 
     item = MagicMock()
     sync.preprocessed_data.append(item)
@@ -283,13 +332,11 @@ async def test_store_data_task(
 
 
 @pytest.mark.asyncio
-async def test_fetch_relationships(
-    fake_cache_db, temp_config_file, patched_synchronizer
-):
+async def test_fetch_relationships(fake_cache_db, temp_config, patched_synchronizer):
     """
     Ensures fetch_relationships appends fetched relationships to pending queue.
     """
-    sync = BaseSynchronizer(fake_cache_db, temp_config_file)
+    sync = BaseSynchronizer(fake_cache_db, temp_config)
 
     fake_src = MagicMock()
     fake_src.origin_uri = "http://src"
@@ -307,12 +354,12 @@ async def test_fetch_relationships(
 
 @pytest.mark.asyncio
 async def test_cleanup_task_runs_once(
-    fake_cache_db, temp_config_file, monkeypatch, patched_synchronizer
+    fake_cache_db, temp_config, monkeypatch, patched_synchronizer
 ):
     """
     Ensures cleanup_task triggers cleanup once, then stops on interrupt.
     """
-    sync = BaseSynchronizer(fake_cache_db, temp_config_file)
+    sync = BaseSynchronizer(fake_cache_db, temp_config)
 
     fake_source = MagicMock()
     fake_source.debug_info.return_value = "X"
@@ -330,12 +377,12 @@ async def test_cleanup_task_runs_once(
 
 @pytest.mark.asyncio
 async def test_fetch_data_task_cycle(
-    fake_cache_db, temp_config_file, monkeypatch, patched_synchronizer
+    fake_cache_db, temp_config, monkeypatch, patched_synchronizer
 ):
     """
     Ensures fetch_data_task respects interrupt and performs a minimal iteration.
     """
-    sync = BaseSynchronizer(fake_cache_db, temp_config_file)
+    sync = BaseSynchronizer(fake_cache_db, temp_config)
 
     fake_source = MagicMock()
     fake_source.origin_uri = "http://x"
@@ -359,12 +406,12 @@ async def test_fetch_data_task_cycle(
 
 @pytest.mark.asyncio
 async def test_store_data_task_with_relationships(
-    fake_cache_db, temp_config_file, monkeypatch, patched_synchronizer
+    fake_cache_db, temp_config, monkeypatch, patched_synchronizer
 ):
     """
     Ensures mapped relationships are processed and stored correctly.
     """
-    sync = BaseSynchronizer(fake_cache_db, temp_config_file)
+    sync = BaseSynchronizer(fake_cache_db, temp_config)
 
     item = MagicMock()
     sync.preprocessed_data.append(item)
@@ -395,12 +442,12 @@ async def test_store_data_task_with_relationships(
 
 @pytest.mark.asyncio
 async def test_api_status(
-    fake_cache_db, temp_config_file, monkeypatch, patched_synchronizer
+    fake_cache_db, temp_config, monkeypatch, patched_synchronizer
 ):
     """
     Ensures /task/status returns a valid JSON response after removing auth.
     """
-    sync = BaseSynchronizer(fake_cache_db, temp_config_file)
+    sync = BaseSynchronizer(fake_cache_db, temp_config)
 
     fake_server = MagicMock()
     fake_server.serve = AsyncMock(return_value=None)
@@ -436,12 +483,12 @@ async def test_api_status(
 
 @pytest.mark.asyncio
 async def test_login_for_access_token_success(
-    fake_cache_db, temp_config_file, monkeypatch, patched_synchronizer
+    fake_cache_db, temp_config, monkeypatch, patched_synchronizer
 ):
     """
     Ensures successful login returns a valid access token.
     """
-    sync = BaseSynchronizer(fake_cache_db, temp_config_file)
+    sync = BaseSynchronizer(fake_cache_db, temp_config)
 
     fake_server = MagicMock()
     fake_server.serve = AsyncMock()
@@ -463,9 +510,7 @@ async def test_login_for_access_token_success(
 
 
 @pytest.mark.asyncio
-async def test_login_for_access_token_invalid(
-    fake_cache_db, temp_config_file, monkeypatch
-):
+async def test_login_for_access_token_invalid(fake_cache_db, temp_config, monkeypatch):
     """
     Ensures invalid login returns HTTP 401 with a clear error message.
     """
@@ -481,7 +526,7 @@ async def test_login_for_access_token_invalid(
 
     fake_cache_db.authenticate_user = AsyncMock(return_value=None)
 
-    sync = BaseSynchronizer(fake_cache_db, temp_config_file)
+    sync = BaseSynchronizer(fake_cache_db, temp_config)
 
     fake_server = MagicMock()
     fake_server.serve = AsyncMock()
@@ -506,12 +551,12 @@ async def test_login_for_access_token_invalid(
 
 @pytest.mark.asyncio
 async def test_task_start_endpoint(
-    fake_cache_db, temp_config_file, monkeypatch, patched_synchronizer
+    fake_cache_db, temp_config, monkeypatch, patched_synchronizer
 ):
     """
     Ensures /task/start endpoint works correctly without authentication.
     """
-    sync = BaseSynchronizer(fake_cache_db, temp_config_file)
+    sync = BaseSynchronizer(fake_cache_db, temp_config)
 
     fake_server = MagicMock()
     fake_server.serve = AsyncMock()
@@ -546,19 +591,32 @@ async def test_task_start_endpoint(
 # =====================================================================
 
 
-def test_preprocessor_loader_missing(monkeypatch, temp_config_file, fake_cache_db):
+def test_preprocessor_loader_missing(monkeypatch, tmp_path, fake_cache_db):
     """
     Ensures validation fails when preprocessor_plugins is missing in config.
     """
-    cfg = Path(temp_config_file)
-    contents = cfg.read_text().replace('preprocessor_plugins = ["dummy_pre"]', "")
-    cfg.write_text(contents)
+    plugin_dir = tmp_path / "plugins"
+    plugin_dir.mkdir()
 
+    config_dict = {
+        "Synchronizer": {
+            "sync_interval": 10,
+            "cleanup_grace_period": 20,
+            "cleanup_interval": 30,
+            # "preprocessor_plugins": ["dummy_pre"],
+            "plugin_configs_path": plugin_dir,
+        },
+        "Api": {
+            "host": "127.0.0.1",
+            "port": 9999,
+            "access_token_expire_minutes": 30,
+        },
+    }
     with pytest.raises(ValidationError):
-        BaseSynchronizer(fake_cache_db, cfg)
+        SynchronizerConfig.model_validate(config_dict)
 
 
-def test_preprocessor_plugin_wrong_type(fake_cache_db, temp_config_file, monkeypatch):
+def test_preprocessor_plugin_wrong_type(fake_cache_db, temp_config, monkeypatch):
     """
     Ensures incorrect plugin type raises ValueError during initialization.
     """
@@ -569,7 +627,7 @@ def test_preprocessor_plugin_wrong_type(fake_cache_db, temp_config_file, monkeyp
     monkeypatch.setattr(BaseSynchronizer, "_load_plugin_from_entrypoint", fake_loader)
 
     with pytest.raises(ValueError):
-        BaseSynchronizer(fake_cache_db, temp_config_file)
+        BaseSynchronizer(fake_cache_db, temp_config)
 
 
 def test_status_model_enum_conversion():

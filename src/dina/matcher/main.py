@@ -19,12 +19,13 @@ import uvicorn
 from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.params import Query, Depends
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, HttpUrl, Field
+from pydantic import BaseModel, HttpUrl
 import polars as pl
 
 from dina.cachedb.database import CacheDB
 from dina.cachedb.model import Match, CsafProduct, Asset
 from dina.common.auth import AccessChecker, Token, SessionData, create_access_token
+from dina.common.config import Config, MatchingConfig
 from dina.common.log import configure_logging, get_logger, LoggingConfig
 import sys
 import argparse
@@ -39,6 +40,23 @@ logger = get_logger(__name__)
 
 if sys.platform.startswith("win"):
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+
+class MatchingState(enum.Enum):
+    STOPPED = "stopped"
+    STOP_REQUESTED = "stop_requested"
+    RUNNING = "running"
+
+
+class MatcherStatus(BaseModel):
+    state: MatchingState
+    start: float | None = None
+    last_matching: float | None = None
+
+
+class MatchingTask(BaseModel):
+    assets: list[HttpUrl]
+    csaf_documents: list[HttpUrl]
 
 
 # TODO: Define correct fields
@@ -70,109 +88,24 @@ class MatchSubscription(BaseModel):
     origin_filter: list[str]
 
 
-class ApiConfig(BaseModel):
-    host: str
-    port: int
-    access_token_expire_minutes: int
-
-
-class MatcherConfig(BaseModel):
-    sync_interval: int
-    match_threshold: float
-    Api: ApiConfig
-    Cachedb: CacheDB.Config
-    asset_plugins_path: Path
-    csaf_plugins_path: Path
-    Logging: LoggingConfig | None = None
-
-
-class DatabaseConfig(BaseModel):
-    freetext_fields_separator: str
-    freetext_fields: dict[str, float] = Field(default_factory=dict)
-    ordered_fields: dict[str, float] = Field(default_factory=dict)
-    other_fields: dict[str, float] = Field(default_factory=dict)
-    freetext_fields_weights: dict[str, float] = Field(default_factory=dict)
-
-
-class VersionConfig(BaseModel):
-    weights: dict[str, float] = Field(default_factory=dict)
-
-
-class CpeConfig(BaseModel):
-    csaf_cpe_field_name: str
-    weights: dict[str, float] = Field(default_factory=dict)
-
-
-class PurlConfig(BaseModel):
-    csaf_purl_field_name: str
-    weights: dict[str, float] = Field(default_factory=dict)
-
-
-class NgramConfig(BaseModel):
-    weights: dict[int, float] = Field(default_factory=dict)
-
-
-class LevenshteinConfig(BaseModel):
-    max_distance: int
-
-
-class ThresholdConfig(BaseModel):
-    vendor: int
-    product_family: int
-    product_name: int
-    keyword: int
-    version: int
-
-
-class MatchingConfig(BaseModel):
-    database: DatabaseConfig
-    version: VersionConfig
-    cpe: CpeConfig
-    purl: PurlConfig
-    ngram: NgramConfig
-    levenshtein: LevenshteinConfig
-    threshold: ThresholdConfig
-
-
-class MatchingState(enum.Enum):
-    STOPPED = "stopped"
-    STOP_REQUESTED = "stop_requested"
-    RUNNING = "running"
-
-
-class MatcherStatus(BaseModel):
-    state: MatchingState
-    start: float | None = None
-    last_matching: float | None = None
-
-
-class MatchingTask(BaseModel):
-    assets: list[HttpUrl]
-    csaf_documents: list[HttpUrl]
-
-
 class Matcher:
-    class Config(BaseModel):
-        Matcher: MatcherConfig
-
-    def __init__(self, config_path: Path = Path("./assets/matcher.toml")) -> None:
+    def __init__(self, config_path: Path = Path("./assets/config.toml")) -> None:
         """
         Initialize the Matcher.
         """
-        with open(config_path, "rb") as f:
-            self.__config = Matcher.Config.model_validate(tomllib.load(f))
+        self.__config = Config.load(config_path)
 
         with open("./assets/plugin_configs/default/matching_config.toml", "rb") as f:
             mc = MatchingConfig.model_validate(tomllib.load(f))
 
         self.__matching_cfg_dict = mc.model_dump()
 
-        # Configure logging based on matcher.toml
+        # Configure logging based on config.toml
         configure_logging(self.__config.Matcher.Logging)
 
         self.__manager = multiprocessing.Manager()
         self.__matches: Queue[list[Match]] = self.__manager.Queue()
-        self.__cache_db = CacheDB()
+        self.__cache_db = CacheDB(self.__config.Cachedb)
         self.__last_matching: float | None = None
         self.__matching_tasks: list[MatchingTask] = []
         self.__matching_state: MatchingState = MatchingState.STOPPED
@@ -190,7 +123,7 @@ class Matcher:
 
     async def run(self):
         """Run the matcher."""
-        await self.__cache_db.connect(self.__config.Matcher.Cachedb)
+        await self.__cache_db.connect()
         log_queue = self.__manager.Queue()
         async with asyncio.TaskGroup() as tg:
             tg.create_task(self.__serve_api())
@@ -291,12 +224,11 @@ class Matcher:
                     categorized_matches[HttpUrl(match.asset.origin_uri)].append(match)
                 # Let asset plugins notify subscribers of new matches
                 for origin, matches in categorized_matches.items():
-                    if self.__data_source_plugins[
-                        origin
-                    ].config.DataSource.publish_matches:
-                        await self.__data_source_plugins[origin].notify_new_matches(
-                            matches
-                        )
+                    if ds := self.__data_source_plugins.get(origin):
+                        if ds.config.DataSource.publish_matches:
+                            await self.__data_source_plugins[origin].notify_new_matches(
+                                matches
+                            )
             await asyncio.sleep(0.1)
 
     async def __serve_api(self):
@@ -507,7 +439,7 @@ class Matcher:
 
 
 def match_pairs(
-    matches: queue.Queue,
+    matches: queue.Queue[list[Match]],
     log_queue: multiprocessing.Queue,
     logging_config: LoggingConfig,
     pairs: list[tuple[CsafProduct, Asset]],
@@ -546,7 +478,7 @@ def match_pairs(
     matches.put(batch)
 
 
-async def run_matcher(config_path: Path = Path("./assets/matcher.toml")):
+async def run_matcher(config_path: Path = Path("./assets/config.toml")):
     """Run the Matcher."""
     # Create and initialize the Matcher
     matcher = Matcher(config_path=config_path)
@@ -569,7 +501,7 @@ def main():
         parser.add_argument(
             "--config",
             type=Path,
-            default=Path("./assets/matcher.toml"),
+            default=Path("./assets/config.toml"),
             help="Path to matcher configuration TOML file",
         )
         args = parser.parse_args()

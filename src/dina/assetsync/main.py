@@ -3,6 +3,7 @@ from pathlib import Path
 import argparse
 
 from dina.cachedb.database import CacheDB
+from dina.common.config import Config
 from dina.common.log import configure_logging, get_logger
 from dina.synchronizer.base import BaseSynchronizer
 import sys
@@ -20,21 +21,22 @@ class AssetSynchronizer(BaseSynchronizer):
     This class extends the BaseManager to provide functionality specific to asset management.
     """
 
-    def __init__(self, config_path: Path = Path("./assets/assetsync.toml")):
+    def __init__(self, config_path: Path = Path("./assets/config.toml")):
         """
         Initialize the Asset Manager.
         """
-        cache_db = CacheDB()
+        config = Config.load(config_path)
+        cache_db = CacheDB(config.Cachedb)
         super().__init__(
             cache_db,
-            config_path,
+            config.Assetsync,
             root_path="/assetsync",
         )
         # Configure logging
         configure_logging(self.config.Logging)
 
 
-async def run_asset_manager(config_path: Path = Path("./assets/assetsync.toml")):
+async def run_asset_manager(config_path: Path = Path("./assets/config.toml")):
     """Run the Asset Manager."""
     # Create and initialize the Asset Manager
     asset_manager = AssetSynchronizer(config_path=config_path)
@@ -59,7 +61,7 @@ def main():
         parser.add_argument(
             "--config",
             type=Path,
-            default=Path("./assets/assetsync.toml"),
+            default=Path("./assets/config.toml"),
             help="Path to asset synchronizer configuration TOML file",
         )
         args = parser.parse_args()

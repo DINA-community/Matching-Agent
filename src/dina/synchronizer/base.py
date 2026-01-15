@@ -51,7 +51,6 @@ class ApiConfig(BaseModel):
 class SynchronizerSectionConfig(BaseModel):
     sync_interval: int
     preprocessor_plugins: list[str]
-    Api: ApiConfig
     plugin_configs_path: Path
     # Number of seconds before last_run to consider records stale for cleanup
     cleanup_grace_period: int
@@ -60,9 +59,8 @@ class SynchronizerSectionConfig(BaseModel):
 
 
 class SynchronizerConfig(BaseModel):
-    Assetsync: dict | None = None
     Synchronizer: SynchronizerSectionConfig
-    Cachedb: CacheDB.Config
+    Api: ApiConfig
     Logging: LoggingConfig | None = None
 
 
@@ -73,14 +71,19 @@ class PluginLoadError(Exception):
 class BaseSynchronizer(ABC):
     starttime = 0
 
-    def __init__(self, cache_db: CacheDB, config_file: Path, root_path: str = ""):
+    def __init__(
+        self,
+        cache_db: CacheDB,
+        config: SynchronizerConfig,
+        root_path: str = "",
+    ):
         """Initialize the BaseManager.
 
         Args:
             cache_db: The cache database to use.
             data_source_plugin_configs: Path to a directory containing data source plugin configuration files.
-            config_file: Path to the manager configuration file (e.g., assetman.toml).
             root_path: The root path for the API when behind a reverse proxy (e.g., "/assetsync").
+            config_class: The Pydantic model class to use for configuration.
         """
         self.__last_synchronization: float | None = None
         self.__sync_start_time: float | None = None
@@ -93,8 +96,8 @@ class BaseSynchronizer(ABC):
             list
         )
         self.preprocessed_data: list[Asset | CsafProduct] = []
-        self.config_file: Path = config_file
-        self.config: SynchronizerConfig = self.load_config(config_file)
+
+        self.config = config
 
         self.data_sources: dict[HttpUrl, DataSourcePlugin] = load_datasource_plugins(
             self.config.Synchronizer.plugin_configs_path
@@ -155,14 +158,6 @@ class BaseSynchronizer(ABC):
             raise PluginLoadError(f"Error loading plugin {plugin_name}: {e}")
 
     @staticmethod
-    def load_config(config_file: Path) -> SynchronizerConfig:
-        if not config_file.exists():
-            raise FileNotFoundError(f"Configuration file not found: {config_file}")
-
-        with open(config_file, "rb") as f:
-            return SynchronizerConfig.model_validate(tomllib.load(f))
-
-    @staticmethod
     def __load_preprocessor_plugins(
         preprocessor_plugin_names: list[str],
     ) -> list[PreprocessorPlugin]:
@@ -199,7 +194,7 @@ class BaseSynchronizer(ABC):
         return preprocessor_plugins
 
     async def setup(self):
-        await self.cache_db.connect(self.config.Cachedb)
+        await self.cache_db.connect()
 
     async def run(self):
         """Run the manager."""
@@ -360,7 +355,7 @@ class BaseSynchronizer(ABC):
                     detail="Incorrect username or password",
                 )
             access_token_expires = datetime.timedelta(
-                minutes=self.config.Synchronizer.Api.access_token_expire_minutes
+                minutes=self.config.Api.access_token_expire_minutes
             )
             token = create_access_token(
                 SessionData(username=user.username), access_token_expires
@@ -385,8 +380,8 @@ class BaseSynchronizer(ABC):
         # TODO: Add security options
         config = uvicorn.Config(
             app=api,
-            host=self.config.Synchronizer.Api.host,
-            port=self.config.Synchronizer.Api.port,
+            host=self.config.Api.host,
+            port=self.config.Api.port,
         )
         server = uvicorn.Server(config)
         await server.serve()

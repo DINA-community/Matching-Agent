@@ -46,7 +46,7 @@ class CLI:
             "--config",
             "-c",
             type=Path,
-            default=Path("./assets/assetsync.toml"),
+            default=Path("./assets/config.toml"),
             help="Path to TOML config containing a [Cachedb] section",
         )
 
