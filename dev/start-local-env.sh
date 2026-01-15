@@ -116,6 +116,7 @@ main() {
         cat >&2 <<USAGE
 Usage: $0 [--recreate|--down|--stop] [--volumes]
 
+  --stop                 Stop services
   --down                 Stop and remove services
   --recreate             Recreate containers (like: up -d --force-recreate --remove-orphans)
   --volumes, -v          When used with --down or --recreate: also delete named volumes
@@ -127,7 +128,7 @@ USAGE
         ;;
       *)
         echo "Unknown option: $1" >&2
-        echo "Usage: $0 [--recreate|--down] [--volumes]" >&2
+        echo "Usage: $0 [--recreate|--down|--stop] [--volumes]" >&2
         exit 2
         ;;
     esac
@@ -142,6 +143,11 @@ USAGE
 
   # Execute action
   case "$ACTION" in
+    stop)
+      info "Stopping dev environment..."
+      $COMPOSE_CMD -f "$COMPOSE_FILE" stop
+      exit 0
+      ;;
     down)
       if [[ "$WITH_VOLUMES" == true ]]; then
         info "Stopping and removing dev environment and named volumes..."
