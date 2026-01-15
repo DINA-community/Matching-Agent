@@ -5,6 +5,7 @@
 # Usage:
 #   ./dev/start-local-env.sh                         # start services in background
 #   ./dev/start-local-env.sh --recreate              # recreate containers
+#   ./dev/start-local-env.sh --stop                  # stop
 #   ./dev/start-local-env.sh --down                  # stop and remove services
 #   ./dev/start-local-env.sh --down --volumes        # stop, remove services AND named volumes
 #   ./dev/start-local-env.sh --recreate --volumes    # full reset: down -v, then up (fresh volumes)
@@ -24,6 +25,23 @@ info()  { echo "[INFO]  $*"; }
 need_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
     error "Required command '$1' not found in PATH"; exit 127
+  fi
+}
+
+need_env() {
+  # Checks if .env exists and use example instead if user approves
+  ENV_FILE=".env"
+  DEFAULT_FILE="dev/.env.example"   
+  # If not found, create it in the original directory
+  if [ ! -f "dev/$ENV_FILE" ]; then
+    read -rp "$ENV_FILE does not exist. Create from $DEFAULT_FILE? [y/N] " answer
+    if [[ "$answer" =~ ^[Yy] ]]; then
+      cp "$DEFAULT_FILE" "dev/$ENV_FILE" || { echo "Failed to copy $DEFAULT_FILE to $ENV_FILE"; exit 127; }
+      echo "$ENV_FILE created from $DEFAULT_FILE"
+    else
+      echo "Please provide $ENV_FILE. Otherwise the installation can not be continued."
+      exit 1
+    fi
   fi
 }
 
@@ -48,16 +66,12 @@ Services are starting. Useful info:
 To get the NetBox API token printed by the setup container:
   $COMPOSE_CMD -f $COMPOSE_FILE logs netbox-setup
 
-To see container status:
-  $COMPOSE_CMD -f $COMPOSE_FILE ps
-
-To stop services later:
-  $COMPOSE_CMD -f $COMPOSE_FILE stop
-
-To stop and delete services later:
-  $COMPOSE_CMD -f $COMPOSE_FILE down
-To stop and also delete named volumes (data reset):
-  $COMPOSE_CMD -f $COMPOSE_FILE down -v
+./dev/start-local-env.sh                       # start services in background
+./dev/start-local-env.sh --recreate            # recreate containers
+./dev/start-local-env.sh --stop                # stop 
+./dev/start-local-env.sh --down                # stop and remove services
+./dev/start-local-env.sh --down --volumes      # stop and remove services AND named volumes
+./dev/start-local-env.sh --recreate --volumes  # full reset: down -v, then up (fresh volumes)
 EOF
 }
 
@@ -69,6 +83,9 @@ main() {
     error "Compose file '$COMPOSE_FILE' not found. Run from the repository root."
     exit 1
   fi
+
+  # Checking for Compose file first, ensures the root folder.
+  need_env
 
   # Best-effort hint if submodules (for dev services) are missing
   if [[ ! -d "dev/netbox" || ! -d "dev/isduba" ]]; then
@@ -86,6 +103,9 @@ main() {
       --down)
         ACTION="down"
         ;;
+      --stop)
+        ACTION="stop"
+        ;;
       --recreate)
         ACTION="recreate"
         ;;
@@ -94,7 +114,7 @@ main() {
         ;;
       --help|-h)
         cat >&2 <<USAGE
-Usage: $0 [--recreate|--down] [--volumes]
+Usage: $0 [--recreate|--down|--stop] [--volumes]
 
   --down                 Stop and remove services
   --recreate             Recreate containers (like: up -d --force-recreate --remove-orphans)

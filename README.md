@@ -79,6 +79,7 @@ To configure the environment variables, copy the `.env.example` file to `.env` a
 ```bash
 ./dev/start-local-env.sh                       # start services in background
 ./dev/start-local-env.sh --recreate            # recreate containers
+./dev/start-local-env.sh --stop                # stop 
 ./dev/start-local-env.sh --down                # stop and remove services
 ./dev/start-local-env.sh --down --volumes      # stop and remove services AND named volumes
 ./dev/start-local-env.sh --recreate --volumes  # full reset: down -v, then up (fresh volumes)
@@ -109,22 +110,19 @@ Before starting the services, make sure to configure the plugins and the APIs ac
 To configure the Netbox fetcher plugin, copy the file [`assets/plugin_configs/data_source/asset/sample/netbox.toml`](assets/plugin_configs/data_source/asset/sample/netbox.toml) to `assets/plugin_configs/data_source/asset/netbox_local.toml` and adjust the values to your environment.
 The file can be named any way you like, but it must be a toml file.
 
-
 ```shell
 cp assets/plugin_configs/data_source/asset/sample/netbox.toml assets/plugin_configs/data_source/asset/netbox_local.toml
-vim assets/plugin_configs/data_source/asset/netbox_local.toml
 ```
 
 To configure the ISDuBA fetcher plugin, copy the file [`assets/plugin_configs/data_source/csaf/sample/isduba.toml`](assets/plugin_configs/data_source/csaf/sample/isduba.toml) to `assets/plugin_configs/data_source/csaf/isduba_local.toml` and adjust the values to your environment.
 The file can be named any way you like, but it must be a toml file.
 
-Before starting the synchronizers, make sure to create some assets and CSAF documents in the NetBox and ISDuBA instances.
-Follow the corresponding instructions in the [NetBox](https://netboxlabs.com/docs/netbox/) and [ISDuBA documentation](https://github.com/ISDuBA/ISDuBA/blob/main/docs/README.md).
-
 ```shell
 cp assets/plugin_configs/data_source/csaf/sample/isduba.toml assets/plugin_configs/data_source/csaf/isduba_local.toml
-vim assets/plugin_configs/data_source/csaf/isduba_local.toml
 ```
+
+Before starting the synchronizers, make sure to create some assets and CSAF documents in the NetBox and ISDuBA instances.
+Follow the corresponding instructions in the [NetBox](https://netboxlabs.com/docs/netbox/) and [ISDuBA documentation](https://github.com/ISDuBA/ISDuBA/blob/main/docs/README.md).
 
 Next, install the python dependencies with uv by running in your terminal or inside pycharm (double tap `<Ctrl>` and enter the command) to set up the local python environment:
 
