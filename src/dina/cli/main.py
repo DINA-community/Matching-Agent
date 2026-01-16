@@ -400,9 +400,9 @@ class CLI:
         # Load DB config
         config = self._load_cachedb_config(config_path)
 
-        cache_db = CacheDB()
+        cache_db = CacheDB(config)
         try:
-            await cache_db.connect(config)
+            await cache_db.connect()
             await cache_db.create_user(username, password)
         finally:
             await cache_db.disconnect()
