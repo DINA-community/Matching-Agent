@@ -12,6 +12,49 @@ Prerequisites
 - Docker and Docker Compose (optional, for local services like NetBox/ISDuBA and PostgreSQL)
 - Java Runtime Environment (JRE/JDK) required only when building/using the ISDuBA plugin (recommended: OpenJDK 17+)
 
+Project Structure
+--------------------
+This section provides an overview of the project’s directory and package structure to help new users quickly find the right entry points.
+
+.. program-output:: tree -a -L 3 -I ".git|__pycache__|*.pyc|.venv|build|dist|.pytest_cache"
+   :cwd: ..
+
+- ``assets/``: Configuration files for plugins and the matching logic
+- ``dev/``: Docker Compose setup for Postgres, ISDUBA, and NetBox
+- ``docker/``: Docker files to build and run the project in containers
+- ``docs/``: Project documentation (Sphinx sources)
+
+- ``plugins/``: Extensions implemented as plugins
+
+  - ``asset_source/``: Data source plugins (read external data and map it to the internal data model)
+
+    - ``isduba/``: Import from ISDUBA
+    - ``netbox/``: Import from NetBox
+    - ``sample/``: Example/demo plugin used as a template
+
+  - ``preprocessing/``: Preprocessing (normalization, text cleanup)
+
+    - ``default/``: Default preprocessing implementation
+    - ``identify/``: Example for additional preprocessing modules
+
+- ``src/dina/``: Main package (production code)
+
+  - ``assetsync/``: Entry point and logic for the asset synchronizer
+  - ``cacheddb/``: Database access and data model (schema, repositories/queries)
+  - ``cli/``: CLI for user management (Cache DB) and for controlling the matcher/synchronizer APIs
+  - ``common/``: Shared utilities (e.g., logging, configuration, auth helpers)
+  - ``csafsync/``: Entry point and logic for the CSAF synchronizer
+  - ``matcher/``: Matching run and matching logic
+
+    - ``main.py``: Starts the matching run
+    - ``matching.py``: Implements the matching logic
+    - ``calculate_score.py``: Calculates scores and evaluates results
+
+  - ``netbox_api/``: NetBox API client/adapter
+  - ``synchronizer/``: Plugin interfaces for fetching, preprocessing, relationship mapping, and cleanup, as well as reporting newly found matches back to the data source
+
+- ``tests/``: Tests (pytest), fixtures, and test data
+
 Quick start
 -----------
 1) Clone the repository:
