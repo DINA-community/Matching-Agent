@@ -18,6 +18,14 @@
 set -euo pipefail
 
 COMPOSE_FILE="dev/docker-compose.yml"
+ENV_FILE="dev/.env"
+ENV_SAMPLE="dev/configuration/.env.example" 
+NETBOX_URL="NETBOX_CLIENT_HOSTNAME_URL"
+ISDUBA_SAMPLE="assets/plugin_configs/data_source/csaf/sample/isduba.toml"
+NETBOX_SAMPLE="assets/plugin_configs/data_source/asset/sample/netbox.toml"
+NETBOX_FILE="assets/plugin_configs/data_source/asset/netbox-local.toml"
+ISDUBA_FILE="assets/plugin_configs/data_source/csaf/isduba-local.toml"
+LOCAL_SETTING="FULLY_LOCAL"
 
 error() { echo "[ERROR] $*" >&2; }
 info()  { echo "[INFO]  $*"; }
@@ -30,19 +38,44 @@ need_cmd() {
 
 need_env() {
   # Checks if .env exists and use example instead if user approves
-  ENV_FILE=".env"
-  DEFAULT_FILE="dev/.env.example"   
-  # If not found, create it in the original directory
-  if [ ! -f "dev/$ENV_FILE" ]; then
-    read -rp "$ENV_FILE does not exist. Create from $DEFAULT_FILE? [y/N] " answer
+  ENV_FILE="dev/.env"
+  ENV_SAMPLE="dev/configuration/.env.example"   
+  if [ ! -f "$ENV_FILE" ]; then
+    read -rp "$ENV_FILE does not exist. Create from $ENV_SAMPLE? This will create a fully local setup [y/N] " answer
     if [[ "$answer" =~ ^[Yy] ]]; then
-      cp "$DEFAULT_FILE" "dev/$ENV_FILE" || { echo "Failed to copy $DEFAULT_FILE to $ENV_FILE"; exit 127; }
-      echo "$ENV_FILE created from $DEFAULT_FILE"
+
+      cp "$ENV_SAMPLE" "$ENV_FILE" || { echo "Failed to copy $ENV_SAMPLE to $ENV_FILE"; exit 127; }
+      sed -i "s|^\($LOCAL_SETTING=\).*|\1true|" "$ENV_FILE"
+      echo "$ENV_FILE created from $ENV_SAMPLE"
+      cp /dev/configuration/plugins-local.py /dev/configuration/plugins.py  ## fix me before pull request
+      set_local_toml
     else
       echo "Please provide $ENV_FILE. Otherwise the installation can not be continued."
       exit 1
     fi
   fi
+}
+
+set_local_toml() {
+  declare -A REPLACEMENTS=(
+    ["url = "]="ISDUBA_CLIENT_HOSTNAME_URL"
+    ["keycloak_url = "]="ISDUBA_CLIENT_KEYCLOAK_URL"
+    ["keycloak_realm = "]="ISDUBA_CLIENT_KEYCLOAK_REALM"
+    ["username = "]="ISDUBA_CLIENT_USER"
+    ["password = "]="ISDUBA_CLIENT_PASSWORD"
+    )
+    ## Set local tomls files
+    cp "$NETBOX_SAMPLE" "$NETBOX_FILE" 
+    cp "$ISDUBA_SAMPLE" "$ISDUBA_FILE" 
+    value=$(grep -E "^${NETBOX_URL}=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2-)
+    sed -i "s|^\(api_url = \).*|\1\"$value\"|" "$NETBOX_FILE"
+
+    ## Adjust the isduba setting with environment file
+    for pattern in "${!REPLACEMENTS[@]}"; do
+      value=$(grep -E "^${REPLACEMENTS[$pattern]}=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2-)
+      sed -i "s|^\($pattern\).*|\1\"$value\"|" "$ISDUBA_FILE"
+    done
+    
 }
 
 ensure_compose() {
@@ -199,6 +232,12 @@ USAGE
     echo
     info "NetBox API token detected:"
     echo "$token"
+    ## set it in env 
+    LOCAL_SETTING=$(grep -E "^$LOCAL_SETTING=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2-)
+    if  [ "$LOCAL_SETTING" == "true" ]; then
+        sed -i "s|^\(api_token = \).*|\1\"$token\"|" "$NETBOX_FILE"
+    fi
+
     echo
   else
     info "Could not detect NetBox API token automatically within ${TIMEOUT}s. You can retrieve it manually with:"
