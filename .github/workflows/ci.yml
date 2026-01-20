@@ -22,4 +22,6 @@ jobs:
         run: uv run ruff check --output-format=github .
 
       - name: Run tests
+        env:
+          JWT_SECRET_KEY: dummy_secret_key_for_testing
         run: uv run pytest
