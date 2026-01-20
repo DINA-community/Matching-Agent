@@ -577,12 +577,12 @@ class Matching:
 
         csaf_ranges = [
             r
-            for r in csaf_version.get("min_max_version", [])
+            for r in csaf_version.get("min_max_version") or []
             if r.get("min") or r.get("max")
         ]
         asset_ranges = [
             r
-            for r in asset_version.get("min_max_version", [])
+            for r in asset_version.get("min_max_version") or []
             if r.get("min") or r.get("max")
         ]
 
