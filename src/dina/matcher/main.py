@@ -422,9 +422,9 @@ class Matcher:
         """Return origin_uri extended with a plugin-provided path derived from origin_info.
 
         Strategy:
-        - Iterate over installed data source plugins and ask each one to build a path
-          for the given origin_info; return the first non-empty path.
-        - If no path is available, just return the origin_uri as-is.
+            - Iterate over installed data source plugins and ask each one to build a path
+              for the given origin_info; return the first non-empty path.
+            - If no path is available, just return the origin_uri as-is.
         """
         path = self.__data_source_plugins[HttpUrl(origin_uri)].build_resource_path(
             origin_info
