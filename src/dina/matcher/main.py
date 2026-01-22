@@ -226,6 +226,9 @@ class Matcher:
                 for origin, matches in categorized_matches.items():
                     if ds := self.__data_source_plugins.get(origin):
                         if ds.config.DataSource.publish_matches:
+                            logger.debug(
+                                f"Notifying subscribers of new matches from {origin}"
+                            )
                             await self.__data_source_plugins[origin].notify_new_matches(
                                 matches
                             )
