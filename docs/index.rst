@@ -17,6 +17,7 @@ Contents
    api
    matcher-cli
    production-setup
+   troubleshooting
 
 
 Indices and tables
