@@ -45,7 +45,7 @@ need_env() {
     read -rp "$ENV_FILE does not exist. Create from $ENV_SAMPLE? This will create a fully local setup [y/N] " answer
 
     if [[ "$answer" =~ ^[Yy] ]]; then
-      read -rp "Did you execute the following command? uv sync --all-extras" check    
+      read -rp "Did you execute the following command: uv sync --all-extras ?" check    
       if [[ "$check" =~ ^[Yy] ]]; then
         cp -p "$ENV_SAMPLE" "$ENV_FILE" || { echo "Failed to copy $ENV_SAMPLE to $ENV_FILE"; exit 127; }
         sed -i "s|^\($LOCAL_SETTING=\).*|\1true|" "$ENV_FILE"
@@ -127,6 +127,9 @@ To get the NetBox API token printed by the setup container:
 ./dev/start-local-env.sh --down                # stop and remove services
 ./dev/start-local-env.sh --down --volumes      # stop and remove services AND named volumes
 ./dev/start-local-env.sh --recreate --volumes  # full reset: down -v, then up (fresh volumes)
+
+If not done yet, please set account for API access:
+  uv run csaf_matcher_cli user create -u admin
 EOF
 }
 
