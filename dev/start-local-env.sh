@@ -25,7 +25,10 @@ ISDUBA_SAMPLE="assets/plugin_configs/data_source/csaf/sample/isduba.toml"
 NETBOX_SAMPLE="assets/plugin_configs/data_source/asset/sample/netbox.toml"
 NETBOX_FILE="assets/plugin_configs/data_source/asset/netbox-local.toml"
 ISDUBA_FILE="assets/plugin_configs/data_source/csaf/isduba-local.toml"
+PLUGINS_FILE="dev/configuration/plugins.py"
+API_START=dev/configuration/script_api.sh
 LOCAL_SETTING="FULLY_LOCAL"
+JWT="JWT_KEY"
 
 error() { echo "[ERROR] $*" >&2; }
 info()  { echo "[INFO]  $*"; }
@@ -38,16 +41,15 @@ need_cmd() {
 
 need_env() {
   # Checks if .env exists and use example instead if user approves
-  ENV_FILE="dev/.env"
-  ENV_SAMPLE="dev/configuration/.env.example"   
   if [ ! -f "$ENV_FILE" ]; then
     read -rp "$ENV_FILE does not exist. Create from $ENV_SAMPLE? This will create a fully local setup [y/N] " answer
     if [[ "$answer" =~ ^[Yy] ]]; then
 
-      cp "$ENV_SAMPLE" "$ENV_FILE" || { echo "Failed to copy $ENV_SAMPLE to $ENV_FILE"; exit 127; }
+      cp -p "$ENV_SAMPLE" "$ENV_FILE" || { echo "Failed to copy $ENV_SAMPLE to $ENV_FILE"; exit 127; }
       sed -i "s|^\($LOCAL_SETTING=\).*|\1true|" "$ENV_FILE"
       echo "$ENV_FILE created from $ENV_SAMPLE"
-      cp /dev/configuration/plugins-local.py /dev/configuration/plugins.py  ## fix me before pull request
+      # Remove # for plugin_settings in  plugins.py
+      set_plugin_config
       set_local_toml
     else
       echo "Please provide $ENV_FILE. Otherwise the installation can not be continued."
@@ -65,8 +67,8 @@ set_local_toml() {
     ["password = "]="ISDUBA_CLIENT_PASSWORD"
     )
     ## Set local tomls files
-    cp "$NETBOX_SAMPLE" "$NETBOX_FILE" 
-    cp "$ISDUBA_SAMPLE" "$ISDUBA_FILE" 
+    cp -p "$NETBOX_SAMPLE" "$NETBOX_FILE"
+    cp -p "$ISDUBA_SAMPLE" "$ISDUBA_FILE" 
     value=$(grep -E "^${NETBOX_URL}=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2-)
     sed -i "s|^\(api_url = \).*|\1\"$value\"|" "$NETBOX_FILE"
 
@@ -74,8 +76,22 @@ set_local_toml() {
     for pattern in "${!REPLACEMENTS[@]}"; do
       value=$(grep -E "^${REPLACEMENTS[$pattern]}=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2-)
       sed -i "s|^\($pattern\).*|\1\"$value\"|" "$ISDUBA_FILE"
-    done
-    
+    done   
+}
+
+set_plugin_config(){
+  ## setup assumes a comment out plugin_config
+  LINE_START=$(awk '/^# PLUGINS_CONFIG/ { print NR }' $PLUGINS_FILE)
+  LINE_STOP=$(awk -v start="$LINE_START" 'NR > start && /^# }/ { print NR }' $PLUGINS_FILE)
+
+  ## checks before action
+  [[ -n $LINE_START && -n $LINE_STOP ]] || { echo "ERROR: Line boundaries for commenting in plugin settings not found"; exit 1; }
+  if (( $LINE_STOP - $LINE_START == 31 )); then
+      sed -i "${LINE_START},${LINE_STOP}s/^#\s//" $PLUGINS_FILE
+      else
+      echo "Schema of PLUGIN_CONFIG seems to have changed. Installation stopped."
+      exit 1
+  fi
 }
 
 ensure_compose() {
@@ -235,15 +251,25 @@ USAGE
     ## set it in env 
     LOCAL_SETTING=$(grep -E "^$LOCAL_SETTING=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2-)
     if  [ "$LOCAL_SETTING" == "true" ]; then
-        sed -i "s|^\(api_token = \).*|\1\"$token\"|" "$NETBOX_FILE"
+      sed -i "s|^\(api_token = \).*|\1\"$token\"|" "$NETBOX_FILE"
+    fi
+    # set JWT secret key
+    KEY=$(grep -E "^$JWT=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2-)
+    if  [ "$KEY" == "false" ]; then
+      echo "export JWT_SECRET_KEY=$(openssl rand -hex 32)" | tee -a .env dev/.env
+      sed -i "s|^\($JWT=\).*|\1true|" "$ENV_FILE"
+      info "JWT was created successfully"
+    fi
+    # start apis
+    read -rp "Do you want to start the apis right away [y/N] " answer
+    if [[ "$answer" =~ ^[Yy] ]]; then
+      bash $API_START
     fi
 
-    echo
   else
     info "Could not detect NetBox API token automatically within ${TIMEOUT}s. You can retrieve it manually with:"
     echo "  $COMPOSE_CMD -f $COMPOSE_FILE logs $SERVICE"
   fi
-
   print_post_instructions
 }
 
