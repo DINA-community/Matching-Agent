@@ -43,14 +43,20 @@ need_env() {
   # Checks if .env exists and use example instead if user approves
   if [ ! -f "$ENV_FILE" ]; then
     read -rp "$ENV_FILE does not exist. Create from $ENV_SAMPLE? This will create a fully local setup [y/N] " answer
-    if [[ "$answer" =~ ^[Yy] ]]; then
 
-      cp -p "$ENV_SAMPLE" "$ENV_FILE" || { echo "Failed to copy $ENV_SAMPLE to $ENV_FILE"; exit 127; }
-      sed -i "s|^\($LOCAL_SETTING=\).*|\1true|" "$ENV_FILE"
-      echo "$ENV_FILE created from $ENV_SAMPLE"
-      # Remove # for plugin_settings in  plugins.py
-      set_plugin_config
-      set_local_toml
+    if [[ "$answer" =~ ^[Yy] ]]; then
+      read -rp "Did you execute the following command? uv sync --all-extras" check    
+      if [[ "$check" =~ ^[Yy] ]]; then
+        cp -p "$ENV_SAMPLE" "$ENV_FILE" || { echo "Failed to copy $ENV_SAMPLE to $ENV_FILE"; exit 127; }
+        sed -i "s|^\($LOCAL_SETTING=\).*|\1true|" "$ENV_FILE"
+        echo "$ENV_FILE created from $ENV_SAMPLE"
+        # Remove # for plugin_settings in  plugins.py
+        set_plugin_config
+        set_local_toml
+      else
+        echo "Please do so. Exit"
+        exit 1
+      fi
     else
       echo "Please provide $ENV_FILE. Otherwise the installation can not be continued."
       exit 1
@@ -251,16 +257,17 @@ USAGE
     ## set it in env 
     LOCAL_SETTING=$(grep -E "^$LOCAL_SETTING=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2-)
     if  [ "$LOCAL_SETTING" == "true" ]; then
+      # Sets token always new in case it changes.
       sed -i "s|^\(api_token = \).*|\1\"$token\"|" "$NETBOX_FILE"
     fi
     # set JWT secret key
     KEY=$(grep -E "^$JWT=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2-)
     if  [ "$KEY" == "false" ]; then
-      echo "export JWT_SECRET_KEY=$(openssl rand -hex 32)" | tee -a .env dev/.env
+      openssl rand -hex 32 | xargs -I{} printf "export JWT_SECRET_KEY={}\n" | tee -a .env dev/.env > /dev/null
       sed -i "s|^\($JWT=\).*|\1true|" "$ENV_FILE"
       info "JWT was created successfully"
     fi
-    # start apis
+    # start API
     read -rp "Do you want to start the apis right away [y/N] " answer
     if [[ "$answer" =~ ^[Yy] ]]; then
       bash $API_START
