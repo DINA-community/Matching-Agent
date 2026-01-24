@@ -16,8 +16,6 @@ Project Structure
 --------------------
 This section provides an overview of the project’s directory and package structure to help new users quickly find the right entry points.
 
-.. program-output:: tree -a -L 3 -I ".git|__pycache__|*.pyc|.venv|build|dist|.pytest_cache"
-   :cwd: ..
 
 - ``assets/``: Configuration files for plugins and the matching logic
 - ``dev/``: Docker Compose setup for development purposes comprising a Postgres, ISDUBA, and NetBox instance
