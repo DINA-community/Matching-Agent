@@ -108,6 +108,12 @@ class NetboxDataSource(DataSourcePlugin):
         except UnexpectedStatus as e:
             logger.error(f"Failed to fetch devices: {e.status_code}")
             devices = {}
+            if e.status_code == 403:
+                raise RuntimeError(
+                    "Could not authenticate with the netbox instance. "
+                    "Probably invalid access token. "
+                    "Please make sure to correctly configure your access token in the plugin configuration."
+                ) from e
 
         try:
             software_results = validate_response(software_results)
