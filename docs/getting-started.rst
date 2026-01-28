@@ -12,6 +12,46 @@ Prerequisites
 - Docker and Docker Compose (optional, for local services like NetBox/ISDuBA and PostgreSQL)
 - Java Runtime Environment (JRE/JDK) required only when building/using the ISDuBA plugin (recommended: OpenJDK 17+)
 
+Project Structure
+--------------------
+This section provides an overview of the project’s directory and package structure to help new users quickly find the right entry points.
+
+
+- ``assets/``: Configuration files for plugins and the matching logic
+- ``dev/``: Docker Compose setup for development purposes comprising a Postgres, ISDUBA, and NetBox instance
+- ``docker/``: Docker files to build and run the project in containers for production
+- ``docs/``: Project documentation (Sphinx sources)
+
+- ``plugins/``: Extensions implemented as plugins
+
+  - ``asset_source/``: Data source plugins (read external data and map it to the internal data model)
+
+    - ``isduba/``: Import from ISDUBA
+    - ``netbox/``: Import from NetBox
+    - ``sample/``: Example/demo plugin used as a template
+
+  - ``preprocessing/``: Preprocessing (normalization, text cleanup)
+
+    - ``default/``: Default preprocessing implementation
+    - ``identity/``: A preprocessing plugin that does nothing to the data. Used as an example.
+
+- ``src/dina/``: Main package (production code)
+
+  - ``assetsync/``: Entry point and logic for the asset synchronizer
+  - ``cachedb/``: Database access and data model (schema, repositories/queries)
+  - ``cli/``: CLI for user management (Cache DB) and for controlling the matcher/synchronizer APIs
+  - ``common/``: Shared utilities (e.g., logging, configuration, auth helpers)
+  - ``csafsync/``: Entry point and logic for the CSAF synchronizer
+  - ``matcher/``: Matching run and matching logic
+
+    - ``main.py``: The core components of the matcher
+    - ``matching.py``: Implements the matching logic
+    - ``calculate_score.py``: Calculates scores and evaluates results
+
+  - ``synchronizer/``: Plugin interfaces for fetching, preprocessing, relationship mapping, and cleanup, as well as reporting newly found matches back to the data source
+
+- ``tests/``: Tests (pytest), fixtures, and test data
+
 Quick start
 -----------
 1) Clone the repository:

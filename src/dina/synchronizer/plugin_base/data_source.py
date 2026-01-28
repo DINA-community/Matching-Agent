@@ -65,13 +65,7 @@ class FetchRelationshipsResult:
 
 @dataclass
 class FetchProductsResult:
-    """Result object containing fetched data and fetch continuation flag.
-
-    Attributes:
-        data: List of fetched Asset or CsafProduct objects from the data source
-        again: Boolean flag indicating if another fetch should be performed immediately
-            (True) or wait for the next scheduled interval (False)
-    """
+    """Result object containing fetched data and fetch continuation flag."""
 
     again: bool
     data: List[Asset | CsafProduct] = field(default_factory=list)
@@ -175,11 +169,7 @@ class DataSourcePlugin(ABC):
     @property
     @abstractmethod
     def origin_uri(self) -> HttpUrl:
-        """The URI of the data source.
-
-        Returns:
-            str: The base URI of the external data source this plugin connects to.
-        """
+        """The URI of the data source."""
         ...
 
     @abstractmethod
