@@ -114,6 +114,7 @@ dev = [
     "pytest-asyncio>=0.25.0",
     "sphinx>=7.3.7",
     "furo>=2024.8.6",
+    "sphinxcontrib-programoutput",
     "ruff>=0.12.0",
     "testcontainers>=4.8.2",
 ]
