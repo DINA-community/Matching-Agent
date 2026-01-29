@@ -265,6 +265,9 @@ To get the NetBox API token printed by the setup container:
 ./dev/start-local-env.sh --recreate --volumes  # full reset: down -v, then up (fresh volumes)
 ./dev/start-local-env.sh --clean               # remove local images + local env/toml/plugins.py
 
+If you want to use a test database for netbox look at
+  dev/test-cases
+
 If not done yet, please set account for API access:
   uv run csaf_matcher_cli user create -u admin
 EOF
