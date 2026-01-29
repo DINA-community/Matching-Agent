@@ -27,9 +27,25 @@ NETBOX_SAMPLE="assets/plugin_configs/data_source/asset/sample/netbox.toml"
 NETBOX_FILE="assets/plugin_configs/data_source/asset/netbox-local.toml"
 ISDUBA_FILE="assets/plugin_configs/data_source/csaf/isduba-local.toml"
 PLUGINS_FILE="dev/configuration/plugins.py"
+PLUGINS_SAMPLE="dev/configuration/plugins.py.example"
 API_START=dev/configuration/script_api.sh
 LOCAL_SETTING="FULLY_LOCAL"
 JWT="JWT_KEY"
+
+ENV_FILES=(
+  ".env"
+  "dev/.env"
+  "docker/.env"
+  "dev/isduba/docker/.env"
+)
+
+FILE_PAIRS=(
+  ".env.example .env"
+  "dev/.env.example dev/.env"
+  "docker/.env.example docker/.env"
+  "dev/isduba/docker/.env.example dev/isduba/docker/.env"
+  "$PLUGINS_SAMPLE $PLUGINS_FILE"
+)
 
 error() { echo "[ERROR] $*" >&2; }
 info()  { echo "[INFO]  $*"; }
@@ -41,17 +57,14 @@ need_cmd() {
 }
 
 need_env() {
-  # Checks if .env exists and use example instead if user approves
+  # Checks if .env exists and setup a default installation if user approves
   if [ ! -f "$ENV_FILE" ]; then
-    read -rp "$ENV_FILE does not exist. Create from $ENV_SAMPLE? This will create a fully local setup [y/N] " answer
-
-    if [[ "$answer" =~ ^[Yy] ]]; then
-      read -rp "Did you execute the following command: uv sync --all-extras ?" check    
-      if [[ "$check" =~ ^[Yy] ]]; then
+    if confirm_response "$ENV_FILE" "env" ; then
+      if confirm_response "" "sync"; then
         cp -p "$ENV_SAMPLE" "$ENV_FILE" || { echo "Failed to copy $ENV_SAMPLE to $ENV_FILE"; exit 127; }
         sed -i "s|^\($LOCAL_SETTING=\).*|\1true|" "$ENV_FILE"
         echo "$ENV_FILE created from $ENV_SAMPLE"
-        # Remove # for plugin_settings in  plugins.py
+        # Remove # for plugin_settings in plugins.py
         set_plugin_config
         set_local_toml
       else
@@ -59,8 +72,12 @@ need_env() {
         exit 1
       fi
     else
-      echo "Please provide $ENV_FILE. Otherwise the installation can not be continued."
-      exit 1
+      if confirm_response "" "manual"; then
+        echo "Installation initiating..."
+        sleep 2
+      else
+        echo "Installation stopped by user."
+      fi
     fi
   fi
 }
@@ -88,10 +105,13 @@ set_local_toml() {
 
 set_plugin_config(){
   ## setup assumes a comment out plugin_config
+  if [[ ! -f "$PLUGINS_FILE" ]]; then 
+    echo "$PLUGINS_FILE is missing. $PLUGINS_SAMPLE will be modified and used."
+    cp -p "$PLUGINS_SAMPLE" "$PLUGINS_FILE"
+  fi
+  ## checks before action
   LINE_START=$(awk '/^# PLUGINS_CONFIG/ { print NR }' $PLUGINS_FILE)
   LINE_STOP=$(awk -v start="$LINE_START" 'NR > start && /^# }/ { print NR }' $PLUGINS_FILE)
-
-  ## checks before action
   [[ -n $LINE_START && -n $LINE_STOP ]] || { echo "ERROR: Line boundaries for commenting in plugin settings not found"; exit 1; }
   if (( $LINE_STOP - $LINE_START == 31 )); then
       sed -i "${LINE_START},${LINE_STOP}s/^#\s//" $PLUGINS_FILE
@@ -99,14 +119,32 @@ set_plugin_config(){
       echo "Schema of PLUGIN_CONFIG seems to have changed. Installation stopped."
       exit 1
   fi
+  echo "$PLUGINS_FILE set"
 }
 
-confirm_remove() {
+confirm_response() {
   local target="$1"
+  local case="$2"
   local reply
   while true; do
-    if ! read -r -p "Remove $target? [y/N] " reply </dev/tty; then
-      reply=""
+    if [[ $case == "remove" ]]; then
+      if ! read -rp "Remove $target? [y/N] " reply </dev/tty; then
+        reply=""
+      fi
+    elif [[ $case == "env" ]]; then
+      if ! read -rp "$ENV_FILE does not exist. Create from $ENV_SAMPLE? This will create a fully local setup [y/N] " reply </dev/tty; then
+        reply=""
+      fi
+    elif  [[ $case == "sync" ]]; then
+      echo "Did you execute the following command? uv sync --all-extras ?"
+      if ! read -rp "[y/N]" reply </dev/tty; then 
+        reply=""
+      fi
+    elif  [[ $case == "manual" ]]; then
+      echo "Please provide $ENV_FILE. Otherwise the installation will probably not working if the README was not used accordingly."
+      if ! read -rp "Do you want to continue [y/N]" reply </dev/tty; then 
+        reply=""
+      fi
     fi
     case "$reply" in
       [yY]|[yY][eE][sS]) return 0 ;;
@@ -130,9 +168,9 @@ ensure_compose() {
 remove_local_configs() {
   local removed=false
 
-  for env_file in ".env" "dev/.env" "docker/.env" "dev/isduba/docker/.env"; do
+  for env_file in "${ENV_FILES[@]}"; do
     if [[ -f "$env_file" ]]; then
-      if confirm_remove "$env_file"; then
+      if confirm_response "$env_file" "remove"; then
         info "Removing local env file: $env_file"
         rm -f "$env_file"
         removed=true
@@ -142,9 +180,10 @@ remove_local_configs() {
     fi
   done
 
+  # remove toml files in asset
   if [[ -d "assets/plugin_configs/data_source/asset" ]]; then
     while IFS= read -r -d '' file; do
-      if confirm_remove "$file"; then
+      if confirm_response "$file" "remove"; then
         info "Removing local plugin config: $file"
         rm -f "$file"
         removed=true
@@ -154,9 +193,10 @@ remove_local_configs() {
     done < <(find assets/plugin_configs/data_source/asset -maxdepth 1 -type f -name "*.toml" -print0)
   fi
 
+  # remove toml files in csaf
   if [[ -d "assets/plugin_configs/data_source/csaf" ]]; then
     while IFS= read -r -d '' file; do
-      if confirm_remove "$file"; then
+      if confirm_response "$file" "remove"; then
         info "Removing local plugin config: $file"
         rm -f "$file"
         removed=true
@@ -172,9 +212,9 @@ remove_local_configs() {
 }
 
 remove_plugins_config() {
-  local plugins_file="dev/configuration/plugins.py"
+  local plugins_file=$PLUGINS_FILE
   if [[ -f "$plugins_file" ]]; then
-    if confirm_remove "$plugins_file"; then
+    if confirm_response "$plugins_file" "remove"; then
       info "Removing local plugins configuration: $plugins_file"
       rm -f "$plugins_file"
     else
@@ -185,22 +225,19 @@ remove_plugins_config() {
   fi
 }
 
-copy_example_if_missing() {
-  local example_file="$1"
-  local target_file="$2"
-  if [[ -f "$example_file" && ! -f "$target_file" ]]; then
-    info "Copying $example_file to $target_file"
-    cp -f "$example_file" "$target_file"
-  fi
+ensure_local_configs() {
+  # Set sample files in case file is missing
+  for pair in "${FILE_PAIRS[@]}"; do
+    set -- $pair
+    local target_file="$2"
+    local example_file="$1"
+    if [[ -f "$example_file" && ! -f "$target_file" ]]; then
+      info "Copying $example_file to $target_file"
+      cp -fp "$example_file" "$target_file"
+    fi
+  done
 }
 
-ensure_local_configs() {
-  copy_example_if_missing ".env.example" ".env"
-  copy_example_if_missing "dev/.env.example" "dev/.env"
-  copy_example_if_missing "docker/.env.example" "docker/.env"
-  copy_example_if_missing "dev/isduba/docker/.env.example" "dev/isduba/docker/.env"
-  copy_example_if_missing "dev/configuration/plugins.py.example" "dev/configuration/plugins.py"
-}
 
 prune_project_images() {
   local compose_file="$1"
@@ -226,6 +263,7 @@ To get the NetBox API token printed by the setup container:
 ./dev/start-local-env.sh --down                # stop and remove services
 ./dev/start-local-env.sh --down --volumes      # stop and remove services AND named volumes
 ./dev/start-local-env.sh --recreate --volumes  # full reset: down -v, then up (fresh volumes)
+./dev/start-local-env.sh --clean               # remove local images + local env/toml/plugins.py
 
 If not done yet, please set account for API access:
   uv run csaf_matcher_cli user create -u admin
