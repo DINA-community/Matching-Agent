@@ -75,6 +75,8 @@ To set up a development environment, follow the steps below.
 You can start, stop, and recreate the full local development stack (PostgreSQL, NetBox, ISDuBA, etc.) using the helper script in the `dev/` directory.
 In order for the script to work, you need to set the correct environment variables in the `.env` file.
 To configure the environment variables, copy the `.env.example` file to `.env` and modify the values as needed.
+If `dev/configuration/plugins.py` is missing, copy it from `dev/configuration/plugins.py.example`.
+The dev script will also copy available `*.env.example` and `plugins.py.example` files automatically on first run.
 
 ```bash
 ./dev/start-local-env.sh                       # start services in background
@@ -82,6 +84,7 @@ To configure the environment variables, copy the `.env.example` file to `.env` a
 ./dev/start-local-env.sh --down                # stop and remove services
 ./dev/start-local-env.sh --down --volumes      # stop and remove services AND named volumes
 ./dev/start-local-env.sh --recreate --volumes  # full reset: down -v, then up (fresh volumes)
+./dev/start-local-env.sh --clean               # remove local images + local env/toml/plugins.py
 ```
 
 After startup, the API token is printed. This information is needed for the [configuration of the NetBox plugin](#configure-plugins). You can retrieve the NetBox API token any time from the setup container logs:

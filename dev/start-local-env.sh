@@ -8,6 +8,7 @@
 #   ./dev/start-local-env.sh --down                  # stop and remove services
 #   ./dev/start-local-env.sh --down --volumes        # stop, remove services AND named volumes
 #   ./dev/start-local-env.sh --recreate --volumes    # full reset: down -v, then up (fresh volumes)
+#   ./dev/start-local-env.sh --clean                 # remove local images + local env/toml/plugins.py
 #
 # Notes:
 # - Requires Docker and Docker Compose (v2: `docker compose`).
@@ -27,6 +28,21 @@ need_cmd() {
   fi
 }
 
+confirm_remove() {
+  local target="$1"
+  local reply
+  while true; do
+    if ! read -r -p "Remove $target? [y/N] " reply </dev/tty; then
+      reply=""
+    fi
+    case "$reply" in
+      [yY]|[yY][eE][sS]) return 0 ;;
+      ""|[nN]|[nN][oO]) return 1 ;;
+      *) echo "Please answer y or n." ;;
+    esac
+  done
+}
+
 ensure_compose() {
   # Prefer `docker compose` (v2). Fall back to `docker-compose` (v1) if available.
   if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
@@ -35,6 +51,89 @@ ensure_compose() {
     echo "docker-compose"
   else
     error "Neither 'docker compose' nor 'docker-compose' is available."; exit 127
+  fi
+}
+
+remove_local_configs() {
+  local removed=false
+
+  for env_file in ".env" "dev/.env" "docker/.env" "dev/isduba/docker/.env"; do
+    if [[ -f "$env_file" ]]; then
+      if confirm_remove "$env_file"; then
+        info "Removing local env file: $env_file"
+        rm -f "$env_file"
+        removed=true
+      else
+        info "Keeping: $env_file"
+      fi
+    fi
+  done
+
+  if [[ -d "assets/plugin_configs/data_source/asset" ]]; then
+    while IFS= read -r -d '' file; do
+      if confirm_remove "$file"; then
+        info "Removing local plugin config: $file"
+        rm -f "$file"
+        removed=true
+      else
+        info "Keeping: $file"
+      fi
+    done < <(find assets/plugin_configs/data_source/asset -maxdepth 1 -type f -name "*.toml" -print0)
+  fi
+
+  if [[ -d "assets/plugin_configs/data_source/csaf" ]]; then
+    while IFS= read -r -d '' file; do
+      if confirm_remove "$file"; then
+        info "Removing local plugin config: $file"
+        rm -f "$file"
+        removed=true
+      else
+        info "Keeping: $file"
+      fi
+    done < <(find assets/plugin_configs/data_source/csaf -maxdepth 1 -type f -name "*.toml" -print0)
+  fi
+
+  if [[ "$removed" == false ]]; then
+    info "No local env or plugin TOML files found to remove."
+  fi
+}
+
+remove_plugins_config() {
+  local plugins_file="dev/configuration/plugins.py"
+  if [[ -f "$plugins_file" ]]; then
+    if confirm_remove "$plugins_file"; then
+      info "Removing local plugins configuration: $plugins_file"
+      rm -f "$plugins_file"
+    else
+      info "Keeping: $plugins_file"
+    fi
+  else
+    info "Plugins configuration file not found at $plugins_file"
+  fi
+}
+
+copy_example_if_missing() {
+  local example_file="$1"
+  local target_file="$2"
+  if [[ -f "$example_file" && ! -f "$target_file" ]]; then
+    info "Copying $example_file to $target_file"
+    cp -f "$example_file" "$target_file"
+  fi
+}
+
+ensure_local_configs() {
+  copy_example_if_missing ".env.example" ".env"
+  copy_example_if_missing "dev/.env.example" "dev/.env"
+  copy_example_if_missing "docker/.env.example" "docker/.env"
+  copy_example_if_missing "dev/isduba/docker/.env.example" "dev/isduba/docker/.env"
+  copy_example_if_missing "dev/configuration/plugins.py.example" "dev/configuration/plugins.py"
+}
+
+prune_project_images() {
+  local compose_file="$1"
+  if [[ -f "$compose_file" ]]; then
+    info "Removing local images for $compose_file..."
+    $COMPOSE_CMD -f "$compose_file" down --rmi local --remove-orphans || true
   fi
 }
 
@@ -89,15 +188,19 @@ main() {
       --recreate)
         ACTION="recreate"
         ;;
+      --clean)
+        ACTION="clean"
+        ;;
       --volumes|-v)
         WITH_VOLUMES=true
         ;;
       --help|-h)
         cat >&2 <<USAGE
-Usage: $0 [--recreate|--down] [--volumes]
+Usage: $0 [--recreate|--down|--clean] [--volumes]
 
   --down                 Stop and remove services
   --recreate             Recreate containers (like: up -d --force-recreate --remove-orphans)
+  --clean                Remove local images and delete local env/plugin configs
   --volumes, -v          When used with --down or --recreate: also delete named volumes
 
 Notes:
@@ -107,7 +210,7 @@ USAGE
         ;;
       *)
         echo "Unknown option: $1" >&2
-        echo "Usage: $0 [--recreate|--down] [--volumes]" >&2
+        echo "Usage: $0 [--recreate|--down|--clean] [--volumes]" >&2
         exit 2
         ;;
     esac
@@ -119,9 +222,25 @@ USAGE
     error "--volumes is only supported with --down or --recreate"
     exit 2
   fi
+  if [[ "$ACTION" == "clean" && "$WITH_VOLUMES" == true ]]; then
+    error "--volumes is not supported with --clean"
+    exit 2
+  fi
+
+  if [[ "$ACTION" == "up" || "$ACTION" == "recreate" ]]; then
+    ensure_local_configs
+  fi
 
   # Execute action
   case "$ACTION" in
+    clean)
+      info "Cleaning local development environment..."
+      prune_project_images "$COMPOSE_FILE"
+      remove_local_configs
+      remove_plugins_config
+      info "Clean complete."
+      exit 0
+      ;;
     down)
       if [[ "$WITH_VOLUMES" == true ]]; then
         info "Stopping and removing dev environment and named volumes..."
