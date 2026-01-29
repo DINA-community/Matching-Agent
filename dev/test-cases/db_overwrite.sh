@@ -1,23 +1,31 @@
 #!/bin/bash
 
 # Check if an argument was provided
-if [ -z "$1" ]; then
-    echo "Please provide ad database. Usage: $0 <new db>"
-    exit 1
+if [[ -z "$1" ]]; then
+  echo "Please provide ad database. Usage: $0 <new db>"
+  exit 1
 fi
 
-if [ -n "$2" ]; then
-    confirm="$2"
+if [[ "$(dirname "$1")" == "." ]]; then
+  echo "It seems you provided a filename: $1"
+  if [[ -f "$1" ]]; then
+    echo "File was found in the folder: $1"
+  else
+    echo "However, it is not in the folder"
+  fi
 else
-    # Prompt the user if no second argument
-    echo "You provided file: $1"
-    read -r -p "The current database will be deleted. Do you want to proceed? [y/n]: " confirm
+  echo "Please provide a database in the folder of the script."
+  exit 1
 fi
+
+echo "You provided file: $1"
+read -r -p "The current database will be deleted. Do you want to proceed? [y/n]: " confirm
+
 
 case "${confirm,,}" in
-    y|yes) echo "Continuing...";;
-    n|no)  echo "Aborting."; exit 1;;
-    *)     echo "Invalid response. Please answer y or n."; exit 1;;
+    [yY]|[yY][eE][sS]) echo "Let replace some data...";;
+    ""|[nN]|[nN][oO]) echo "Aborting"; exit 1;;
+    *) echo "Please answer y or n." ;;
 esac
 
 full_container=$(docker ps -a --format "{{.Names}}" | grep -i postgres-1 | head -n1)
