@@ -29,6 +29,7 @@ Prerequisites
       uv run csaf_matcher_cli user create -u admin
 
    Notes:
+
    - If the user already exists, this will be logged.
    - Passwords are hashed server‑side using the project’s configured algorithm.
    - For interactive use, do not pass passwords via ``-p/--password``. The CLI will securely prompt.

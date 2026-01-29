@@ -15,6 +15,7 @@ help:
 
 clean:
 	rm -rf "$(BUILDDIR)"
+	rm -rf "$(SOURCEDIR)/_autosummary"
 
 docs:
 	@$(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)

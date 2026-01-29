@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
+from sphinx.application import Sphinx
 
 # -- Path setup --------------------------------------------------------------
 # Add the project src directory to sys.path so autodoc can import the code.
@@ -59,7 +60,24 @@ extensions = [
     "sphinx.ext.autosummary",
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
+    "sphinx.ext.intersphinx",
+    "sphinxcontrib.programoutput",
 ]
+
+# Allow using :paramref: roles for SQLAlchemy
+
+
+def setup(app: Sphinx):
+    app.add_role(
+        "paramref",
+        lambda name, rawtext, text, lineno, inliner, options={}, content=[]: ([], []),
+    )
+
+
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+    "sqlalchemy": ("https://docs.sqlalchemy.org/en/20/", None),
+}
 
 autosummary_generate = True
 napoleon_google_docstring = True
