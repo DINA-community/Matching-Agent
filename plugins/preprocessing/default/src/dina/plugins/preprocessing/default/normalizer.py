@@ -23,6 +23,11 @@ class Standards(enum.Enum):
 
 class Normalizer:
     def __init__(self, config: dict):
+        if not config:
+            raise ValueError(
+                "Normalizer requires config (matching_config.toml), got empty config"
+            )
+
         db = config.get("database", {})
         self.freetext_fields_separator = db.get("freetext_fields_separator", ":")
 
@@ -112,7 +117,19 @@ class Normalizer:
                 if i < len(parts):
                     d[field] = parts[i] if parts[i] else None
 
-            d["raw"] = "cpe:2.3:" + ":".join(d.get(f, "*") or "*" for f in fields)
+            if d["version"]:
+                d["version"] = self.parse_version(d["version"])
+
+            raw = ["cpe:2.3"]
+            for f in fields:
+                if f == "version":
+                    version = d.get(f, "*")
+
+                    if version and isinstance(version, dict):
+                        raw.append(version.get("raw", "*") or "*")
+                else:
+                    raw.append(d.get(f, "*") or "*")
+            d["raw"] = ":".join(raw)
 
         elif cpe.startswith("cpe:/"):
             parts_raw = cpe.split(":")
@@ -193,7 +210,7 @@ class Normalizer:
                 d[key] = None
 
         if not d.get("qualifiers"):
-            d["qualifiers"] = {}
+            d["qualifiers"] = None
 
         return d
 
@@ -534,7 +551,7 @@ class Normalizer:
         d["release_prefix"] = "v"
         d["release_number"] = major
         d["release_branch"] = minor
-        d["qualifier"] = ["sp", sp] if sp else [None, None]
+        d["qualifier"] = ["sp", sp] if sp else None
         d["build_number"] = f"upd{upd}" if upd else None
 
         normalized_version = f"{major}.{minor}.{sp}.{upd}"
@@ -606,7 +623,7 @@ class Normalizer:
         d["release_prefix"] = "r"
         d["release_number"] = rel
         d["release_branch"] = branch
-        d["qualifier"] = [qtype.upper(), int(qnum)] if qtype and qnum else [None, None]
+        d["qualifier"] = [qtype.upper(), int(qnum)] if qtype and qnum else None
 
         norm = f"{rel}.{branch}.{qnum}" if qnum else f"{rel}.{branch}"
 
@@ -630,7 +647,7 @@ class Normalizer:
 
         d = self._base_dict(Standards.PEP440.value, expr)
         d["release_number"] = base
-        d["qualifier"] = [None, None]
+        d["qualifier"] = None
 
         if pre_tag and pre_num:
             d["qualifier"] = [pre_tag, int(pre_num)]
@@ -753,12 +770,15 @@ class Normalizer:
 #             case Standards.DEB:
 #                 print(normalizer._parse_deb(ex))
 #             case _:
-#                 print(normalizer.parse_freetext(ex))
+#                 print(normalizer._parse_version_freetext(ex))
+#         print("\n")
 
 #     # print(normalizer.parse_cpe("cpe:/a:redhat:rhel_eus:8.1::appstream"))
 #     # print(normalizer.parse_cpe("cpe:/a:redhat:jboss_fuse:6.3"))
 #     # print(normalizer.parse_cpe("cpe:2.3:a:versa-networks:versa_director:22.1.4:2024-11-11_Hot_Fix:*:*:*:*:*:*"))
+#     # print(normalizer.parse_cpe("cpe:/a:example:software:1.0.0"))
 
+#     # print(normalizer.parse_purl("pkg:generic/example@1.0.0"))
 #     # print(normalizer.parse_purl("pkg:npm/angular/animation@12.3.1"))
 #     # print(normalizer.parse_purl("pkg:deb/debian/curl@7.50.3-1?arch=i386&distro=jessie"))
 #     # print(normalizer.parse_purl("pkg:rpm/redhat/openssl"))
