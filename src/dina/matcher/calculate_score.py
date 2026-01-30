@@ -10,6 +10,11 @@ logger = get_logger(__name__)
 
 class Score:
     def __init__(self, matching_config: dict):
+        if not matching_config:
+            raise ValueError(
+                "Score requires config (matching_config.toml), got empty config"
+            )
+
         db = matching_config.get("database", {})
         self.freetext_fields_separator = db.get("freetext_fields_separator", ":")
 
