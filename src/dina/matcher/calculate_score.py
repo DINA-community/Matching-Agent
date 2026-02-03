@@ -269,6 +269,7 @@ class Score:
                             f"No Match - Version Score is below {self.version_threshold}% ({version_score}%)",
                             score_percent,
                         )
+
                     return 1, "Match - Family Missing", score_percent
                 # Check if product name score is within a certain range and version and keyword scores exist
                 elif (
@@ -291,6 +292,12 @@ class Score:
                             "Possible match - version and keyword boost",
                             score_percent,
                         )
+
+                    return (
+                        0,
+                        f"No match - overall score is below {self.keyword_threshold}% ({overall_score}%)",
+                        score_percent,
+                    )
                 else:
                     return (
                         0,
@@ -317,12 +324,12 @@ class Score:
                             f"No Match - Version Score is below {self.version_threshold}% ({version_score}%)",
                             score_percent,
                         )
-                    else:
-                        return (
-                            1,
-                            "Match - Product Name and Family is given",
-                            score_percent,
-                        )
+
+                    return (
+                        1,
+                        "Match - Product Name and Family is given",
+                        score_percent,
+                    )
                 # Check if product name score is within a certain range and version and keyword scores exist
                 elif (
                     (self.product_name_threshold - 20)
@@ -344,6 +351,12 @@ class Score:
                             "Possible match - version and keyword boost",
                             score_percent,
                         )
+
+                    return (
+                        0,
+                        f"No match: overall score is below {self.keyword_threshold}% ({overall_score}%)",
+                        score_percent,
+                    )
                 else:
                     return (
                         0,
@@ -357,7 +370,7 @@ class Score:
                     score_percent,
                 )
         # Check if vendor score is below threshold
-        elif vendor_score <= self.vendor_threshold:
+        elif vendor_score < self.vendor_threshold:
             return (
                 0,
                 f"No match: Vendor score is below {self.vendor_threshold}% ({vendor_score}%)",
