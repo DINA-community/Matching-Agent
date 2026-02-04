@@ -92,6 +92,7 @@ Subcommands:
 
 2) Matches
    - ``matcher matches list`` — List matches with optional filters.
+
      Options:
      - ``--limit INT`` (default: 100)
      - ``--offset INT`` (default: 0)
@@ -124,6 +125,7 @@ Subcommands:
 
 3) Task control
    - ``matcher task start`` — Start a matching task. Optional filters:
+   
      - ``--assets INT [INT ...]`` — restrict to specific asset IDs
      - ``--csaf-products INT [INT ...]`` — restrict to specific CSAF product IDs
 

@@ -31,8 +31,7 @@ Prerequisites
    Notes:
    - If the user already exists, this will be logged.
    - Passwords are hashed server‑side using the project’s configured algorithm.
-   - For interactive use, do not pass passwords via ``-p/--password``. The CLI will securely prompt.
-     Reserve ``-p`` for non‑interactive environments (e.g., CI) and source secrets securely.
+   - For interactive use, do not pass passwords via ``-p/--password``. The CLI will securely prompt. Reserve ``-p`` for non‑interactive environments (e.g., CI) and source secrets securely.
 
 Obtain an access token
 ----------------------

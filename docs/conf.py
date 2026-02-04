@@ -83,3 +83,6 @@ html_theme = os.getenv("SPHINX_HTML_THEME", "furo")
 html_title = f"{project} {release} documentation"
 
 templates_path = ["_templates"]
+
+numfig = True
+numfig_format = {"figure": "Figure %s", "table": "Table %s"}
