@@ -314,6 +314,8 @@ class BaseSynchronizer(ABC):
                         )
                     )
                 await self.cache_db.store(data, mapped_relations)
+                if data or mapped_relations:
+                    await self.cache_db.add_matcher_trigger()
             else:
                 await asyncio.sleep(0.1)
 
