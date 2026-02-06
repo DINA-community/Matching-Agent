@@ -1,9 +1,10 @@
 import asyncio
 import time
-from datetime import timezone, datetime
-from typing import List, Any
+from datetime import datetime, timezone
+from typing import Any, List
 
 import httpx
+from fastapi.routing import APIRouter
 from pydantic import BaseModel, HttpUrl
 from sqlalchemy import Integer
 
@@ -11,9 +12,9 @@ from dina.cachedb.fetcher_view import FetcherView
 from dina.cachedb.model import (
     Asset,
     CsafProduct,
+    Match,
     Product,
     ProductType,
-    Match,
 )
 from dina.common import log
 from dina.plugins.datasource.netbox.generated.api_client import AuthenticatedClient
@@ -23,14 +24,14 @@ from dina.plugins.datasource.netbox.generated.api_client.api.dcim import (
     dcim_manufacturers_list,
 )
 from dina.plugins.datasource.netbox.generated.api_client.api.plugins import (
+    plugins_csaf_csafmatch_list_create,
     plugins_d3c_productrelationship_list_list,
     plugins_d3c_software_list_list,
-    plugins_csaf_csafmatch_list_create,
 )
 from dina.plugins.datasource.netbox.generated.api_client.errors import UnexpectedStatus
 from dina.plugins.datasource.netbox.generated.api_client.models import (
-    DeviceTypeCustomFields,
     CsafMatchRequest,
+    DeviceTypeCustomFields,
 )
 from dina.plugins.datasource.netbox.generated.api_client.types import UNSET
 from dina.synchronizer.plugin_base.data_source import (
@@ -71,6 +72,15 @@ class NetboxDataSource(DataSourcePlugin):
         logger.debug(
             f"Initialized NetboxDataSource with API URL: {self.config.DataSource.Plugin.api_url}"
         )
+
+    def add_push_route(
+        self,
+        route: APIRouter,
+        fetcher_view: FetcherView,
+        products: list[Asset | CsafProduct],
+        relationships: dict[HttpUrl, list[Relationship]],
+    ) -> None:
+        logger.warning("Pushing data is not supported by NetboxDataSource")
 
     async def fetch_products(
         self,

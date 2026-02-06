@@ -2,10 +2,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, List, Type
 
+from fastapi.routing import APIRouter
 from pydantic import BaseModel, HttpUrl
 
 from dina.cachedb.fetcher_view import FetcherView
-from dina.cachedb.model import Asset, CsafProduct, ProductType, Match
+from dina.cachedb.model import Asset, CsafProduct, Match, ProductType
 
 
 class DataSourceConfig(BaseModel):
@@ -100,6 +101,21 @@ class DataSourcePlugin(ABC):
         """Return a plugin-specific URI for a given origin_info."""
         path = self.build_resource_path(origin_info).lstrip("/")
         return str(self.origin_uri) + path
+
+    @abstractmethod
+    def add_push_route(
+        self,
+        route: APIRouter,
+        fetcher_view: FetcherView,
+        products: list[Asset | CsafProduct],
+        relationships: dict[HttpUrl, list[Relationship]],
+    ) -> None:
+        """Add an api route to receive push data from external sources.
+
+        The new products or relationships are pushed into the respective list/dict
+        which are then processed by the base synchronizer.
+        """
+        ...
 
     @abstractmethod
     async def fetch_products(self, fetcher_view: FetcherView) -> FetchProductsResult:

@@ -441,6 +441,7 @@ source = { editable = "plugins/asset_source/isduba" }
 dependencies = [
     { name = "aiohttp-retry" },
     { name = "dina-matcher" },
+    { name = "python-multipart" },
     { name = "urllib3" },
 ]
 
@@ -448,6 +449,7 @@ dependencies = [
 requires-dist = [
     { name = "aiohttp-retry" },
     { name = "dina-matcher", editable = "." },
+    { name = "python-multipart" },
     { name = "urllib3" },
 ]
 

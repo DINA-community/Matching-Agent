@@ -351,6 +351,16 @@ class BaseSynchronizer(ABC):
         task_route = APIRouter(
             prefix="/task", dependencies=[Depends(AccessChecker(self.cache_db))]
         )
+        push_route = APIRouter(
+            prefix="/push", dependencies=[Depends(AccessChecker(self.cache_db))]
+        )
+        for source in self.data_sources.values():
+            source.add_push_route(
+                push_route,
+                self.cache_db.fetcher_view(source.origin_uri),
+                self.pending_products,
+                self.pending_relationships,
+            )
 
         @api.post("/token")
         async def login_for_access_token(
@@ -397,6 +407,7 @@ class BaseSynchronizer(ABC):
             )
 
         api.include_router(task_route)
+        api.include_router(push_route)
 
         # TODO: Add security options
         config = uvicorn.Config(

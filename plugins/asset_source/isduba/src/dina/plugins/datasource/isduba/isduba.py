@@ -1,9 +1,11 @@
 import asyncio
 import concurrent.futures
 from datetime import datetime, timezone
-from typing import Any, List
+from typing import Any, List, Annotated
 
 import httpx
+from fastapi.params import Form
+from fastapi.routing import APIRouter
 from pydantic import BaseModel, HttpUrl
 from sqlalchemy import String, and_, cast
 
@@ -53,6 +55,20 @@ class IsdubaDataSource(DataSourcePlugin):
     def endpoint_info(self) -> str:
         """Return information about the data source endpoint."""
         return self.config.DataSource.Plugin.url
+
+    def add_push_route(
+        self,
+        route: APIRouter,
+        fetcher_view: FetcherView,
+        products: list[Asset | CsafProduct],
+        relationships: dict[HttpUrl, list[Relationship]],
+    ) -> None:
+        @route.post(f"/{str(self.origin_uri).replace('/', '_')}")
+        async def push(
+            advisory: Annotated[object, Form()],
+            validation_status: Annotated[str, Form()],
+        ):
+            logger.info(f"Received push data: {advisory}")
 
     async def fetch_products(self, fetcher_view: FetcherView) -> FetchProductsResult:
         """Fetch data from the data source and return it as a list of Assets or CsafDocuments."""
