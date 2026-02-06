@@ -138,6 +138,7 @@ class Matcher:
             tg.create_task(self.__matching_task(log_queue))
             tg.create_task(self.__log_task(log_queue))
             tg.create_task(self.__store_matches_task())
+            tg.create_task(self.__trigger_task())
 
     async def __log_task(self, log_queue: multiprocessing.Queue) -> None:
         while True:
@@ -244,6 +245,23 @@ class Matcher:
                                 matches
                             )
             await asyncio.sleep(0.1)
+
+    async def __trigger_task(self):
+        last_trigger_id = 0
+        while True:
+            try:
+                triggers = await self.__cache_db.consume_matcher_triggers(
+                    last_id=last_trigger_id
+                )
+                if triggers:
+                    last_trigger_id = triggers[-1].id
+                    if not self.__matching_tasks:
+                        self.__matching_tasks.append(
+                            MatchingTask(assets=[], csaf_documents=[])
+                        )
+            except Exception as e:
+                logger.error(f"Error consuming matcher triggers: {e}", exc_info=True)
+            await asyncio.sleep(0.5)
 
     async def __serve_api(self):
         api = FastAPI(root_path="/matcher")

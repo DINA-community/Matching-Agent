@@ -39,6 +39,7 @@ def fake_cache_db():
     cache = MagicMock()
     cache.fetcher_view.return_value = MagicMock()
     cache.store = AsyncMock()
+    cache.add_matcher_trigger = AsyncMock()
     cache.run_cleanup_for_plugin = AsyncMock()
     cache.authenticate_user = AsyncMock(return_value=MagicMock(username="user"))
     return cache

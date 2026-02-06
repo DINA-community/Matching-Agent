@@ -26,6 +26,7 @@ from dina.cachedb.model import (
     Base,
     CsafProduct,
     Match,
+    MatcherTrigger,
     Product,
     SynchronizerMetadata,
     User,
@@ -500,6 +501,34 @@ class CacheDB:
                     .values([match.to_dict() for match in matches])
                 )
                 return (await session.execute(stmt)).scalars().all()
+
+    async def add_matcher_trigger(self, origin_uri: HttpUrl | None = None) -> None:
+        if self.engine is None:
+            raise Exception("Database not connected")
+        async with AsyncSession(self.engine) as session:
+            async with session.begin():
+                session.add(
+                    MatcherTrigger(origin_uri=str(origin_uri) if origin_uri else None)
+                )
+
+    async def consume_matcher_triggers(self, last_id: int = 0) -> list[MatcherTrigger]:
+        if self.engine is None:
+            raise Exception("Database not connected")
+        async with AsyncSession(self.engine) as session:
+            async with session.begin():
+                stmt = (
+                    select(MatcherTrigger)
+                    .where(MatcherTrigger.id > last_id)
+                    .order_by(MatcherTrigger.id)
+                )
+                triggers = (await session.execute(stmt)).scalars().all()
+                if triggers:
+                    await session.execute(
+                        delete(MatcherTrigger).where(
+                            MatcherTrigger.id <= triggers[-1].id
+                        )
+                    )
+                return triggers
 
     async def get_matches(
         self,

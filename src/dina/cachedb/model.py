@@ -85,6 +85,15 @@ class SynchronizerMetadata(Base):
     )
 
 
+class MatcherTrigger(Base):
+    __tablename__ = "matcher_trigger"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    origin_uri: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[float] = mapped_column(
+        Float, default=lambda: datetime.datetime.now().timestamp()
+    )
+
+
 class ProductType(enum.Enum):
     Software = "Software"
     Device = "Device"
