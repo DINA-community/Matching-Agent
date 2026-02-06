@@ -52,6 +52,11 @@ class MatcherStatus(BaseModel):
     state: MatchingState
     start: float | None = None
     last_matching: float | None = None
+    total_match_runs: int = 0
+    total_pairs_processed: int = 0
+    total_matches_found: int = 0
+    pending_tasks: int = 0
+    pending_match_batches: int = 0
 
 
 class MatchingTask(BaseModel):
@@ -111,6 +116,9 @@ class Matcher:
         self.__matching_state: MatchingState = MatchingState.STOPPED
         self.__matching_start_time: float | None = None
         self.__last_publish: float | None = None
+        self.__total_match_runs: int = 0
+        self.__total_pairs_processed: int = 0
+        self.__total_matches_found: int = 0
         self.__data_source_plugins = load_datasource_plugins(
             Path(self.__config.Matcher.asset_plugins_path)
         )
@@ -162,6 +170,7 @@ class Matcher:
                     logger.info(f"Starting matching task: {task}")
                     self.__matching_state = MatchingState.RUNNING
                     self.__matching_start_time = time.time()
+                    self.__total_match_runs += 1
                     parallel_tasks = []
                     num_processes = multiprocessing.cpu_count()
                     with concurrent.futures.ProcessPoolExecutor() as pool:
@@ -173,6 +182,7 @@ class Matcher:
                                 break
                             if not batch:
                                 continue
+                            self.__total_pairs_processed += len(batch)
                             while self.__matches.qsize() > num_processes * 2:
                                 await asyncio.sleep(0.1)
                             parallel_tasks.append(
@@ -212,6 +222,7 @@ class Matcher:
                         f"Storing {len(matches_batch)} matches. ~{self.__matches.qsize()} batches remaining."
                     )
                     tasks.append(self.__cache_db.store_matches(matches_batch))
+                    self.__total_matches_found += len(matches_batch)
                 except Empty:
                     pass
             if tasks:
@@ -368,6 +379,11 @@ class Matcher:
                 state=self.__matching_state,
                 start=self.__matching_start_time,
                 last_matching=self.__last_matching,
+                total_match_runs=self.__total_match_runs,
+                total_pairs_processed=self.__total_pairs_processed,
+                total_matches_found=self.__total_matches_found,
+                pending_tasks=len(self.__matching_tasks),
+                pending_match_batches=self.__matches.qsize(),
             )
 
         @task_route.post("/stop")

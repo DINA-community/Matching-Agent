@@ -89,6 +89,10 @@ class BaseSynchronizer(ABC):
         self.__sync_start_time: float | None = None
         self.__sync_state: SynchronizerState = SynchronizerState.STOPPED
         self.__last_cleanup: float | None = None
+        self.__total_sync_runs: int = 0
+        self.__total_relationship_fetch_calls: int = 0
+        self.__total_products_fetched: int = 0
+        self.__total_relationships_fetched: int = 0
         self.__root_path: str = root_path
         self.cache_db: CacheDB = cache_db
         self.pending_products: list[Asset | CsafProduct] = []
@@ -225,6 +229,7 @@ class BaseSynchronizer(ABC):
                     self.__sync_start_time = datetime.datetime.now().timestamp()
                     fetcher_view = self.cache_db.fetcher_view(source.origin_uri)
                     self.__sync_state = SynchronizerState.RUNNING
+                    self.__total_sync_runs += 1
 
                     again = True
 
@@ -251,6 +256,7 @@ class BaseSynchronizer(ABC):
     async def fetch_products(self, fetcher_view: FetcherView, source: DataSourcePlugin):
         logger.debug(f"Fetching data from {source.debug_info()}")
         result = await source.fetch_products(fetcher_view)
+        self.__total_products_fetched += len(result.data)
         for datapoint in result.data:
             datapoint.origin_uri = str(source.origin_uri)
             self.pending_products.append(datapoint)
@@ -264,6 +270,8 @@ class BaseSynchronizer(ABC):
         while again:
             logger.debug(f"Fetching relationships from {source.debug_info()}")
             result = await source.fetch_relationships(fetcher_view)
+            self.__total_relationship_fetch_calls += 1
+            self.__total_relationships_fetched += len(result.data)
             self.pending_relationships[source.origin_uri].extend(result.data)
             again = result.again
 
@@ -369,10 +377,21 @@ class BaseSynchronizer(ABC):
 
         @task_route.get("/status")
         async def status() -> SynchronizerStatus:
+            pending_relationships = sum(
+                len(relations) for relations in self.pending_relationships.values()
+            )
             return SynchronizerStatus(
                 last_synchronization=self.__last_synchronization,
                 state=self.__sync_state,
                 start=self.__sync_start_time,
+                last_cleanup=self.__last_cleanup,
+                total_relationship_fetch_calls=self.__total_relationship_fetch_calls,
+                total_products_fetched=self.__total_products_fetched,
+                total_relationships_fetched=self.__total_relationships_fetched,
+                pending_products=len(self.pending_products),
+                pending_relationships=pending_relationships,
+                preprocessed_products=len(self.preprocessed_data),
+                data_sources=len(self.data_sources),
             )
 
         api.include_router(task_route)
@@ -459,3 +478,11 @@ class SynchronizerStatus(BaseModel):
     state: SynchronizerState
     start: float | None = None
     last_synchronization: float | None
+    last_cleanup: float | None = None
+    total_relationship_fetch_calls: int = 0
+    total_products_fetched: int = 0
+    total_relationships_fetched: int = 0
+    pending_products: int = 0
+    pending_relationships: int = 0
+    preprocessed_products: int = 0
+    data_sources: int = 0
