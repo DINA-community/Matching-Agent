@@ -61,22 +61,22 @@ need_env() {
   if [ ! -f "$ENV_FILE" ]; then
     if confirm_response "$ENV_FILE" "env" ; then
       if confirm_response "" "sync"; then
-        cp -p "$ENV_SAMPLE" "$ENV_FILE" || { echo "Failed to copy $ENV_SAMPLE to $ENV_FILE"; exit 127; }
+        cp -p "$ENV_SAMPLE" "$ENV_FILE" || { error "Failed to copy $ENV_SAMPLE to $ENV_FILE"; exit 127; }
         sed -i "s|^\($LOCAL_SETTING=\).*|\1true|" "$ENV_FILE"
-        echo "$ENV_FILE created from $ENV_SAMPLE"
+        info "$ENV_FILE created from $ENV_SAMPLE"
         # Remove # for plugin_settings in plugins.py
         set_plugin_config
         set_local_toml
       else
-        echo "Please do so. Exit"
+        info "Please do so. Exit"
         exit 1
       fi
     else
       if confirm_response "" "manual"; then
-        echo "Installation initiating..."
+        info "Installation initiating..."
         sleep 2
       else
-        echo "Installation stopped by user."
+        info "Installation stopped by user."
       fi
     fi
   fi

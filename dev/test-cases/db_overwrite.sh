@@ -9,7 +9,7 @@ fi
 if [[ "$(dirname "$1")" == "." ]]; then
   echo "It seems you provided a filename: $1"
   if [[ -f "$1" ]]; then
-    echo "File was found in the folder: $1"
+    echo "File was found in the folder"
   else
     echo "However, it is not in the folder"
   fi
@@ -23,8 +23,8 @@ read -r -p "The current database will be deleted. Do you want to proceed? [y/n]:
 
 
 case "${confirm,,}" in
-    [yY]|[yY][eE][sS]) echo "Let replace some data...";;
-    ""|[nN]|[nN][oO]) echo "Aborting"; exit 1;;
+    [yY]|[yY][eE][sS]) echo "Let's replace some data...";;
+    ""|[nN]|[nN][oO]) echo "Abort"; exit 1;;
     *) echo "Please answer y or n." ;;
 esac
 
