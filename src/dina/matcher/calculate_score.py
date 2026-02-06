@@ -1,3 +1,4 @@
+import json
 import numpy as np
 import polars as pl
 from polars.exceptions import ColumnNotFoundError
@@ -9,7 +10,14 @@ logger = get_logger(__name__)
 
 class Score:
     def __init__(self, matching_config: dict):
+        if not matching_config:
+            raise ValueError(
+                "Score requires config (matching_config.toml), got empty config"
+            )
+
         db = matching_config.get("database", {})
+        self.freetext_fields_separator = db.get("freetext_fields_separator", ":")
+
         freetext_fields = db.get("freetext_fields", {})
         ordered_fields = db.get("ordered_fields", {})
         other_fields = db.get("other_fields", {})
@@ -41,6 +49,16 @@ class Score:
 
         vendor_score = product_name_score = product_family_score = version_score = None
 
+        asset_name = self._get_clean_scalar(
+            df_norm, "asset_name", self.freetext_fields_separator
+        )
+        csaf_name = self._get_clean_scalar(
+            df_norm, "csaf_name", self.freetext_fields_separator
+        )
+
+        trace = []
+        trace.append(f"Matching: '{asset_name}' - '{csaf_name}'")
+
         # Extract base field matches
         for field, weight in (self.fields or {}).items():
             weights.append(weight)
@@ -68,20 +86,93 @@ class Score:
             score = self._compute_field_score(df_norm, field, v)
             scores.append(score)
 
-            # Keep for reporting
             if field == "manufacturer_name":
+                asset_vendor = self._get_clean_scalar(
+                    df_norm, "asset_manufacturer_name", self.freetext_fields_separator
+                )
+                csaf_vendor = self._get_clean_scalar(
+                    df_norm, "csaf_manufacturer_name", self.freetext_fields_separator
+                )
                 vendor_score = score * 100
+                trace.append(
+                    self._trace_line(
+                        asset_vendor,
+                        csaf_vendor,
+                        "vendor_score",
+                        vendor_score,
+                        self.vendor_threshold,
+                    )
+                )
             elif field == "name":
                 product_name_score = score * 100
+                trace.append(
+                    self._trace_line(
+                        asset_name,
+                        csaf_name,
+                        "product_name_score",
+                        product_name_score,
+                        self.product_name_threshold,
+                    )
+                )
             elif field == "device_family":
+                asset_family = self._get_clean_scalar(
+                    df_norm, "asset_device_family", self.freetext_fields_separator
+                )
+                csaf_family = self._get_clean_scalar(
+                    df_norm, "csaf_device_family", self.freetext_fields_separator
+                )
                 product_family_score = score * 100
+                trace.append(
+                    self._trace_line(
+                        asset_family,
+                        csaf_family,
+                        "product_family_score",
+                        product_family_score,
+                        self.product_family_threshold,
+                    )
+                )
             elif field == "version":
+                asset_version = self._get_clean_scalar(
+                    df_norm, "asset_version", self.freetext_fields_separator
+                )
+                csaf_version = self._get_clean_scalar(
+                    df_norm, "csaf_version", self.freetext_fields_separator
+                )
                 version_score = score * 100
+                trace.append(
+                    self._trace_line(
+                        asset_version,
+                        csaf_version,
+                        "version_score",
+                        version_score,
+                        self.version_threshold,
+                    )
+                )
             else:
-                keyword_scores.append(score * 100)
+                asset_keyword = self._get_clean_scalar(
+                    df_norm, "asset_" + field, self.freetext_fields_separator
+                )
+                csaf_keyword = self._get_clean_scalar(
+                    df_norm, "csaf_" + field, self.freetext_fields_separator
+                )
+                keyword_score = score * 100
+                trace.append(
+                    self._trace_line(
+                        asset_keyword,
+                        csaf_keyword,
+                        f"{field}_score",
+                        keyword_score,
+                        thr=None,
+                        note="(Keyword)",
+                    )
+                )
+                keyword_scores.append(keyword_score)
 
         # Compute combined weighted score
         keyword_score = np.mean(keyword_scores) if keyword_scores else None
+        trace.append(
+            f"  keyword_score result = {keyword_score} (>= {self.keyword_threshold})"
+        )
 
         if cpe_score == 1.0 or purl_score == 1.0:
             score_percent = 1.0
@@ -96,25 +187,9 @@ class Score:
                 else 0.0
             )
 
-        logger.trace(
-            "  vendor_score         = %s (>= %s)\n"
-            "  product_name_score   = %s (>= %s)\n"
-            "  product_family_score = %s (>= %s)\n"
-            "  version_score        = %s (>= %s)\n"
-            "  keyword_score        = %s (>= %s)\n"
-            "  final_score_percent  = %.2f",
-            fmt(vendor_score),
-            self.vendor_threshold,
-            fmt(product_name_score),
-            self.product_name_threshold,
-            fmt(product_family_score),
-            self.product_family_threshold,
-            fmt(version_score),
-            self.version_threshold,
-            fmt(keyword_score),
-            self.keyword_threshold,
-            score_percent,
-        )
+        trace.append(f"  final_score_percent = {score_percent}")
+        trace_result = "\n".join(trace) + "\n"
+        logger.trace(trace_result)
 
         return self._evaluate_thresholds(
             vendor_score,
@@ -194,6 +269,7 @@ class Score:
                             f"No Match - Version Score is below {self.version_threshold}% ({version_score}%)",
                             score_percent,
                         )
+
                     return 1, "Match - Family Missing", score_percent
                 # Check if product name score is within a certain range and version and keyword scores exist
                 elif (
@@ -216,6 +292,12 @@ class Score:
                             "Possible match - version and keyword boost",
                             score_percent,
                         )
+
+                    return (
+                        0,
+                        f"No match - overall score is below {self.keyword_threshold}% ({overall_score}%)",
+                        score_percent,
+                    )
                 else:
                     return (
                         0,
@@ -242,12 +324,12 @@ class Score:
                             f"No Match - Version Score is below {self.version_threshold}% ({version_score}%)",
                             score_percent,
                         )
-                    else:
-                        return (
-                            1,
-                            "Match - Product Name and Family is given",
-                            score_percent,
-                        )
+
+                    return (
+                        1,
+                        "Match - Product Name and Family is given",
+                        score_percent,
+                    )
                 # Check if product name score is within a certain range and version and keyword scores exist
                 elif (
                     (self.product_name_threshold - 20)
@@ -269,6 +351,12 @@ class Score:
                             "Possible match - version and keyword boost",
                             score_percent,
                         )
+
+                    return (
+                        0,
+                        f"No match: overall score is below {self.keyword_threshold}% ({overall_score}%)",
+                        score_percent,
+                    )
                 else:
                     return (
                         0,
@@ -282,7 +370,7 @@ class Score:
                     score_percent,
                 )
         # Check if vendor score is below threshold
-        elif vendor_score <= self.vendor_threshold:
+        elif vendor_score < self.vendor_threshold:
             return (
                 0,
                 f"No match: Vendor score is below {self.vendor_threshold}% ({vendor_score}%)",
@@ -290,6 +378,95 @@ class Score:
             )
         return 0, "Loop Error", score_percent
 
+    def _get_clean_scalar(
+        self, df: pl.DataFrame, col: str, sep: str, default: str = "None"
+    ) -> str:
+        """Return a single cleaned value from a Polars DataFrame column.
 
-def fmt(v):
-    return "None" if v is None else "{:.2f}".format(v)
+        - Expects `df` to contain at most one relevant row.
+        - If the column is missing, the DataFrame is empty, or the value is NULL, return `default`.
+        - If the value is a JSON object serialized as a string, extract the preferred field ("raw" or "name").
+        - Otherwise, replace the configured separator with a space for readable output/logging.
+        """
+
+        if col not in df.columns or df.height == 0:
+            return default
+
+        s = df.select(col).to_series()
+
+        if s.len() == 0:
+            return default
+
+        val = s.item()
+        if val is None:
+            return default
+
+        preferred = self._extract_raw_from_obj_string(val)
+
+        if preferred:
+            return str(preferred)
+
+        return str(val).replace(sep, " ")
+
+    def _extract_raw_from_obj_string(self, text: str):
+        """Try to parse a JSON object stored as a string and return its preferred display field.
+
+        Returns:
+            The value of "raw" or "name" if `text` is a JSON object string; otherwise None.
+        """
+
+        t = text.strip()
+
+        if not (t.startswith("{") and t.endswith("}")):
+            return None
+
+        try:
+            obj = json.loads(t)
+            if isinstance(obj, dict):
+                return obj.get("raw") or obj.get("name")
+        except Exception:
+            pass
+
+        return None
+
+    def _fmt(self, v):
+        """Format numeric values for trace output (two decimals) and keep None readable."""
+
+        return "None" if v is None else "{:.2f}".format(v)
+
+    def _clean(self, s: str | None) -> str:
+        """Normalize trace labels: handle None, trim whitespace, and strip surrounding quotes."""
+
+        if s is None:
+            return ""
+        return str(s).strip().strip("'\"")
+
+    def _trace_line(
+        self,
+        left: str,
+        right: str,
+        label: str,
+        score,
+        thr=None,
+        note=None,
+        left_w=28,
+        right_w=28,
+    ):
+        """Build one aligned trace line for debugging matching decisions.
+
+        - Cleans left/right strings for readable output.
+        - Aligns columns to fixed widths so multiple lines line up nicely.
+        - Optionally includes a threshold and a note suffix.
+        """
+
+        left = self._clean(left)
+        right = self._clean(right)
+
+        score_str = "None" if score is None else str(score)
+        if isinstance(score, (int, float)):
+            score_str = f"{score:6.2f}"
+
+        thr_str = f"(>= {thr})" if thr is not None else ""
+        note_str = f" {note}" if note else ""
+
+        return f"  '{left:<{left_w}}' x '{right:<{right_w}}' | {label:<20}= {score_str} {thr_str}{note_str}".rstrip()

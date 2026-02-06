@@ -16,6 +16,7 @@ Contents
    authentication
    api
    matcher-cli
+   matching-agent
    production-setup
 
 
