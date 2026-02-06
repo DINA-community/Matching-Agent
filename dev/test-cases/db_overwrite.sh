@@ -72,5 +72,12 @@ else
     fi
 fi
 
+# Remove netbox-setup so it can run a clean setup after import.
+if docker ps -a --format "{{.Names}}" | grep -Fxq "netbox-setup"; then
+    docker rm -f "netbox-setup"
+else
+    echo "netbox-setup container not found; skipping removal."
+fi
+
 
 # docker exec netbox python3 manage.py migrate
