@@ -32,3 +32,26 @@ Solutions
 
        uv pip install "polars[rtcompat]"
 
+Netbox Plugin: Document Titles Not Loading in Local Development
+----------------------------------------------------------------
+
+When using the Netbox plugin in the local development environment, you may notice that document titles from ISDUBA are not displayed correctly in the web UI, even though links are clickable.
+
+Root Cause
+~~~~~~~~~~
+
+This is a known limitation of the local development setup due to URL accessibility constraints:
+
+- The ISDUBA instance in the local Docker Compose environment can be reached via two different URLs:
+
+  - ``http://isduba.localhost`` (accessible from your browser)
+  - ``http://isduba-server`` (accessible from within the Docker network)
+
+- The Netbox plugin must use **one** URL configuration to fetch document titles and generate links
+- If configured with ``localhost``: Links work in the browser, but the Netbox container cannot fetch titles (it cannot resolve ``localhost`` to the ISDUBA container)
+- If configured with ``isduba``: The Netbox container can fetch titles, but links are not clickable from your browser (your browser cannot resolve the ``isduba`` hostname)
+
+Solution
+~~~~~~~~
+
+This is **not an issue in production environments**, where a single publicly accessible URL serves both purposes (e.g., ``https://isduba.example.com``).
