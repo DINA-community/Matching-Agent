@@ -234,12 +234,19 @@ class BaseSynchronizer(ABC):
                     again = True
 
                     while again:
+                        if self.__sync_state == SynchronizerState.STOP_REQUESTED:
+                            break
                         again = await self.fetch_products(fetcher_view, source)
+                        if self.__sync_state == SynchronizerState.STOP_REQUESTED:
+                            break
                         await self.fetch_relationships(fetcher_view, source)
 
-                    await fetcher_view.set_last_run(
-                        datetime.datetime.fromtimestamp(self.__sync_start_time)
-                    )
+                    if self.__sync_state != SynchronizerState.STOP_REQUESTED:
+                        # Only update last run time if the run completed.
+                        await fetcher_view.set_last_run(
+                            datetime.datetime.fromtimestamp(self.__sync_start_time)
+                        )
+
                 except Exception as e:
                     logger.error(
                         f"Error fetching data from {source.debug_info()}: {e}",
@@ -376,6 +383,11 @@ class BaseSynchronizer(ABC):
         async def sync():
             self.__last_synchronization = None
             return {}
+
+        @task_route.post("/stop")
+        async def stop():
+            logger.info("Stopping synchronization task")
+            self.__sync_state = SynchronizerState.STOP_REQUESTED
 
         @task_route.get("/status")
         async def status() -> SynchronizerStatus:
