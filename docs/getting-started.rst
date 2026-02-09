@@ -241,5 +241,24 @@ Plugin-specific tests
 ^^^^^^^^^^^^^^^^^^^^^
 
 Plugin tests are included automatically when the corresponding plugin is installed
-(e.g. via ``uv sync --extra <plugin>``).  
+(e.g. via ``uv sync --extra <plugin>``).
 If a plugin is not installed, its tests will be skipped.
+
+
+Testing with Coverage
+^^^^^^^^^^^^^^^^^^^^^
+
+To run tests with coverage reporting using ``pytest-cov``:
+
+.. code-block:: bash
+
+    uv run pytest --cov=dina --cov-report=html --cov-report=term
+
+This generates an HTML coverage report in ``htmlcov/`` and prints a summary to the terminal.
+
+**TL;DR**: Use ``--cov=<package>`` to measure coverage, and ``--cov-report=html`` or ``--cov-report=term`` to generate reports.
+
+For more information:
+
+- pytest documentation: https://docs.pytest.org/
+- pytest-cov documentation: https://pytest-cov.readthedocs.io/

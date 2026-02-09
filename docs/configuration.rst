@@ -13,7 +13,7 @@ environment variables are also used.
 .. _config-assetsync:
 
 Asset Synchronizer Configuration (assets/config.toml)
---------------------------------
+-----------------------------------------------------
 The Asset Synchronizer (assetsync) fetches asset/product data from configured data sources and stores
 them in the cache database. It uses the ``[Assetsync]`` section in ``assets/config.toml``.
 
@@ -98,7 +98,7 @@ Parameters
 .. _config-csafsync:
 
 CSAF Synchronizer Configuration (assets/config.toml)
---------------------------------
+----------------------------------------------------
 The CSAF Synchronizer (csafsync) fetches CSAF security advisories from configured data sources and
 stores them in the cache database. It uses the ``[Csafsync]`` section in ``assets/config.toml``.
 
@@ -140,7 +140,7 @@ The parameters are identical to the Asset Synchronizer configuration (see above)
 .. _config-matcher:
 
 Matcher Configuration (assets/config.toml)
----------------------
+------------------------------------------
 The Matcher service periodically matches assets against CSAF advisories to identify vulnerabilities.
 It uses the ``[Matcher]`` section in ``assets/config.toml``.
 
@@ -215,8 +215,8 @@ Parameters
   - ``backup_count`` (int, optional): How many rotated files to keep. Default 5.
 
 
-Plugin Configuration Files (assets/plugin_configs/**)
------------------------------------------------------
+Plugin Configuration Files (assets/plugin_configs/...)
+------------------------------------------------------
 Data source and preprocessor plugins have their own configuration files. Each data source config file
 is a TOML document with a top-level ``[DataSource]`` section and a ``[DataSource.Plugin]`` section.
 Container images include a copy under ``docker/assets/plugin_configs`` with the same structure.
