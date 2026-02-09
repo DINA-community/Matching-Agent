@@ -151,6 +151,8 @@ It uses the ``[Matcher]`` section in ``assets/config.toml``.
    sync_interval = 60
    # OR: Fixed time of day scheduling (mutually exclusive with sync_interval)
    # fixed_time_of_day = "02:30"  # Format: "HH:MM" in 24-hour format
+   # Maximum duration in seconds for a matching run (optional)
+   # max_duration = 3600  # Stop matching after 1 hour
    match_threshold = 0
    asset_plugins_path = "./assets/plugin_configs/data_source/asset"
    csaf_plugins_path = "./assets/plugin_configs/data_source/csaf"
@@ -189,6 +191,10 @@ Parameters
     matching at this frequency.
   - ``fixed_time_of_day`` (str "HH:MM", mutually exclusive with sync_interval): Fixed time of day in
     24-hour format when matching should run daily. Example: ``"02:30"`` for 2:30 AM.
+  - ``max_duration`` (int, optional): Maximum duration in seconds for a matching run. When set, the matching
+    process will gracefully stop after this duration has elapsed, preserving all matches found up to that point.
+    This is useful for preventing excessively long matching runs. If not set, matching runs until all pairs
+    are processed. Example: ``3600`` limits matching to 1 hour.
   - ``match_threshold`` (float, required): Minimum score to keep a match (0 keeps all matches).
   - ``asset_plugins_path`` (str path, required): Directory containing asset data source plugin
     configurations. Used to determine which asset sources are active.

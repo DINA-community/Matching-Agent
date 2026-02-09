@@ -206,8 +206,22 @@ class Matcher:
                         async for batch in self.__cache_db.fetch_pairs_batches(
                             task.assets, task.csaf_documents, batch_size_sqrt=20
                         ):
+                            # Check for stop request
                             if self.__matching_state == MatchingState.STOP_REQUESTED:
+                                logger.info("Stop requested, stopping matching task")
                                 break
+
+                            # Check for max duration timeout
+                            if self.__config.Matcher.max_duration is not None:
+                                elapsed = time.time() - self.__matching_start_time
+                                if elapsed >= self.__config.Matcher.max_duration:
+                                    logger.warning(
+                                        f"Matching task exceeded max_duration of {self.__config.Matcher.max_duration}s "
+                                        f"(elapsed: {elapsed:.1f}s). Stopping matching."
+                                    )
+                                    self.__matching_state = MatchingState.STOP_REQUESTED
+                                    break
+
                             if not batch:
                                 continue
                             self.__total_pairs_processed += len(batch)

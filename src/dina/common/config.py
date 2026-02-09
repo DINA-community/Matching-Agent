@@ -34,6 +34,7 @@ class ApiConfig(BaseModel):
 class MatcherConfig(BaseModel):
     sync_interval: int | None = None
     fixed_time_of_day: str | None = None  # Format: "HH:MM" in 24-hour format
+    max_duration: int | None = None  # Maximum duration in seconds for a matching run
     match_threshold: float
     Api: ApiConfig
     asset_plugins_path: Path

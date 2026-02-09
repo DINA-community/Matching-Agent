@@ -170,6 +170,8 @@ password = "secret"
 sync_interval = 86400
 # OR: Run at a fixed time of day (mutually exclusive with sync_interval)
 # fixed_time_of_day = "02:30"  # Format: "HH:MM" in 24-hour format
+# Maximum duration in seconds for a matching run (optional)
+# max_duration = 3600  # Stop matching after 1 hour
 # Threshold for showing matches
 match_threshold = 0
 # Path to asset data source plugin configs used for the assetsync
@@ -231,6 +233,7 @@ Both the Matcher and Synchronizers support two mutually exclusive scheduling mod
 #### Configuration Options
 
 - `Matcher.sync_interval` or `Matcher.fixed_time_of_day`: When to run matching cycles.
+- `Matcher.max_duration`: (Optional) Maximum duration in seconds for a matching run. If set, the matching process will gracefully stop after this duration, preserving all matches found up to that point. Useful for preventing excessively long matching runs.
 - `Matcher.match_threshold`: Value for showing possible matches
 - `Matcher.asset_plugins_path`: Path to the directory containing asset-specific plugin configuration files.
 - `Matcher.csaf_plugins_path`: Path to the directory containing CSAF-specific plugin configuration files.
