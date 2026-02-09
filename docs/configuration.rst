@@ -27,7 +27,10 @@ them in the cache database. It uses the ``[Assetsync]`` section in ``assets/conf
    password = "secret"
 
    [Assetsync.Synchronizer]
+   # Interval-based scheduling (mutually exclusive with fixed_time_of_day)
    sync_interval = 3600
+   # OR: Fixed time of day scheduling (mutually exclusive with sync_interval)
+   # fixed_time_of_day = "03:00"  # Format: "HH:MM" in 24-hour format
    plugin_configs_path = "./assets/plugin_configs/data_source/asset"
    preprocessor_plugins = ["identity"]
    cleanup_interval = 86400
@@ -38,13 +41,30 @@ them in the cache database. It uses the ``[Assetsync]`` section in ``assets/conf
    port = 8992
    access_token_expire_minutes = 10
 
+Scheduling Configuration
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The Asset Synchronizer supports two mutually exclusive scheduling modes:
+
+**Interval-based scheduling** (default):
+  Run synchronization at regular intervals. The next run begins after the specified number of seconds have
+  elapsed since the previous run completed.
+
+**Fixed time of day scheduling**:
+  Run synchronization once per day at a specific time (e.g., during off-peak hours).
+
+**Important**: You must specify exactly one scheduling option. Using both or neither will result in a
+validation error when the service starts.
+
 Parameters
 ~~~~~~~~~~
 
 - ``[Assetsync.Synchronizer]`` section:
 
-  - ``sync_interval`` (int, required): Interval in seconds between synchronization runs. Assets are fetched
-    from all configured data sources at this frequency.
+  - ``sync_interval`` (int, mutually exclusive with fixed_time_of_day): Interval in seconds between
+    synchronization runs. Assets are fetched from all configured data sources at this frequency.
+  - ``fixed_time_of_day`` (str "HH:MM", mutually exclusive with sync_interval): Fixed time of day in
+    24-hour format when synchronization should run daily. Example: ``"03:00"`` for 3:00 AM.
   - ``plugin_configs_path`` (str path, required): Directory containing asset data source plugin
     configuration files (e.g., ``netbox.toml``).
   - ``preprocessor_plugins`` (list[str], required): List of preprocessor plugin names to apply transformations
@@ -85,7 +105,10 @@ stores them in the cache database. It uses the ``[Csafsync]`` section in ``asset
 .. code-block:: toml
 
    [Csafsync.Synchronizer]
+   # Interval-based scheduling (mutually exclusive with fixed_time_of_day)
    sync_interval = 3600
+   # OR: Fixed time of day scheduling (mutually exclusive with sync_interval)
+   # fixed_time_of_day = "03:00"  # Format: "HH:MM" in 24-hour format
    plugin_configs_path = "./assets/plugin_configs/data_source/csaf"
    preprocessor_plugins = []
    cleanup_interval = 86400
@@ -96,11 +119,18 @@ stores them in the cache database. It uses the ``[Csafsync]`` section in ``asset
    port = 8991
    access_token_expire_minutes = 10
 
+Scheduling Configuration
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The CSAF Synchronizer supports the same two mutually exclusive scheduling modes as the Asset Synchronizer
+(see above). You must specify exactly one of ``sync_interval`` or ``fixed_time_of_day``.
+
 Parameters
 ~~~~~~~~~~
 
 The parameters are identical to the Asset Synchronizer configuration (see above), except they are located under the ``[Csafsync]`` prefix:
 
+- ``sync_interval`` or ``fixed_time_of_day``: Same scheduling options as Asset Synchronizer.
 - ``plugin_configs_path`` points to CSAF data source configurations instead of asset sources.
 - ``port`` defaults to 8991 for the CSAF sync API.
 
@@ -117,7 +147,10 @@ It uses the ``[Matcher]`` section in ``assets/config.toml``.
 .. code-block:: toml
 
    [Matcher]
+   # Interval-based scheduling (mutually exclusive with fixed_time_of_day)
    sync_interval = 60
+   # OR: Fixed time of day scheduling (mutually exclusive with sync_interval)
+   # fixed_time_of_day = "02:30"  # Format: "HH:MM" in 24-hour format
    match_threshold = 0
    asset_plugins_path = "./assets/plugin_configs/data_source/asset"
    csaf_plugins_path = "./assets/plugin_configs/data_source/csaf"
@@ -127,13 +160,35 @@ It uses the ``[Matcher]`` section in ``assets/config.toml``.
    port = 8998
    access_token_expire_minutes = 10
 
+Scheduling Configuration
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The Matcher supports two mutually exclusive scheduling modes:
+
+**Interval-based scheduling** (default):
+  Run matching at regular intervals. The next run begins after the specified number of seconds have
+  elapsed since the previous run completed.
+
+**Fixed time of day scheduling**:
+  Run matching once per day at a specific time. This is useful for scheduling intensive matching
+  operations during off-peak hours.
+
+**Important**: You must specify exactly one scheduling option. Using both or neither will result in a
+validation error when the service starts.
+
+**Note**: The Matcher will still run immediately when triggered via the API (``POST /task/start``),
+regardless of the configured schedule.
+
 Parameters
 ~~~~~~~~~~
 
 - ``[Matcher]`` section:
 
-  - ``sync_interval`` (int, required): Interval in seconds between matching runs. The matcher queries the
-    cache database for assets and CSAF documents and performs matching at this frequency.
+  - ``sync_interval`` (int, mutually exclusive with fixed_time_of_day): Interval in seconds between
+    matching runs. The matcher queries the cache database for assets and CSAF documents and performs
+    matching at this frequency.
+  - ``fixed_time_of_day`` (str "HH:MM", mutually exclusive with sync_interval): Fixed time of day in
+    24-hour format when matching should run daily. Example: ``"02:30"`` for 2:30 AM.
   - ``match_threshold`` (float, required): Minimum score to keep a match (0 keeps all matches).
   - ``asset_plugins_path`` (str path, required): Directory containing asset data source plugin
     configurations. Used to determine which asset sources are active.

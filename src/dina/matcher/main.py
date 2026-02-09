@@ -154,14 +154,41 @@ class Matcher:
                     logger.handle(record)
                 await asyncio.sleep(0.01)
 
+    def __should_run_matching(self) -> bool:
+        """Determine if matching should run based on configured schedule."""
+        # Always run if there are explicit matching tasks queued
+        if len(self.__matching_tasks) > 0:
+            return True
+
+        if self.__last_matching is None:
+            return True
+
+        if self.__config.Matcher.sync_interval is not None:
+            # Interval-based scheduling
+            return (
+                self.__last_matching + self.__config.Matcher.sync_interval < time.time()
+            )
+        else:
+            # Fixed time of day scheduling
+            now = datetime.datetime.now()
+            hours, minutes = map(
+                int, self.__config.Matcher.fixed_time_of_day.split(":")
+            )
+            target_time = now.replace(
+                hour=hours, minute=minutes, second=0, microsecond=0
+            )
+
+            # If target time has passed today, set for tomorrow
+            if now > target_time:
+                target_time += datetime.timedelta(days=1)
+
+            # Check if last matching was before today's target time and we've passed it
+            last_match_dt = datetime.datetime.fromtimestamp(self.__last_matching)
+            return last_match_dt < target_time <= now
+
     async def __matching_task(self, log_queue: multiprocessing.Queue) -> None:
         while True:
-            if (
-                self.__last_matching is None
-                or self.__last_matching + self.__config.Matcher.sync_interval
-                < time.time()
-                or len(self.__matching_tasks) > 0
-            ):
+            if self.__should_run_matching():
                 try:
                     try:
                         task = self.__matching_tasks.pop()
