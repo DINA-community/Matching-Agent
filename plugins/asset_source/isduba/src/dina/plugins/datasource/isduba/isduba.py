@@ -1,8 +1,12 @@
 import asyncio
 import concurrent.futures
 from datetime import datetime, timezone
-from typing import Any, List, Annotated
 
+# import json
+from typing import Any, List, Annotated
+# import uuid
+
+# from fastapi import HTTPException
 import httpx
 from fastapi.params import Form
 from fastapi.routing import APIRouter
@@ -68,7 +72,89 @@ class IsdubaDataSource(DataSourcePlugin):
             advisory: Annotated[object, Form()],
             validation_status: Annotated[str, Form()],
         ):
-            logger.info(f"Received push data: {advisory}")
+            logger.info("Received push data")
+
+            # try:
+            #     advisory_obj: dict[str, Any] = json.loads(advisory)
+            # except json.JSONDecodeError as e:
+            #     raise HTTPException(status_code=400, detail=f"Invalid JSON in advisory: {e.msg}")
+
+            # document = advisory_obj.get("document", {})
+            # tracking = document.get("tracking", {})
+            # doc_id = tracking.get("id")
+
+            # if not doc_id:
+            #     raise HTTPException(status_code=400, detail="Missing document.tracking.id")
+
+            # product_tree = advisory_obj.get("product_tree", {})
+
+            # if not product_tree:
+            #     return []
+
+            # product_tree_clean = get_csaf_product_tree(
+            #     self.origin_uri,
+            #     uuid.uuid4().hex,
+            #     document,
+            #     product_tree,
+            # )
+
+            # if not product_tree_clean:
+            #     return []
+
+            # csaf_products: list[Asset | CsafProduct] = convert_into_database_format(product_tree_clean)
+            # existing_relationships: List[Relationship] = get_relationships(product_tree)
+
+            # for p in csaf_products:
+            #     p.origin_uri = str(self.origin_uri)
+
+            #     index = 0
+
+            #     for rel in existing_relationships:
+            #         index +=1
+
+            #         # TODO: relationships don't work
+            #         if index == 50:
+            #             break
+            #         doc_id_str = p.origin_info["path"]
+            #         product_ref = await fetcher_view.get_existing(
+            #             CsafProduct,
+            #             and_(
+            #                 cast(
+            #                     CsafProduct.origin_info[
+            #                         "product_name_id"
+            #                     ].astext,
+            #                     String,
+            #                 )
+            #                 == str(rel.product_reference),
+            #                 cast(CsafProduct.origin_info["path"].astext, String)
+            #                 == doc_id_str,
+            #             ),
+            #         )
+            #         relates_to_ref = await fetcher_view.get_existing(
+            #             CsafProduct,
+            #             and_(
+            #                 cast(
+            #                     CsafProduct.origin_info[
+            #                         "product_name_id"
+            #                     ].astext,
+            #                     String,
+            #                 )
+            #                 == str(rel.relates_to_product_reference),
+            #                 cast(CsafProduct.origin_info["path"].astext, String)
+            #                 == doc_id_str,
+            #             ),
+            #         )
+
+            #     if product_ref and relates_to_ref:
+            #         relationships[self.origin_uri].append(
+            #             Relationship(
+            #                 parent=product_ref[0],
+            #                 child=relates_to_ref[0],
+            #                 ty=CsafProduct,
+            #             )
+            #         )
+
+            # products.extend(csaf_products)
 
     async def fetch_products(self, fetcher_view: FetcherView) -> FetchProductsResult:
         """Fetch data from the data source and return it as a list of Assets or CsafDocuments."""
