@@ -23,7 +23,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, APIRouter
 from fastapi.params import Depends
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, HttpUrl, model_validator
 
 from dina.cachedb.database import CacheDB
 from dina.cachedb.fetcher_view import FetcherView
@@ -49,13 +49,39 @@ class ApiConfig(BaseModel):
 
 
 class SynchronizerSectionConfig(BaseModel):
-    sync_interval: int
+    sync_interval: int | None = None
+    fixed_time_of_day: str | None = None  # Format: "HH:MM" in 24-hour format
     preprocessor_plugins: list[str]
     plugin_configs_path: Path
     # Number of seconds before last_run to consider records stale for cleanup
     cleanup_grace_period: int
     # The cleanup procedure is executed every cleanup_interval seconds
     cleanup_interval: int
+
+    @model_validator(mode="after")
+    def validate_scheduling_config(self):
+        """Ensure sync_interval and fixed_time_of_day are mutually exclusive."""
+        if self.sync_interval is None and self.fixed_time_of_day is None:
+            raise ValueError(
+                "Either sync_interval or fixed_time_of_day must be specified"
+            )
+        if self.sync_interval is not None and self.fixed_time_of_day is not None:
+            raise ValueError(
+                "sync_interval and fixed_time_of_day are mutually exclusive"
+            )
+
+        # Validate time format if fixed_time_of_day is provided
+        if self.fixed_time_of_day is not None:
+            try:
+                hours, minutes = self.fixed_time_of_day.split(":")
+                h, m = int(hours), int(minutes)
+                if not (0 <= h <= 23 and 0 <= m <= 59):
+                    raise ValueError
+            except (ValueError, AttributeError):
+                raise ValueError(
+                    f"fixed_time_of_day must be in HH:MM format (24-hour), got: {self.fixed_time_of_day}"
+                )
+        return self
 
 
 class SynchronizerConfig(BaseModel):
@@ -218,13 +244,38 @@ class BaseSynchronizer(ABC):
             for e in eg.exceptions:
                 logger.error("TaskGroup exception:", exc_info=e)
 
+    def __should_run_sync(self) -> bool:
+        """Determine if synchronization should run based on configured schedule."""
+        if self.__last_synchronization is None:
+            return True
+
+        if self.config.Synchronizer.sync_interval is not None:
+            # Interval-based scheduling
+            return (
+                self.__last_synchronization + self.config.Synchronizer.sync_interval
+                < time.time()
+            )
+        else:
+            # Fixed time of day scheduling
+            now = datetime.datetime.now()
+            hours, minutes = map(
+                int, self.config.Synchronizer.fixed_time_of_day.split(":")
+            )
+            target_time = now.replace(
+                hour=hours, minute=minutes, second=0, microsecond=0
+            )
+
+            # If target time has passed today, set for tomorrow
+            if now > target_time:
+                target_time += datetime.timedelta(days=1)
+
+            # Check if last sync was before today's target time and we've passed it
+            last_sync_dt = datetime.datetime.fromtimestamp(self.__last_synchronization)
+            return last_sync_dt < target_time <= now
+
     async def fetch_data_task(self, source: DataSourcePlugin):
         while True:
-            if (
-                self.__last_synchronization is None
-                or self.__last_synchronization + self.config.Synchronizer.sync_interval
-                < time.time()
-            ):
+            if self.__should_run_sync():
                 try:
                     self.__sync_start_time = datetime.datetime.now().timestamp()
                     fetcher_view = self.cache_db.fetcher_view(source.origin_uri)
@@ -234,12 +285,19 @@ class BaseSynchronizer(ABC):
                     again = True
 
                     while again:
+                        if self.__sync_state == SynchronizerState.STOP_REQUESTED:
+                            break
                         again = await self.fetch_products(fetcher_view, source)
+                        if self.__sync_state == SynchronizerState.STOP_REQUESTED:
+                            break
                         await self.fetch_relationships(fetcher_view, source)
 
-                    await fetcher_view.set_last_run(
-                        datetime.datetime.fromtimestamp(self.__sync_start_time)
-                    )
+                    if self.__sync_state != SynchronizerState.STOP_REQUESTED:
+                        # Only update last run time if the run completed.
+                        await fetcher_view.set_last_run(
+                            datetime.datetime.fromtimestamp(self.__sync_start_time)
+                        )
+
                 except Exception as e:
                     logger.error(
                         f"Error fetching data from {source.debug_info()}: {e}",
@@ -376,6 +434,11 @@ class BaseSynchronizer(ABC):
         async def sync():
             self.__last_synchronization = None
             return {}
+
+        @task_route.post("/stop")
+        async def stop():
+            logger.info("Stopping synchronization task")
+            self.__sync_state = SynchronizerState.STOP_REQUESTED
 
         @task_route.get("/status")
         async def status() -> SynchronizerStatus:

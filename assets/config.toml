@@ -11,7 +11,10 @@ password = "secret"
 [Assetsync.Synchronizer]
 # Synchronization interval in seconds.
 # The synchronizer will perform a fetching task every X seconds.
+# Mutually exclusive with fixed_time_of_day.
 sync_interval = 86400
+# OR: Run at a fixed time of day (mutually exclusive with sync_interval)
+# fixed_time_of_day = "03:00"  # Format: "HH:MM" in 24-hour format
 # Path to the directory containing asset data source plugin configuration TOML files
 plugin_configs_path = "./assets/plugin_configs/data_source/asset/"
 # Number of seconds before last successful run; entries older than (last_run - cleanup_grace_period)
@@ -50,9 +53,12 @@ backup_count = 5
 # Csaf specific configuration
 
 [Csafsync.Synchronizer]
-# Synchronization inetrval in seconds.
+# Synchronization interval in seconds.
 # The synchronizer will perform a fetching task every X seconds.
+# Mutually exclusive with fixed_time_of_day.
 sync_interval = 86400
+# OR: Run at a fixed time of day (mutually exclusive with sync_interval)
+# fixed_time_of_day = "03:00"  # Format: "HH:MM" in 24-hour format
 # Path to the directory containing CSAF data source plugin configuration TOML files
 plugin_configs_path = "./assets/plugin_configs/data_source/csaf"
 # Number of seconds before last successful run; entries older than (last_run - cleanup_grace_period)
@@ -88,8 +94,13 @@ backup_count = 5
 
 
 [Matcher]
-# Seconds between matching runs
+# Seconds between matching runs (mutually exclusive with fixed_time_of_day)
 sync_interval = 86400
+# OR: Run at a fixed time of day (mutually exclusive with sync_interval)
+# fixed_time_of_day = "02:30"  # Format: "HH:MM" in 24-hour format
+# Maximum duration in seconds for a matching run (optional)
+# If set, matching will gracefully stop after this duration, preserving all matches found.
+# max_duration = 3600  # Stop matching after 1 hour
 # Threshold for showing matches
 match_threshold = 0
 # Path to asset data source plugin configs used for the assetsync
