@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import sys
 import tomllib
 from pathlib import Path
 from typing import Any, cast
@@ -12,6 +13,9 @@ from dina.common.log import configure_logging, get_logger
 configure_logging()
 
 logger = get_logger(__name__)
+
+if sys.platform.startswith("win"):
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
 class CLI:
