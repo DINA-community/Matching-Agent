@@ -1,4 +1,5 @@
 import json
+import re
 
 # from pathlib import Path
 # import tomllib
@@ -424,17 +425,19 @@ class Matching:
         Missing inclusive flags default to True.
         """
 
-        def _to_float(value):
+        def _to_int(value: str):
             try:
-                return float(value)
+                value = value.replace(".", "")
+                value = re.sub(r"[A-Za-z]", "", value)
+                return int(value)
             except (TypeError, ValueError):
                 return None
 
         # --- Extract numbers ---
-        a_min = _to_float(str(asset_range.get("min")).replace(".", ""))
-        a_max = _to_float(str(asset_range.get("max")).replace(".", ""))
-        c_min = _to_float(str(csaf_range.get("min")).replace(".", ""))
-        c_max = _to_float(str(csaf_range.get("max")).replace(".", ""))
+        a_min = _to_int(str(asset_range.get("min")))
+        a_max = _to_int(str(asset_range.get("max")))
+        c_min = _to_int(str(csaf_range.get("min")))
+        c_max = _to_int(str(csaf_range.get("max")))
 
         # --- Inclusivity flags (default True) ---
         a_min_inc = self._bool_or_default(asset_range.get("min_inclusive"))
