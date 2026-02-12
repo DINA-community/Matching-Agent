@@ -9,10 +9,11 @@ import queue
 import time
 import tomllib
 import traceback
-from collections import defaultdict
+from collections import defaultdict, deque
+from dataclasses import dataclass
 from pathlib import Path
 from queue import Empty, Queue
-from typing import Any, Annotated
+from typing import Any, Annotated, AsyncGenerator
 
 import fastapi
 import uvicorn
@@ -93,6 +94,13 @@ class MatchSubscription(BaseModel):
     origin_filter: list[str]
 
 
+@dataclass
+class _ActiveMatchingTask:
+    task: MatchingTask
+    batch_iter: AsyncGenerator[list[tuple[CsafProduct, Asset]]]
+    start_time: float
+
+
 class Matcher:
     def __init__(self, config_path: Path = Path("./assets/config.toml")) -> None:
         """
@@ -112,7 +120,7 @@ class Matcher:
         self.__matches: Queue[list[Match]] = self.__manager.Queue()
         self.__cache_db = CacheDB(self.__config.Cachedb)
         self.__last_matching: float | None = None
-        self.__matching_tasks: list[MatchingTask] = []
+        self.__matching_tasks: deque[MatchingTask] = deque()
         self.__matching_state: MatchingState = MatchingState.STOPPED
         self.__matching_start_time: float | None = None
         self.__last_publish: float | None = None
@@ -187,69 +195,114 @@ class Matcher:
             return last_match_dt < target_time <= now
 
     async def __matching_task(self, log_queue: multiprocessing.Queue) -> None:
+        active_tasks: deque[_ActiveMatchingTask] = deque()
+        parallel_tasks: list[asyncio.Future] = []
+        num_processes = multiprocessing.cpu_count()
+        loop = asyncio.get_event_loop()
+        pool = concurrent.futures.ProcessPoolExecutor()
+        last_log_output = datetime.datetime.now()
+
         while True:
-            if self.__should_run_matching():
-                try:
-                    try:
-                        task = self.__matching_tasks.pop()
-                    except IndexError:
-                        # If no task is queued, try to match all assets and all csaf products.
-                        task = MatchingTask(assets=[], csaf_documents=[])
-                    logger.info(f"Starting matching task: {task}")
-                    self.__matching_state = MatchingState.RUNNING
-                    self.__matching_start_time = time.time()
-                    self.__total_match_runs += 1
+            if self.__matching_state == MatchingState.STOP_REQUESTED:
+                logger.info("Stop requested, stopping matching tasks")
+                active_tasks.clear()
+                if parallel_tasks:
+                    await asyncio.gather(*parallel_tasks)
                     parallel_tasks = []
-                    num_processes = multiprocessing.cpu_count()
-                    with concurrent.futures.ProcessPoolExecutor() as pool:
-                        loop = asyncio.get_event_loop()
-                        async for batch in self.__cache_db.fetch_pairs_batches(
-                            task.assets, task.csaf_documents, batch_size_sqrt=20
-                        ):
-                            # Check for stop request
-                            if self.__matching_state == MatchingState.STOP_REQUESTED:
-                                logger.info("Stop requested, stopping matching task")
-                                break
+                self.__matching_state = MatchingState.STOPPED
+                self.__matching_start_time = None
+                self.__last_matching = time.time()
+                continue
 
-                            # Check for max duration timeout
-                            if self.__config.Matcher.max_duration is not None:
-                                elapsed = time.time() - self.__matching_start_time
-                                if elapsed >= self.__config.Matcher.max_duration:
-                                    logger.warning(
-                                        f"Matching task exceeded max_duration of {self.__config.Matcher.max_duration}s "
-                                        f"(elapsed: {elapsed:.1f}s). Stopping matching."
-                                    )
-                                    self.__matching_state = MatchingState.STOP_REQUESTED
-                                    break
+            should_run = self.__should_run_matching()
+            if active_tasks or should_run:
+                try:
+                    if should_run and not active_tasks and not self.__matching_tasks:
+                        # If no task is queued, try to match all assets and all csaf products.
+                        self.__matching_tasks.append(
+                            MatchingTask(assets=[], csaf_documents=[])
+                        )
 
-                            if not batch:
-                                continue
-                            self.__total_pairs_processed += len(batch)
-                            while self.__matches.qsize() > num_processes * 2:
-                                await asyncio.sleep(0.1)
-                            parallel_tasks.append(
-                                loop.run_in_executor(
-                                    pool,
-                                    match_pairs,
-                                    self.__matches,
-                                    log_queue,
-                                    self.__config.Matcher.Logging,
-                                    batch,
-                                    self.__config.Matcher.match_threshold,
-                                    self.__matching_cfg_dict,
-                                )
+                    now = datetime.datetime.now()
+                    if (now - last_log_output).total_seconds() >= 5:
+                        logger.info(f"Currently processing {len(active_tasks)} tasks.")
+                        last_log_output = now
+
+                    while self.__matching_tasks:
+                        task = self.__matching_tasks.popleft()
+                        logger.info(f"Starting matching task: {task}")
+                        active_tasks.append(
+                            _ActiveMatchingTask(
+                                task=task,
+                                batch_iter=self.__cache_db.fetch_pairs_batches(
+                                    task.assets, task.csaf_documents, batch_size_sqrt=20
+                                ),
+                                start_time=time.time(),
                             )
-                            if len(parallel_tasks) >= num_processes:
-                                await asyncio.gather(*parallel_tasks)
-                                parallel_tasks = []
+                        )
+                        self.__total_match_runs += 1
+                        if self.__matching_state != MatchingState.RUNNING:
+                            self.__matching_state = MatchingState.RUNNING
+                            self.__matching_start_time = time.time()
+
+                    if not active_tasks:
+                        await asyncio.sleep(1)
+                        continue
+
+                    task_state = active_tasks.popleft()
+
+                    # Check for max duration timeout per task
+                    if self.__config.Matcher.max_duration is not None:
+                        elapsed = time.time() - task_state.start_time
+                        if elapsed >= self.__config.Matcher.max_duration:
+                            logger.warning(
+                                f"Matching task exceeded max_duration of {self.__config.Matcher.max_duration}s "
+                                f"(elapsed: {elapsed:.1f}s). Stopping task."
+                            )
+                            continue
+
+                    try:
+                        batch = await task_state.batch_iter.__anext__()
+                    except StopAsyncIteration:
+                        continue
+
+                    if not batch:
+                        active_tasks.append(task_state)
+                        continue
+
+                    self.__total_pairs_processed += len(batch)
+                    while self.__matches.qsize() > num_processes * 2:
+                        await asyncio.sleep(0.1)
+                    parallel_tasks.append(
+                        loop.run_in_executor(
+                            pool,
+                            match_pairs,
+                            self.__matches,
+                            log_queue,
+                            self.__config.Matcher.Logging,
+                            batch,
+                            self.__config.Matcher.match_threshold,
+                            self.__matching_cfg_dict,
+                        )
+                    )
+                    if len(parallel_tasks) >= num_processes:
+                        await asyncio.gather(*parallel_tasks)
+                        parallel_tasks = []
+
+                    active_tasks.append(task_state)
                 except Exception as e:
                     logger.error(f"Error fetching matches: {e}")
                     print(traceback.format_exc())
                 finally:
-                    logger.info("Matching task finished")
-                    self.__matching_state = MatchingState.STOPPED
-                    self.__matching_start_time = None
-                    self.__last_matching = time.time()
+                    if not active_tasks and not self.__matching_tasks:
+                        if parallel_tasks:
+                            await asyncio.gather(*parallel_tasks)
+                            parallel_tasks = []
+                        if self.__matching_state == MatchingState.RUNNING:
+                            logger.info("Matching task finished")
+                        self.__matching_state = MatchingState.STOPPED
+                        self.__matching_start_time = None
+                        self.__last_matching = time.time()
 
             else:
                 await asyncio.sleep(1)
