@@ -745,7 +745,7 @@ Thresholds
 
 - ``vendor_threshold`` = 50
 - ``product_family_threshold`` = 5
-- ``product_name_threshold`` = 50
+- ``product_name_threshold`` = 70
 - ``keyword_threshold`` = 5
 - ``version_threshold`` = 50
 
