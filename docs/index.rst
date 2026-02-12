@@ -18,6 +18,7 @@ Contents
    matcher-cli
    matching-agent
    production-setup
+   troubleshooting
 
 
 Indices and tables

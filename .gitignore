@@ -207,5 +207,8 @@ src/.DS_Store
 
 
 logs/
+local/
 Troubleshoot.md
 .vscode/
+/tests/data*
+dev/configuration/plugins.py

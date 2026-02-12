@@ -75,13 +75,17 @@ To set up a development environment, follow the steps below.
 You can start, stop, and recreate the full local development stack (PostgreSQL, NetBox, ISDuBA, etc.) using the helper script in the `dev/` directory.
 In order for the script to work, you need to set the correct environment variables in the `.env` file.
 To configure the environment variables, copy the `.env.example` file to `.env` and modify the values as needed.
+If `dev/configuration/plugins.py` is missing, copy it from `dev/configuration/plugins.py.example`.
+The dev script will also copy available `*.env.example` and `plugins.py.example` files automatically on first run.
 
 ```bash
 ./dev/start-local-env.sh                       # start services in background
 ./dev/start-local-env.sh --recreate            # recreate containers
+./dev/start-local-env.sh --stop                # stop 
 ./dev/start-local-env.sh --down                # stop and remove services
 ./dev/start-local-env.sh --down --volumes      # stop and remove services AND named volumes
 ./dev/start-local-env.sh --recreate --volumes  # full reset: down -v, then up (fresh volumes)
+./dev/start-local-env.sh --clean               # remove local images + local env/toml/plugins.py
 ```
 
 After startup, the API token is printed. This information is needed for the [configuration of the NetBox plugin](#configure-plugins). You can retrieve the NetBox API token any time from the setup container logs:
@@ -109,22 +113,19 @@ Before starting the services, make sure to configure the plugins and the APIs ac
 To configure the Netbox fetcher plugin, copy the file [`assets/plugin_configs/data_source/asset/sample/netbox.toml`](assets/plugin_configs/data_source/asset/sample/netbox.toml) to `assets/plugin_configs/data_source/asset/netbox_local.toml` and adjust the values to your environment.
 The file can be named any way you like, but it must be a toml file.
 
-
 ```shell
 cp assets/plugin_configs/data_source/asset/sample/netbox.toml assets/plugin_configs/data_source/asset/netbox_local.toml
-vim assets/plugin_configs/data_source/asset/netbox_local.toml
 ```
 
 To configure the ISDuBA fetcher plugin, copy the file [`assets/plugin_configs/data_source/csaf/sample/isduba.toml`](assets/plugin_configs/data_source/csaf/sample/isduba.toml) to `assets/plugin_configs/data_source/csaf/isduba_local.toml` and adjust the values to your environment.
 The file can be named any way you like, but it must be a toml file.
 
-Before starting the synchronizers, make sure to create some assets and CSAF documents in the NetBox and ISDuBA instances.
-Follow the corresponding instructions in the [NetBox](https://netboxlabs.com/docs/netbox/) and [ISDuBA documentation](https://github.com/ISDuBA/ISDuBA/blob/main/docs/README.md).
-
 ```shell
 cp assets/plugin_configs/data_source/csaf/sample/isduba.toml assets/plugin_configs/data_source/csaf/isduba_local.toml
-vim assets/plugin_configs/data_source/csaf/isduba_local.toml
 ```
+
+Before starting the synchronizers, make sure to create some assets and CSAF documents in the NetBox and ISDuBA instances.
+Follow the corresponding instructions in the [NetBox](https://netboxlabs.com/docs/netbox/) and [ISDuBA documentation](https://github.com/ISDuBA/ISDuBA/blob/main/docs/README.md).
 
 Next, install the python dependencies with uv by running in your terminal or inside pycharm (double tap `<Ctrl>` and enter the command) to set up the local python environment:
 
@@ -165,8 +166,12 @@ username = "admin"
 password = "secret"
 
 [Matcher]
-# Seconds between matching runs
+# Seconds between matching runs (mutually exclusive with fixed_time_of_day)
 sync_interval = 86400
+# OR: Run at a fixed time of day (mutually exclusive with sync_interval)
+# fixed_time_of_day = "02:30"  # Format: "HH:MM" in 24-hour format
+# Maximum duration in seconds for a matching run (optional)
+# max_duration = 3600  # Stop matching after 1 hour
 # Threshold for showing matches
 match_threshold = 0
 # Path to asset data source plugin configs used for the assetsync
@@ -182,7 +187,10 @@ port = 8998
 # Assetsync specific configuration
 
 [Assetsync.Synchronizer]
+# Seconds between sync runs (mutually exclusive with fixed_time_of_day)
 sync_interval = 86400
+# OR: Run at a fixed time of day (mutually exclusive with sync_interval)
+# fixed_time_of_day = "03:00"  # Format: "HH:MM" in 24-hour format
 plugin_configs_path = "./assets/plugin_configs/data_source/asset/"
 cleanup_grace_period = 86400
 cleanup_interval = 60
@@ -196,7 +204,10 @@ port = 8992
 # Csaf specific configuration
 
 [Csafsync.Synchronizer]
+# Seconds between sync runs (mutually exclusive with fixed_time_of_day)
 sync_interval = 86400
+# OR: Run at a fixed time of day (mutually exclusive with sync_interval)
+# fixed_time_of_day = "03:00"  # Format: "HH:MM" in 24-hour format
 plugin_configs_path = "./assets/plugin_configs/data_source/csaf"
 cleanup_grace_period = 86400
 cleanup_interval = 60
@@ -207,7 +218,22 @@ host = "0.0.0.0"
 port = 8991
 ```
 
-- `Matcher.sync_interval`: Minimal delay between matching cycles.
+#### Scheduling Configuration
+
+Both the Matcher and Synchronizers support two mutually exclusive scheduling modes:
+
+**Interval-based scheduling** (default):
+- `sync_interval`: Time in seconds between runs. For example, `86400` runs every 24 hours after the previous run completes.
+
+**Fixed time of day scheduling**:
+- `fixed_time_of_day`: Run once per day at a specific time in 24-hour format (e.g., `"02:30"` for 2:30 AM).
+
+**Important**: You must specify exactly one of these options. Using both or neither will result in a validation error.
+
+#### Configuration Options
+
+- `Matcher.sync_interval` or `Matcher.fixed_time_of_day`: When to run matching cycles.
+- `Matcher.max_duration`: (Optional) Maximum duration in seconds for a matching run. If set, the matching process will gracefully stop after this duration, preserving all matches found up to that point. Useful for preventing excessively long matching runs.
 - `Matcher.match_threshold`: Value for showing possible matches
 - `Matcher.asset_plugins_path`: Path to the directory containing asset-specific plugin configuration files.
 - `Matcher.csaf_plugins_path`: Path to the directory containing CSAF-specific plugin configuration files.
@@ -218,7 +244,7 @@ port = 8991
 
 Both synchronizers share the following configuration (Assetsync.Synchronizer and Csafsync.Synchronizer):
 
-- `.Synchronizer.sync_interval`: Minimal delay between fetch cycles.
+- `.Synchronizer.sync_interval` or `.Synchronizer.fixed_time_of_day`: When to run fetch cycles.
 - `.Synchronizer.preprocessor_plugins`: List and order of preprocessing plugins.
 - `.Synchronizer.plugin_configs_path`: Path to the directory containing plugin configuration files.
 - `.Synchronizer.cleanup_grace_period`: Time in seconds from the last synchronization after which assets are considered stale and will be deleted.
