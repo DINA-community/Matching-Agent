@@ -13,7 +13,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass
 from pathlib import Path
 from queue import Empty, Queue
-from typing import Any, Annotated, AsyncGenerator
+from typing import Any, Annotated, AsyncGenerator, Literal
 
 import fastapi
 import uvicorn
@@ -61,8 +61,17 @@ class MatcherStatus(BaseModel):
 
 
 class MatchingTask(BaseModel):
+    id: int
     assets: list[HttpUrl]
     csaf_documents: list[HttpUrl]
+
+
+class MatchingTaskInfo(BaseModel):
+    id: int
+    assets: list[HttpUrl]
+    csaf_documents: list[HttpUrl]
+    state: Literal["pending", "running"]
+    start_time: float | None = None
 
 
 # TODO: Define correct fields
@@ -121,6 +130,9 @@ class Matcher:
         self.__cache_db = CacheDB(self.__config.Cachedb)
         self.__last_matching: float | None = None
         self.__matching_tasks: deque[MatchingTask] = deque()
+        self.__active_tasks: dict[int, _ActiveMatchingTask] = {}
+        self.__cancelled_task_ids: set[int] = set()
+        self.__next_task_id = itertools.count(1)
         self.__matching_state: MatchingState = MatchingState.STOPPED
         self.__matching_start_time: float | None = None
         self.__last_publish: float | None = None
@@ -147,6 +159,15 @@ class Matcher:
             tg.create_task(self.__log_task(log_queue))
             tg.create_task(self.__store_matches_task())
             tg.create_task(self.__trigger_task())
+
+    def __new_matching_task(
+        self, assets: list[HttpUrl], csaf_documents: list[HttpUrl]
+    ) -> MatchingTask:
+        return MatchingTask(
+            id=next(self.__next_task_id),
+            assets=assets,
+            csaf_documents=csaf_documents,
+        )
 
     async def __log_task(self, log_queue: multiprocessing.Queue) -> None:
         while True:
@@ -206,6 +227,7 @@ class Matcher:
             if self.__matching_state == MatchingState.STOP_REQUESTED:
                 logger.info("Stop requested, stopping matching tasks")
                 active_tasks.clear()
+                self.__active_tasks.clear()
                 if parallel_tasks:
                     await asyncio.gather(*parallel_tasks)
                     parallel_tasks = []
@@ -219,9 +241,7 @@ class Matcher:
                 try:
                     if should_run and not active_tasks and not self.__matching_tasks:
                         # If no task is queued, try to match all assets and all csaf products.
-                        self.__matching_tasks.append(
-                            MatchingTask(assets=[], csaf_documents=[])
-                        )
+                        self.__matching_tasks.append(self.__new_matching_task([], []))
 
                     now = datetime.datetime.now()
                     if (now - last_log_output).total_seconds() >= 5:
@@ -230,16 +250,20 @@ class Matcher:
 
                     while self.__matching_tasks:
                         task = self.__matching_tasks.popleft()
+                        if task.id in self.__cancelled_task_ids:
+                            logger.info(f"Skipping cancelled task {task.id}")
+                            self.__cancelled_task_ids.discard(task.id)
+                            continue
                         logger.info(f"Starting matching task: {task}")
-                        active_tasks.append(
-                            _ActiveMatchingTask(
-                                task=task,
-                                batch_iter=self.__cache_db.fetch_pairs_batches(
-                                    task.assets, task.csaf_documents, batch_size_sqrt=20
-                                ),
-                                start_time=time.time(),
-                            )
+                        active_task = _ActiveMatchingTask(
+                            task=task,
+                            batch_iter=self.__cache_db.fetch_pairs_batches(
+                                task.assets, task.csaf_documents, batch_size_sqrt=20
+                            ),
+                            start_time=time.time(),
                         )
+                        active_tasks.append(active_task)
+                        self.__active_tasks[task.id] = active_task
                         self.__total_match_runs += 1
                         if self.__matching_state != MatchingState.RUNNING:
                             self.__matching_state = MatchingState.RUNNING
@@ -250,6 +274,11 @@ class Matcher:
                         continue
 
                     task_state = active_tasks.popleft()
+                    if task_state.task.id in self.__cancelled_task_ids:
+                        logger.info(f"Cancelling active task {task_state.task.id}")
+                        self.__cancelled_task_ids.discard(task_state.task.id)
+                        self.__active_tasks.pop(task_state.task.id, None)
+                        continue
 
                     # Check for max duration timeout per task
                     if self.__config.Matcher.max_duration is not None:
@@ -259,11 +288,13 @@ class Matcher:
                                 f"Matching task exceeded max_duration of {self.__config.Matcher.max_duration}s "
                                 f"(elapsed: {elapsed:.1f}s). Stopping task."
                             )
+                            self.__active_tasks.pop(task_state.task.id, None)
                             continue
 
                     try:
                         batch = await task_state.batch_iter.__anext__()
                     except StopAsyncIteration:
+                        self.__active_tasks.pop(task_state.task.id, None)
                         continue
 
                     if not batch:
@@ -303,6 +334,7 @@ class Matcher:
                         self.__matching_state = MatchingState.STOPPED
                         self.__matching_start_time = None
                         self.__last_matching = time.time()
+                        self.__active_tasks.clear()
 
             else:
                 await asyncio.sleep(1)
@@ -350,9 +382,7 @@ class Matcher:
                 if triggers:
                     last_trigger_id = triggers[-1].id
                     if not self.__matching_tasks:
-                        self.__matching_tasks.append(
-                            MatchingTask(assets=[], csaf_documents=[])
-                        )
+                        self.__matching_tasks.append(self.__new_matching_task([], []))
             except Exception as e:
                 logger.error(f"Error consuming matcher triggers: {e}", exc_info=True)
             await asyncio.sleep(0.5)
@@ -481,9 +511,22 @@ class Matcher:
             if csaf_documents is None:
                 csaf_documents = []
             logger.info("Starting matching task")
-            self.__matching_tasks.append(
-                MatchingTask(assets=assets, csaf_documents=csaf_documents)
-            )
+            task = self.__new_matching_task(assets, csaf_documents)
+            self.__matching_tasks.append(task)
+            return {"id": task.id}
+
+        @task_route.get("/running")
+        async def running_tasks() -> list[MatchingTaskInfo]:
+            return [
+                MatchingTaskInfo(
+                    id=task.task.id,
+                    assets=task.task.assets,
+                    csaf_documents=task.task.csaf_documents,
+                    state="running",
+                    start_time=task.start_time,
+                )
+                for task in self.__active_tasks.values()
+            ]
 
         @task_route.get("/status")
         async def status() -> MatcherStatus:
@@ -499,9 +542,35 @@ class Matcher:
             )
 
         @task_route.post("/stop")
-        async def stop():
-            logger.info("Stopping matching task")
-            self.__matching_state = MatchingState.STOP_REQUESTED
+        async def stop(task_id: Annotated[int | None, Query()] = None):
+            if task_id is None:
+                logger.info("Stopping all matching tasks")
+                self.__matching_tasks.clear()
+                self.__cancelled_task_ids.update(self.__active_tasks.keys())
+                self.__matching_state = MatchingState.STOP_REQUESTED
+                return {"stopped": "all"}
+
+            removed_pending = False
+            if self.__matching_tasks:
+                remaining: deque[MatchingTask] = deque()
+                while self.__matching_tasks:
+                    task = self.__matching_tasks.popleft()
+                    if task.id == task_id:
+                        removed_pending = True
+                    else:
+                        remaining.append(task)
+                self.__matching_tasks = remaining
+
+            if removed_pending:
+                logger.info(f"Cancelled pending task {task_id}")
+                return {"stopped": "pending", "id": task_id}
+
+            if task_id in self.__active_tasks:
+                logger.info(f"Cancellation requested for active task {task_id}")
+                self.__cancelled_task_ids.add(task_id)
+                return {"stopped": "running", "id": task_id}
+
+            raise HTTPException(status_code=404, detail="Task not found")
 
         @clear_route.post("/all")
         async def clean_all():
