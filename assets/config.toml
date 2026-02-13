@@ -17,6 +17,9 @@ sync_interval = 86400
 # fixed_time_of_day = "03:00"  # Format: "HH:MM" in 24-hour format
 # Path to the directory containing asset data source plugin configuration TOML files
 plugin_configs_path = "./assets/plugin_configs/data_source/asset/"
+# When false, do not trigger the matcher after a successful sync batch is stored
+# This is true by default.
+# trigger_matcher_on_sync = false
 # Number of seconds before last successful run; entries older than (last_run - cleanup_grace_period)
 cleanup_grace_period = 86400
 cleanup_interval = 60
@@ -61,6 +64,9 @@ sync_interval = 86400
 # fixed_time_of_day = "03:00"  # Format: "HH:MM" in 24-hour format
 # Path to the directory containing CSAF data source plugin configuration TOML files
 plugin_configs_path = "./assets/plugin_configs/data_source/csaf"
+# When false, do not trigger the matcher after a successful sync batch is stored
+# This is true by default.
+# trigger_matcher_on_sync = false
 # Number of seconds before last successful run; entries older than (last_run - cleanup_grace_period)
 cleanup_grace_period = 86400
 cleanup_interval = 60

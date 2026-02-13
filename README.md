@@ -192,6 +192,9 @@ sync_interval = 86400
 # OR: Run at a fixed time of day (mutually exclusive with sync_interval)
 # fixed_time_of_day = "03:00"  # Format: "HH:MM" in 24-hour format
 plugin_configs_path = "./assets/plugin_configs/data_source/asset/"
+# When false, do not trigger the matcher after a successful sync batch is stored
+# This is true by default.
+# trigger_matcher_on_sync = false
 cleanup_grace_period = 86400
 cleanup_interval = 60
 preprocessor_plugins = ["identity", "default"]
@@ -209,6 +212,9 @@ sync_interval = 86400
 # OR: Run at a fixed time of day (mutually exclusive with sync_interval)
 # fixed_time_of_day = "03:00"  # Format: "HH:MM" in 24-hour format
 plugin_configs_path = "./assets/plugin_configs/data_source/csaf"
+# When false, do not trigger the matcher after a successful sync batch is stored
+# This is true by default.
+# trigger_matcher_on_sync = false
 cleanup_grace_period = 86400
 cleanup_interval = 60
 preprocessor_plugins = ["identity", "default"]
@@ -228,11 +234,12 @@ Both the Matcher and Synchronizers support two mutually exclusive scheduling mod
 **Fixed time of day scheduling**:
 - `fixed_time_of_day`: Run once per day at a specific time in 24-hour format (e.g., `"02:30"` for 2:30 AM).
 
-**Important**: You must specify exactly one of these options. Using both or neither will result in a validation error.
+**Important**: For the Matcher, you must specify at most one of these options. If you omit both,
+matching only runs when triggered manually. Synchronizers still require exactly one scheduling option.
 
 #### Configuration Options
 
-- `Matcher.sync_interval` or `Matcher.fixed_time_of_day`: When to run matching cycles.
+- `Matcher.sync_interval` or `Matcher.fixed_time_of_day`: When to run matching cycles (omit both for manual-only).
 - `Matcher.max_duration`: (Optional) Maximum duration in seconds for a matching run. If set, the matching process will gracefully stop after this duration, preserving all matches found up to that point. Useful for preventing excessively long matching runs.
 - `Matcher.match_threshold`: Value for showing possible matches
 - `Matcher.asset_plugins_path`: Path to the directory containing asset-specific plugin configuration files.
@@ -245,6 +252,7 @@ Both the Matcher and Synchronizers support two mutually exclusive scheduling mod
 Both synchronizers share the following configuration (Assetsync.Synchronizer and Csafsync.Synchronizer):
 
 - `.Synchronizer.sync_interval` or `.Synchronizer.fixed_time_of_day`: When to run fetch cycles.
+- `.Synchronizer.trigger_matcher_on_sync`: When false, do not trigger a matcher run after synchronization.
 - `.Synchronizer.preprocessor_plugins`: List and order of preprocessing plugins.
 - `.Synchronizer.plugin_configs_path`: Path to the directory containing plugin configuration files.
 - `.Synchronizer.cleanup_grace_period`: Time in seconds from the last synchronization after which assets are considered stale and will be deleted.

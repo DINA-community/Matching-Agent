@@ -197,7 +197,7 @@ class Matcher:
             return (
                 self.__last_matching + self.__config.Matcher.sync_interval < time.time()
             )
-        else:
+        elif self.__config.Matcher.fixed_time_of_day is not None:
             # Fixed time of day scheduling
             now = datetime.datetime.now()
             hours, minutes = map(
@@ -214,6 +214,9 @@ class Matcher:
             # Check if last matching was before today's target time and we've passed it
             last_match_dt = datetime.datetime.fromtimestamp(self.__last_matching)
             return last_match_dt < target_time <= now
+        else:
+            # No schedule configured: manual triggers only
+            return False
 
     async def __matching_task(self, log_queue: multiprocessing.Queue) -> None:
         active_tasks: deque[_ActiveMatchingTask] = deque()

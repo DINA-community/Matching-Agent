@@ -32,6 +32,9 @@ them in the cache database. It uses the ``[Assetsync]`` section in ``assets/conf
    # OR: Fixed time of day scheduling (mutually exclusive with sync_interval)
    # fixed_time_of_day = "03:00"  # Format: "HH:MM" in 24-hour format
    plugin_configs_path = "./assets/plugin_configs/data_source/asset"
+   # When false, do not trigger the matcher after a successful sync batch is stored
+   # This is true by default.
+   # trigger_matcher_on_sync = false
    preprocessor_plugins = ["identity"]
    cleanup_interval = 86400
    cleanup_grace_period = 604800
@@ -67,6 +70,8 @@ Parameters
     24-hour format when synchronization should run daily. Example: ``"03:00"`` for 3:00 AM.
   - ``plugin_configs_path`` (str path, required): Directory containing asset data source plugin
     configuration files (e.g., ``netbox.toml``).
+  - ``trigger_matcher_on_sync`` (bool, optional): When true (default), trigger the matcher after a
+    successful synchronization batch is stored. Set to false to disable automatic matching after sync.
   - ``preprocessor_plugins`` (list[str], required): List of preprocessor plugin names to apply transformations
     to fetched data before storage. Use ``["identity"]`` if no transformations are needed.
   - ``cleanup_interval`` (int, required): Interval in seconds between cleanup runs that remove stale data.
@@ -110,6 +115,9 @@ stores them in the cache database. It uses the ``[Csafsync]`` section in ``asset
    # OR: Fixed time of day scheduling (mutually exclusive with sync_interval)
    # fixed_time_of_day = "03:00"  # Format: "HH:MM" in 24-hour format
    plugin_configs_path = "./assets/plugin_configs/data_source/csaf"
+   # When false, do not trigger the matcher after a successful sync batch is stored
+   # This is true by default.
+   # trigger_matcher_on_sync = false
    preprocessor_plugins = []
    cleanup_interval = 86400
    cleanup_grace_period = 604800
@@ -132,6 +140,7 @@ The parameters are identical to the Asset Synchronizer configuration (see above)
 
 - ``sync_interval`` or ``fixed_time_of_day``: Same scheduling options as Asset Synchronizer.
 - ``plugin_configs_path`` points to CSAF data source configurations instead of asset sources.
+- ``trigger_matcher_on_sync`` controls whether synchronization triggers a matcher run (default true).
 - ``port`` defaults to 8991 for the CSAF sync API.
 
 ``[Csafsync.Logging]`` is optional and uses the same fields as ``[Assetsync.Logging]``.
@@ -175,8 +184,8 @@ The Matcher supports two mutually exclusive scheduling modes:
   Run matching once per day at a specific time. This is useful for scheduling intensive matching
   operations during off-peak hours.
 
-**Important**: You must specify exactly one scheduling option. Using both or neither will result in a
-validation error when the service starts.
+**Important**: You must specify at most one scheduling option. Using both will result in a validation
+error when the service starts. If neither option is set, matching only runs when triggered manually.
 
 **Note**: The Matcher will still run immediately when triggered via the API (``POST /task/start``),
 regardless of the configured schedule.
@@ -288,4 +297,3 @@ These variables are used by the development stack under ``dev/``. All are requir
 - ``NETBOX_SUPERUSER_NAME`` (str, required): Netbox superuser username.
 - ``NETBOX_SUPERUSER_EMAIL`` (str, required): Netbox superuser email.
 - ``BUILD_VERSION`` (str, required): Build/version tag for dev images.
-
