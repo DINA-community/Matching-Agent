@@ -2,11 +2,11 @@ import asyncio
 import concurrent.futures
 from datetime import datetime, timezone
 
-# import json
+import json
 from typing import Any, List, Annotated
-# import uuid
+import uuid
 
-# from fastapi import HTTPException
+from fastapi import HTTPException
 import httpx
 from fastapi.params import Form
 from fastapi.routing import APIRouter
@@ -60,7 +60,7 @@ class IsdubaDataSource(DataSourcePlugin):
         """Return information about the data source endpoint."""
         return self.config.DataSource.Plugin.url
 
-    def add_push_route(
+    async def add_push_route(
         self,
         route: APIRouter,
         fetcher_view: FetcherView,
@@ -74,47 +74,43 @@ class IsdubaDataSource(DataSourcePlugin):
         ):
             logger.info("Received push data")
 
-            # try:
-            #     advisory_obj: dict[str, Any] = json.loads(advisory)
-            # except json.JSONDecodeError as e:
-            #     raise HTTPException(status_code=400, detail=f"Invalid JSON in advisory: {e.msg}")
+            try:
+                raw = await advisory.read()
+                advisory_obj: dict[str, Any] = json.loads(raw)
+            except json.JSONDecodeError as e:
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid JSON in advisory: {e.msg}"
+                )
 
-            # document = advisory_obj.get("document", {})
-            # tracking = document.get("tracking", {})
-            # doc_id = tracking.get("id")
+            document = advisory_obj.get("document", {})
+            product_tree = advisory_obj.get("product_tree", {})
 
-            # if not doc_id:
-            #     raise HTTPException(status_code=400, detail="Missing document.tracking.id")
+            if not document or not product_tree:
+                return
 
-            # product_tree = advisory_obj.get("product_tree", {})
+            # TODO: must be switched to the ISDuBA document ID later
+            local_numeric = uuid.uuid4().int
 
-            # if not product_tree:
-            #     return []
+            product_tree_clean = get_csaf_product_tree(
+                self.origin_uri,
+                str(local_numeric),
+                document,
+                product_tree,
+            )
 
-            # product_tree_clean = get_csaf_product_tree(
-            #     self.origin_uri,
-            #     uuid.uuid4().hex,
-            #     document,
-            #     product_tree,
-            # )
+            if not product_tree_clean:
+                return
 
-            # if not product_tree_clean:
-            #     return []
-
-            # csaf_products: list[Asset | CsafProduct] = convert_into_database_format(product_tree_clean)
+            csaf_products: list[Asset | CsafProduct] = convert_into_database_format(
+                product_tree_clean
+            )
             # existing_relationships: List[Relationship] = get_relationships(product_tree)
 
-            # for p in csaf_products:
-            #     p.origin_uri = str(self.origin_uri)
-
-            #     index = 0
+            for p in csaf_products:
+                p.origin_uri = str(self.origin_uri)
 
             #     for rel in existing_relationships:
-            #         index +=1
-
             #         # TODO: relationships don't work
-            #         if index == 50:
-            #             break
             #         doc_id_str = p.origin_info["path"]
             #         product_ref = await fetcher_view.get_existing(
             #             CsafProduct,
@@ -154,7 +150,7 @@ class IsdubaDataSource(DataSourcePlugin):
             #             )
             #         )
 
-            # products.extend(csaf_products)
+            products.extend(csaf_products)
 
     async def fetch_products(self, fetcher_view: FetcherView) -> FetchProductsResult:
         """Fetch data from the data source and return it as a list of Assets or CsafDocuments."""

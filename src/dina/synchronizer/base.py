@@ -413,7 +413,7 @@ class BaseSynchronizer(ABC):
             prefix="/push", dependencies=[Depends(AccessChecker(self.cache_db))]
         )
         for source in self.data_sources.values():
-            source.add_push_route(
+            await source.add_push_route(
                 push_route,
                 self.cache_db.fetcher_view(source.origin_uri),
                 self.pending_products,
