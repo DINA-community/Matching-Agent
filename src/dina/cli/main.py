@@ -156,6 +156,22 @@ class CLI:
         clear_csaf.add_argument("--origin-uri", required=True)
         clear_csaf.set_defaults(action="matcher_clear_csaf")
 
+        # matcher config group
+        matcher_config = matcher_sub.add_parser("config", help="View or update config")
+        matcher_config.add_argument(
+            "--get",
+            action="store_true",
+            help="Get matcher configuration",
+        )
+        matcher_config.add_argument(
+            "--set",
+            dest="updates",
+            action="append",
+            default=[],
+            help="Update value (key=value). Use dotted keys for nested fields.",
+        )
+        matcher_config.set_defaults(action="matcher_config")
+
         # synchronizer subcommands (generic for any sync service base URL)
         sync = subparsers.add_parser(
             "sync", help="Interact with a Synchronizer API (asset or CSAF)"
@@ -173,6 +189,21 @@ class CLI:
         sync_start.set_defaults(action="sync_task_start")
         sync_status = sync_task_sub.add_parser("status", help="Sync status")
         sync_status.set_defaults(action="sync_task_status")
+
+        sync_config = sync_sub.add_parser("config", help="View or update config")
+        sync_config.add_argument(
+            "--get",
+            action="store_true",
+            help="Get synchronizer configuration",
+        )
+        sync_config.add_argument(
+            "--set",
+            dest="updates",
+            action="append",
+            default=[],
+            help="Update value (key=value). Use dotted keys for nested fields.",
+        )
+        sync_config.set_defaults(action="sync_config")
 
         return parser
 
@@ -228,7 +259,7 @@ class CLI:
         return getpass.getpass("Password: ")
 
     async def _get_token(self, base_url: str, username: str, password: str) -> str:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             resp = await client.post(
                 f"{base_url.rstrip('/')}/token",
                 data={"username": username, "password": password},
@@ -270,6 +301,42 @@ class CLI:
 
     def _auth_headers(self, token: str) -> dict[str, str]:
         return {"Authorization": f"Bearer {token}"}
+
+    @staticmethod
+    def _parse_update_value(raw: str) -> Any:
+        lowered = raw.lower()
+        if lowered in ("true", "false"):
+            return lowered == "true"
+        if lowered in ("null", "none"):
+            return None
+        if raw.startswith(("{", "[", '"')):
+            import json
+
+            try:
+                return json.loads(raw)
+            except json.JSONDecodeError:
+                pass
+        try:
+            return int(raw)
+        except ValueError:
+            pass
+        try:
+            return float(raw)
+        except ValueError:
+            pass
+        return raw
+
+    def _parse_updates(self, updates: list[str]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for item in updates:
+            if "=" not in item:
+                raise RuntimeError(f"Invalid update '{item}'. Use key=value.")
+            key, raw = item.split("=", 1)
+            key = key.strip()
+            if not key:
+                raise RuntimeError(f"Invalid update '{item}'. Use key=value.")
+            result[key] = self._parse_update_value(raw.strip())
+        return result
 
     @staticmethod
     def _print_json(data: Any) -> None:
@@ -344,7 +411,9 @@ class CLI:
         token = await self._get_token(base, username, resolved_pwd)
         headers = self._auth_headers(token)
 
-        async with httpx.AsyncClient(timeout=60.0, headers=headers) as client:
+        async with httpx.AsyncClient(
+            timeout=60.0, headers=headers, follow_redirects=True
+        ) as client:
             action = getattr(args, "action", None)
             if action == "matcher_matches_list":
                 params: dict[str, Any] = {
@@ -439,6 +508,22 @@ class CLI:
                 self._raise_for_status(resp, "clear csaf")
                 print("Cleared CSAF cache.")
 
+            elif action == "matcher_config":
+                if not args.get and not args.updates:
+                    raise RuntimeError("config requires --get or --set")
+                if args.get:
+                    resp = await client.get(f"{base.rstrip('/')}/config")
+                    self._raise_for_status(resp, "config get")
+                    self._print_output(resp.json())
+                if args.updates:
+                    updates = self._parse_updates(args.updates)
+                    resp = await client.post(
+                        f"{base.rstrip('/')}/config",
+                        json=updates,
+                    )
+                    self._raise_for_status(resp, "config set")
+                    self._print_output(resp.json())
+
             else:
                 self.parser.error("Unknown matcher command")
 
@@ -469,7 +554,9 @@ class CLI:
         token = await self._get_token(base, username, resolved_pwd)
         headers = self._auth_headers(token)
 
-        async with httpx.AsyncClient(timeout=60.0, headers=headers) as client:
+        async with httpx.AsyncClient(
+            timeout=60.0, headers=headers, follow_redirects=True
+        ) as client:
             action = getattr(args, "action", None)
             if action == "sync_task_start":
                 resp = await client.post(f"{base.rstrip('/')}/task/start")
@@ -480,6 +567,22 @@ class CLI:
                 resp = await client.get(f"{base.rstrip('/')}/task/status")
                 self._raise_for_status(resp, "sync status")
                 self._print_output(resp.json())
+
+            elif action == "sync_config":
+                if not args.get and not args.updates:
+                    raise RuntimeError("config requires --get or --set")
+                if args.get:
+                    resp = await client.get(f"{base.rstrip('/')}/config")
+                    self._raise_for_status(resp, "config get")
+                    self._print_output(resp.json())
+                if args.updates:
+                    updates = self._parse_updates(args.updates)
+                    resp = await client.post(
+                        f"{base.rstrip('/')}/config",
+                        json=updates,
+                    )
+                    self._raise_for_status(resp, "config set")
+                    self._print_output(resp.json())
 
             else:
                 self.parser.error("Unknown sync command")

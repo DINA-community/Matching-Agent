@@ -20,13 +20,20 @@ import uvicorn
 from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.params import Query, Depends
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, HttpUrl, ValidationError
 import polars as pl
 
 from dina.cachedb.database import CacheDB
 from dina.cachedb.model import Match, CsafProduct, Asset
 from dina.common.auth import AccessChecker, Token, SessionData, create_access_token
-from dina.common.config import Config, MatchingConfig
+from dina.common.config import (
+    Config,
+    MatchingConfig,
+    apply_updates,
+    validate_update_keys,
+    validate_update_prefixes,
+    write_toml_file,
+)
 from dina.common.log import configure_logging, get_logger, LoggingConfig
 import sys
 import argparse
@@ -122,6 +129,7 @@ class Matcher:
         """
         Initialize the Matcher.
         """
+        self.__config_path = config_path
         self.__config = Config.load(config_path)
 
         with open("./assets/plugin_configs/default/matching_config.toml", "rb") as f:
@@ -457,6 +465,9 @@ class Matcher:
         clear_route = APIRouter(
             prefix="/clear", dependencies=[Depends(AccessChecker(self.__cache_db))]
         )
+        config_route = APIRouter(
+            prefix="/config", dependencies=[Depends(AccessChecker(self.__cache_db))]
+        )
 
         @api.post("/token")
         async def login_for_access_token(
@@ -726,10 +737,49 @@ class Matcher:
             Subscribing to this hook can be done via the /hooks/subscribe_match_updates endpoint.
             """
 
+        @config_route.get("/")
+        async def get_config() -> dict[str, Any]:
+            """Return the current matcher configuration."""
+            return {
+                "Matcher": self.__config.Matcher.model_dump(mode="json"),
+                "Cachedb": self.__config.Cachedb.model_dump(mode="json"),
+            }
+
+        @config_route.post("/")
+        async def update_config(
+            updates: Annotated[dict[str, Any], fastapi.Body(...)],
+        ) -> dict[str, Any]:
+            """Validate and persist matcher configuration updates."""
+            with open(self.__config_path, "rb") as f:
+                raw = tomllib.load(f)
+            try:
+                validate_update_prefixes(updates, {"Matcher", "Cachedb"})
+            except ValueError as e:
+                raise HTTPException(status_code=422, detail=str(e))
+            try:
+                validate_update_keys(Config, updates)
+            except ValueError as e:
+                raise HTTPException(status_code=422, detail=str(e))
+            try:
+                updated = apply_updates(raw, updates)
+            except ValueError as e:
+                raise HTTPException(status_code=422, detail=str(e))
+            try:
+                validated = Config.model_validate(updated)
+            except ValidationError as e:
+                raise HTTPException(status_code=422, detail=str(e))
+            write_toml_file(self.__config_path, validated.model_dump(mode="json"))
+            self.__config = validated
+            return {
+                "Matcher": self.__config.Matcher.model_dump(mode="json"),
+                "Cachedb": self.__config.Cachedb.model_dump(mode="json"),
+            }
+
         api.include_router(task_route)
         api.include_router(matches_route)
         api.include_router(sub_route)
         api.include_router(clear_route)
+        api.include_router(config_route)
 
         config = uvicorn.Config(
             app=api,

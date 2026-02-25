@@ -31,6 +31,8 @@ class CSAFSynchronizer(BaseSynchronizer):
             cache_db,
             config.Csafsync,
             root_path="/csafsync",
+            config_path=config_path,
+            config_section="Csafsync",
         )
         # Configure logging
         configure_logging(self.config.Logging)

@@ -16,19 +16,27 @@ from abc import ABC
 from collections import defaultdict
 from importlib.metadata import EntryPoints, entry_points
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import fastapi
 import uvicorn
 from fastapi import FastAPI, HTTPException, APIRouter
 from fastapi.params import Depends
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, HttpUrl, model_validator
+from pydantic import BaseModel, HttpUrl, ValidationError
 
 from dina.cachedb.database import CacheDB
 from dina.cachedb.fetcher_view import FetcherView
 from dina.cachedb.model import Asset, CsafProduct
-from dina.common.log import LoggingConfig, get_logger
+from dina.common.config import (
+    Config,
+    apply_updates,
+    validate_update_keys,
+    validate_update_prefixes,
+    write_toml_file,
+    SynchronizerConfig,
+)
+from dina.common.log import get_logger
 
 from dina.common.auth import AccessChecker, create_access_token, SessionData, Token
 from dina.synchronizer.plugin_base.data_source import DataSourcePlugin, Relationship
@@ -40,55 +48,6 @@ logger = get_logger(__name__)
 type TomlEntry = (
     dict[str, TomlEntry] | list[TomlEntry] | str | int | float | bool | None
 )
-
-
-class ApiConfig(BaseModel):
-    host: str
-    port: int
-    access_token_expire_minutes: int
-
-
-class SynchronizerSectionConfig(BaseModel):
-    sync_interval: int | None = None
-    fixed_time_of_day: str | None = None  # Format: "HH:MM" in 24-hour format
-    preprocessor_plugins: list[str]
-    plugin_configs_path: Path
-    trigger_matcher_on_sync: bool = True
-    # Number of seconds before last_run to consider records stale for cleanup
-    cleanup_grace_period: int
-    # The cleanup procedure is executed every cleanup_interval seconds
-    cleanup_interval: int
-
-    @model_validator(mode="after")
-    def validate_scheduling_config(self):
-        """Ensure sync_interval and fixed_time_of_day are mutually exclusive."""
-        if self.sync_interval is None and self.fixed_time_of_day is None:
-            raise ValueError(
-                "Either sync_interval or fixed_time_of_day must be specified"
-            )
-        if self.sync_interval is not None and self.fixed_time_of_day is not None:
-            raise ValueError(
-                "sync_interval and fixed_time_of_day are mutually exclusive"
-            )
-
-        # Validate time format if fixed_time_of_day is provided
-        if self.fixed_time_of_day is not None:
-            try:
-                hours, minutes = self.fixed_time_of_day.split(":")
-                h, m = int(hours), int(minutes)
-                if not (0 <= h <= 23 and 0 <= m <= 59):
-                    raise ValueError
-            except (ValueError, AttributeError):
-                raise ValueError(
-                    f"fixed_time_of_day must be in HH:MM format (24-hour), got: {self.fixed_time_of_day}"
-                )
-        return self
-
-
-class SynchronizerConfig(BaseModel):
-    Synchronizer: SynchronizerSectionConfig
-    Api: ApiConfig
-    Logging: LoggingConfig | None = None
 
 
 class PluginLoadError(Exception):
@@ -103,6 +62,8 @@ class BaseSynchronizer(ABC):
         cache_db: CacheDB,
         config: SynchronizerConfig,
         root_path: str = "",
+        config_path: Path | None = None,
+        config_section: str | None = None,
     ):
         """Initialize the BaseManager.
 
@@ -121,6 +82,8 @@ class BaseSynchronizer(ABC):
         self.__total_products_fetched: int = 0
         self.__total_relationships_fetched: int = 0
         self.__root_path: str = root_path
+        self.__config_path = config_path
+        self.__config_section = config_section
         self.__store_idle_event = asyncio.Event()
         self.__store_idle_event.set()
         self.cache_db: CacheDB = cache_db
@@ -430,6 +393,9 @@ class BaseSynchronizer(ABC):
         task_route = APIRouter(
             prefix="/task", dependencies=[Depends(AccessChecker(self.cache_db))]
         )
+        config_route = APIRouter(
+            prefix="/config", dependencies=[Depends(AccessChecker(self.cache_db))]
+        )
 
         @api.post("/token")
         async def login_for_access_token(
@@ -480,7 +446,55 @@ class BaseSynchronizer(ABC):
                 data_sources=len(self.data_sources),
             )
 
+        @config_route.get("/")
+        async def get_config() -> dict[str, Any]:
+            """Return the current synchronizer configuration."""
+            if self.__config_section is None:
+                raise HTTPException(
+                    status_code=500, detail="Configuration section not configured"
+                )
+            return {
+                self.__config_section: self.config.model_dump(mode="json"),
+                "Cachedb": self.cache_db.config.model_dump(mode="json"),
+            }
+
+        @config_route.post("/")
+        async def update_config(
+            updates: Annotated[dict[str, Any], fastapi.Body(...)],
+        ) -> dict[str, Any]:
+            """Validate and persist synchronizer configuration updates."""
+            if self.__config_path is None or self.__config_section is None:
+                raise HTTPException(
+                    status_code=500, detail="Configuration persistence not configured"
+                )
+            with open(self.__config_path, "rb") as f:
+                raw = tomllib.load(f)
+            try:
+                validate_update_prefixes(updates, {self.__config_section, "Cachedb"})
+            except ValueError as e:
+                raise HTTPException(status_code=422, detail=str(e))
+            try:
+                validate_update_keys(Config, updates)
+            except ValueError as e:
+                raise HTTPException(status_code=422, detail=str(e))
+            try:
+                updated = apply_updates(raw, updates)
+            except ValueError as e:
+                raise HTTPException(status_code=422, detail=str(e))
+            try:
+                validated = Config.model_validate(updated)
+            except ValidationError as e:
+                raise HTTPException(status_code=422, detail=str(e))
+            write_toml_file(self.__config_path, validated.model_dump(mode="json"))
+            self.config = getattr(validated, self.__config_section)
+            self.cache_db.config = validated.Cachedb
+            return {
+                self.__config_section: self.config.model_dump(mode="json"),
+                "Cachedb": self.cache_db.config.model_dump(mode="json"),
+            }
+
         api.include_router(task_route)
+        api.include_router(config_route)
 
         # TODO: Add security options
         config = uvicorn.Config(
