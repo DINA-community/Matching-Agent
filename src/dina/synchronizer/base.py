@@ -363,11 +363,15 @@ class BaseSynchronizer(ABC):
     async def store_data_task(self):
         """Store the preprocessed data."""
         while True:
-            if self.preprocessed_data or any(self.pending_relationships.values()):
+            if self.preprocessed_data:
                 logger.info(f"Storing {len(self.preprocessed_data)} items in cacheDB")
                 self.__store_idle_event.clear()
                 data = self.preprocessed_data
                 self.preprocessed_data = []
+                await self.cache_db.store(data, [])
+                self.__store_idle_event.set()
+            elif any(self.pending_relationships.values()):
+                self.__store_idle_event.clear()
                 mapped_relations = []
                 for origin_uri in self.pending_relationships.keys():
                     fetcher_view = self.cache_db.fetcher_view(origin_uri)
@@ -386,7 +390,7 @@ class BaseSynchronizer(ABC):
                             ),
                         )
                     )
-                await self.cache_db.store(data, mapped_relations)
+                await self.cache_db.store([], mapped_relations)
                 self.__store_idle_event.set()
             else:
                 self.__store_idle_event.set()
