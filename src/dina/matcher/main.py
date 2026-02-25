@@ -133,12 +133,15 @@ class Matcher:
         configure_logging(self.__config.Matcher.Logging)
 
         self.__manager = multiprocessing.Manager()
-        self.__matches: Queue[list[Match]] = self.__manager.Queue()
+        self.__matches: Queue[tuple[int, list[Match]]] = self.__manager.Queue()
         self.__cache_db = CacheDB(self.__config.Cachedb)
         self.__last_matching: float | None = None
         self.__matching_tasks: deque[MatchingTask] = deque()
         self.__active_tasks: dict[int, _ActiveMatchingTask] = {}
         self.__cancelled_task_ids: set[int] = set()
+        self.__in_flight_by_task: dict[int, int] = {}
+        self.__scheduled_batches_by_task: dict[int, int] = {}
+        self.__store_in_progress_by_task: dict[int, int] = {}
         self.__next_task_id = itertools.count(1)
         self.__matching_state: MatchingState = MatchingState.STOPPED
         self.__matching_start_time: float | None = None
@@ -327,18 +330,30 @@ class Matcher:
                     task_state.processed_pairs += len(batch)
                     while self.__matches.qsize() > num_processes * 2:
                         await asyncio.sleep(0.1)
-                    parallel_tasks.append(
-                        loop.run_in_executor(
-                            pool,
-                            match_pairs,
-                            self.__matches,
-                            log_queue,
-                            self.__config.Matcher.Logging,
-                            batch,
-                            self.__config.Matcher.match_threshold,
-                            self.__matching_cfg_dict,
-                        )
+                    self.__in_flight_by_task[task_state.task.id] = (
+                        self.__in_flight_by_task.get(task_state.task.id, 0) + 1
                     )
+                    self.__scheduled_batches_by_task[task_state.task.id] = (
+                        self.__scheduled_batches_by_task.get(task_state.task.id, 0) + 1
+                    )
+                    task_id = task_state.task.id
+                    future = loop.run_in_executor(
+                        pool,
+                        match_pairs,
+                        task_id,
+                        self.__matches,
+                        log_queue,
+                        self.__config.Matcher.Logging,
+                        batch,
+                        self.__config.Matcher.match_threshold,
+                        self.__matching_cfg_dict,
+                    )
+
+                    def _done_callback(_fut, done_task_id: int = task_id):
+                        self.__decrement_in_flight(done_task_id)
+
+                    future.add_done_callback(_done_callback)
+                    parallel_tasks.append(future)
                     if len(parallel_tasks) >= num_processes:
                         await asyncio.gather(*parallel_tasks)
                         parallel_tasks = []
@@ -365,9 +380,18 @@ class Matcher:
     async def __store_matches_task(self):
         while True:
             tasks = []
+            stored_task_ids: list[int] = []
             while not self.__matches.empty():
                 try:
-                    matches_batch = self.__matches.get(block=False)
+                    task_id, matches_batch = self.__matches.get(block=False)
+                    if task_id in self.__scheduled_batches_by_task:
+                        self.__scheduled_batches_by_task[task_id] -= 1
+                        if self.__scheduled_batches_by_task[task_id] <= 0:
+                            del self.__scheduled_batches_by_task[task_id]
+                    self.__store_in_progress_by_task[task_id] = (
+                        self.__store_in_progress_by_task.get(task_id, 0) + 1
+                    )
+                    stored_task_ids.append(task_id)
                     logger.debug(
                         f"Storing {len(matches_batch)} matches. ~{self.__matches.qsize()} batches remaining."
                     )
@@ -377,6 +401,12 @@ class Matcher:
                     pass
             if tasks:
                 match_ids = await asyncio.gather(*tasks)
+                for task_id in stored_task_ids:
+                    count = self.__store_in_progress_by_task.get(task_id, 0) - 1
+                    if count <= 0:
+                        self.__store_in_progress_by_task.pop(task_id, None)
+                    else:
+                        self.__store_in_progress_by_task[task_id] = count
                 match_ids = itertools.chain.from_iterable(match_ids)
                 matches = await self.__cache_db.get_matches(ids=match_ids)
                 # Categorize by asset origin
@@ -623,21 +653,65 @@ class Matcher:
 
         @clear_route.post("/all")
         async def clean_all():
+            """Stop all matching tasks, wait for pending batches, then clear all matcher caches."""
+            self.__matching_tasks.clear()
+            self.__cancelled_task_ids.update(self.__active_tasks.keys())
+            self.__matching_state = MatchingState.STOP_REQUESTED
+            await self.__wait_for_tasks_idle(None)
             logger.info("Cleaning entire matcher cache")
             await self.__cache_db.clear()
 
         @clear_route.post("/matches")
         async def clean_matches():
+            """Stop all matching tasks, wait for pending batches, then clear the matches cache."""
+            self.__matching_tasks.clear()
+            self.__cancelled_task_ids.update(self.__active_tasks.keys())
+            self.__matching_state = MatchingState.STOP_REQUESTED
+            await self.__wait_for_tasks_idle(None)
             logger.info("Cleaning matcher matches cache")
             await self.__cache_db.clear_matches()
 
         @clear_route.post("/assets")
         async def clean_assets(origin_uri: HttpUrl):
+            """Stop matching tasks for this origin, wait for pending batches, then clear assets for a specific origin."""
+            affected_task_ids: set[int] = set()
+            if self.__matching_tasks:
+                remaining: deque[MatchingTask] = deque()
+                while self.__matching_tasks:
+                    task = self.__matching_tasks.popleft()
+                    if self._matches_origin(task.assets, origin_uri):
+                        affected_task_ids.add(task.id)
+                        continue
+                    remaining.append(task)
+                self.__matching_tasks = remaining
+            for task_id, task in self.__active_tasks.items():
+                if self._matches_origin(task.task.assets, origin_uri):
+                    self.__cancelled_task_ids.add(task_id)
+                    affected_task_ids.add(task_id)
+            if affected_task_ids:
+                await self.__wait_for_tasks_idle(affected_task_ids)
             logger.info("Cleaning matcher assets cache")
             await self.__cache_db.clear_assets(origin_uri)
 
         @clear_route.post("/csaf")
         async def clean_csaf(origin_uri: HttpUrl):
+            """Stop matching tasks for this origin, wait for pending batches, then clear CSAF products for a specific origin."""
+            affected_task_ids: set[int] = set()
+            if self.__matching_tasks:
+                remaining: deque[MatchingTask] = deque()
+                while self.__matching_tasks:
+                    task = self.__matching_tasks.popleft()
+                    if self._matches_origin(task.csaf_documents, origin_uri):
+                        affected_task_ids.add(task.id)
+                        continue
+                    remaining.append(task)
+                self.__matching_tasks = remaining
+            for task_id, task in self.__active_tasks.items():
+                if self._matches_origin(task.task.csaf_documents, origin_uri):
+                    self.__cancelled_task_ids.add(task_id)
+                    affected_task_ids.add(task_id)
+            if affected_task_ids:
+                await self.__wait_for_tasks_idle(affected_task_ids)
             logger.info("Cleaning matcher csaf cache")
             await self.__cache_db.clear_csaf_products(origin_uri)
 
@@ -686,9 +760,48 @@ class Matcher:
 
         return HttpUrl(origin_uri)
 
+    @staticmethod
+    def _matches_origin(uris: list[HttpUrl], origin_uri: HttpUrl) -> bool:
+        """Return True if any URI matches the given origin, or list is empty (all)."""
+        if not uris:
+            return True
+        origin = str(origin_uri).rstrip("/")
+        return any(str(uri).startswith(origin) for uri in uris)
+
+    def __decrement_in_flight(self, task_id: int) -> None:
+        count = self.__in_flight_by_task.get(task_id, 0) - 1
+        if count <= 0:
+            self.__in_flight_by_task.pop(task_id, None)
+        else:
+            self.__in_flight_by_task[task_id] = count
+
+    async def __wait_for_tasks_idle(self, task_ids: set[int] | None) -> None:
+        """Wait until specified tasks have no in-flight or queued batches."""
+        while True:
+            logger.debug(
+                f"Waiting for {task_ids} to finish processing: {self.__in_flight_by_task}"
+            )
+            if task_ids is None:
+                no_active = not self.__active_tasks
+                no_in_flight = not self.__in_flight_by_task
+                no_queued = not self.__scheduled_batches_by_task
+                store_idle = not self.__store_in_progress_by_task
+                if no_active and no_in_flight and no_queued and store_idle:
+                    return
+            else:
+                if all(
+                    self.__in_flight_by_task.get(task_id, 0) == 0
+                    and self.__scheduled_batches_by_task.get(task_id, 0) == 0
+                    and self.__store_in_progress_by_task.get(task_id, 0) == 0
+                    for task_id in task_ids
+                ):
+                    return
+            await asyncio.sleep(0.1)
+
 
 def match_pairs(
-    matches: queue.Queue[list[Match]],
+    task_id: int,
+    matches: queue.Queue[tuple[int, list[Match]]],
     log_queue: multiprocessing.Queue,
     logging_config: LoggingConfig,
     pairs: list[tuple[CsafProduct, Asset]],
@@ -724,7 +837,7 @@ def match_pairs(
         match.status = f"result: {result}, reason: {reason}"
 
         batch.append(match)
-    matches.put(batch)
+    matches.put((task_id, batch))
 
 
 async def run_matcher(config_path: Path = Path("./assets/config.toml")):

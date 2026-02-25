@@ -83,7 +83,7 @@ host = "0.0.0.0"
 # The port to serve on.
 port = 8991
 
-access_token_expire_minutes = 10
+access_token_expire_minutes = 120
 
 # Optional logging configuration for the csafsync component
 # If omitted, logs go to console with INFO level (or LOG_LEVEL env).
@@ -117,7 +117,7 @@ csaf_plugins_path = "./assets/plugin_configs/data_source/csaf"
 [Matcher.Api]
 host = "0.0.0.0"
 port = 8998
-access_token_expire_minutes = 10
+access_token_expire_minutes = 120
 
 # Optional logging configuration for the matcher component
 # If omitted, logs go to console with INFO level (or LOG_LEVEL env).

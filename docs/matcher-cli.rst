@@ -158,10 +158,10 @@ Subcommands:
           matcher task stop
 
 4) Clear caches
-   - ``matcher clear all`` — Clear all matcher-related caches
-   - ``matcher clear matches`` — Clear only the matches cache
-   - ``matcher clear assets --origin-uri <URI>`` — Clear cached assets for a given origin
-   - ``matcher clear csaf --origin-uri <URI>`` — Clear cached CSAF data for a given origin
+   - ``matcher clear all`` — Stop all matching tasks, wait for pending batches, then clear all matcher-related caches
+   - ``matcher clear matches`` — Stop all matching tasks, wait for pending batches, then clear only the matches cache
+   - ``matcher clear assets --origin-uri <URI>`` — Stop matching tasks for that origin, wait for pending batches, then clear cached assets for a given origin
+   - ``matcher clear csaf --origin-uri <URI>`` — Stop matching tasks for that origin, wait for pending batches, then clear cached CSAF data for a given origin
 
    Examples:
 
