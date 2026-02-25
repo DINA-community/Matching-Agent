@@ -101,15 +101,13 @@ class CLI:
         task_start = task_sub.add_parser("start", help="Start a matching task")
         task_start.add_argument(
             "--assets",
-            type=int,
             nargs="*",
-            help="Asset IDs to match",
+            help="Asset URLs to match",
         )
         task_start.add_argument(
-            "--csaf-products",
-            type=int,
+            "--csaf-documents",
             nargs="*",
-            help="CSAF product IDs to match",
+            help="CSAF document URLs to match",
         )
         task_start.set_defaults(action="matcher_task_start")
 
@@ -130,6 +128,7 @@ class CLI:
         task_running_get.set_defaults(action="matcher_task_running_get")
 
         task_stop = task_sub.add_parser("stop", help="Stop the matcher")
+        task_stop.add_argument("--task-id", type=int, help="Stop a specific task")
         task_stop.set_defaults(action="matcher_task_stop")
 
         # matcher clear group
@@ -308,8 +307,8 @@ class CLI:
                 qparams: dict[str, Any] = {}
                 if args.assets:
                     qparams["assets"] = args.assets
-                if args.csaf_products:
-                    qparams["csaf_products"] = args.csaf_products
+                if args.csaf_documents:
+                    qparams["csaf_documents"] = args.csaf_documents
                 resp = await client.post(
                     f"{base.rstrip('/')}/task/start", params=qparams
                 )
@@ -335,7 +334,10 @@ class CLI:
                 self._print_json(resp.json())
 
             elif action == "matcher_task_stop":
-                resp = await client.post(f"{base.rstrip('/')}/task/stop")
+                params = {}
+                if args.task_id is not None:
+                    params["task_id"] = args.task_id
+                resp = await client.post(f"{base.rstrip('/')}/task/stop", params=params)
                 resp.raise_for_status()
                 print("Stop requested.")
 

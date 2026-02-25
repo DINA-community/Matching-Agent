@@ -95,7 +95,7 @@ Subcommands:
 
      Options:
      - ``--limit INT`` (default: 100)
-     - ``--offset INT`` (default: 0)
+     - ``--after-id INT`` (default: 0)
      - ``--origin-uri STR``
      - ``--time-lte FLOAT`` and ``--time-gte FLOAT``
      - ``--assets URL [URL ...]`` — filter by asset URLs
@@ -114,6 +114,11 @@ Subcommands:
         uv run csaf_matcher_cli matcher --base-url http://localhost:8998 -u admin \
           matches list --limit 50 --threshold 0.6
 
+        # Filter by specific assets or CSAF documents:
+        uv run csaf_matcher_cli --base-url http://localhost:8998 -u admin \
+          matcher matches list --assets http://assets.local/item/1001 http://assets.local/item/1002 \
+          --csaf-documents http://csaf.local/doc/2001
+
    - ``matcher matches get <id>`` — Fetch a single match by ID.
 
      Example:
@@ -126,8 +131,8 @@ Subcommands:
 3) Task control
    - ``matcher task start`` — Start a matching task. Optional filters:
 
-     - ``--assets INT [INT ...]`` — restrict to specific asset IDs
-     - ``--csaf-products INT [INT ...]`` — restrict to specific CSAF product IDs
+     - ``--assets URL [URL ...]`` — restrict to specific asset URLs
+     - ``--csaf-documents URL [URL ...]`` — restrict to specific CSAF document URLs
 
      Example (start a full run):
 
@@ -141,21 +146,33 @@ Subcommands:
      .. code-block:: bash
 
         uv run csaf_matcher_cli --base-url http://localhost:8998 -u admin \
-          matcher task start --assets 1001 1002 --csaf-products 2001
+          matcher task start --assets http://assets.local/item/1001 http://assets.local/item/1002 \
+          --csaf-documents http://csaf.local/doc/2001
 
    - ``matcher task status`` — Show current matcher status.
+   - ``matcher task running`` — List running matching tasks.
+   - ``matcher task running-get <id>`` — Get a single running matching task.
 
      .. code-block:: bash
 
         uv run csaf_matcher_cli --base-url http://localhost:8998 -u admin \
           matcher task status
 
-   - ``matcher task stop`` — Request a stop of the matcher.
+        uv run csaf_matcher_cli --base-url http://localhost:8998 -u admin \
+          matcher task running --limit 50 --after-id 100
+
+        uv run csaf_matcher_cli --base-url http://localhost:8998 -u admin \
+          matcher task running-get 12
+
+   - ``matcher task stop`` — Request a stop of the matcher (or a specific task with ``--task-id``).
 
      .. code-block:: bash
 
         uv run csaf_matcher_cli --base-url http://localhost:8998 -u admin \
           matcher task stop
+
+        uv run csaf_matcher_cli --base-url http://localhost:8998 -u admin \
+          matcher task stop --task-id 12
 
 4) Clear caches
    - ``matcher clear all`` — Stop all matching tasks, wait for pending batches, then clear all matcher-related caches
@@ -205,4 +222,4 @@ Troubleshooting
 - 401 Unauthorized: ensure credentials are correct and the user exists and is active. If the token may be expired,
   retrieve a new one via ``matcher token``.
 - Connection errors: verify the Matcher service is running and ``--base-url`` points to it.
-- Validation errors: re-check argument names and types (IDs are integers, lists are space-separated).
+- Validation errors: re-check argument names and types (IDs are integers, URL lists are space-separated).

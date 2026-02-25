@@ -497,8 +497,8 @@ class Matcher:
                 origin_uri (HttpUrl | None): Filter matches to only include matches from a specific origin.
                 time_lte (float | None): Filter matches to only include matches with a timestamp less than or equal to the specified value.
                 time_gte (float | None): Filter matches to only include matches with a timestamp greater than or equal to the specified value.
-                assets (list[int] | None): Filter matches to only include matches with assets from the specified list of assets.
-                csaf_documents (list[int] | None): Filter matches to only include matches with csaf_products from the specified set of documents.
+                assets (list[HttpUrl] | None): Filter matches to only include matches for the specified asset URLs.
+                csaf_documents (list[HttpUrl] | None): Filter matches to only include matches for the specified CSAF document URLs.
                 threshold (float | None): Filter matches to only include matches with a score greater than or equal to the specified value.
 
             Returns:
