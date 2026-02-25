@@ -66,7 +66,12 @@ class CLI:
 
         matches_list = matches_sub.add_parser("list", help="List matches")
         matches_list.add_argument("--limit", type=int, default=100)
-        matches_list.add_argument("--offset", type=int, default=0)
+        matches_list.add_argument(
+            "--after-id",
+            type=int,
+            default=0,
+            help="Return matches with an id greater than this value",
+        )
         matches_list.add_argument("--origin-uri", type=str)
         matches_list.add_argument("--time-lte", type=float)
         matches_list.add_argument("--time-gte", type=float)
@@ -260,7 +265,7 @@ class CLI:
             if action == "matcher_matches_list":
                 params: dict[str, Any] = {
                     "limit": args.limit,
-                    "offset": args.offset,
+                    "after_id": args.after_id,
                 }
                 if args.origin_uri:
                     params["origin_uri"] = args.origin_uri

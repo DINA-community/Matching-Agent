@@ -429,7 +429,7 @@ class Matcher:
         @matches_route.get("/")
         async def get_matches(
             limit: int = 100,
-            offset: int = 0,
+            after_id: int = 0,
             origin_uri: HttpUrl | None = None,
             time_lte: float | None = None,
             time_gte: float | None = None,
@@ -441,7 +441,7 @@ class Matcher:
 
             Parameters:
                 limit (int): Maximum number of matches to return. Defaults to 100.
-                offset (int): Number of matches to skip for pagination. Defaults to 0.
+                after_id (int): Return matches with an id greater than this value. Defaults to 0.
                 origin_uri (HttpUrl | None): Filter matches to only include matches from a specific origin.
                 time_lte (float | None): Filter matches to only include matches with a timestamp less than or equal to the specified value.
                 time_gte (float | None): Filter matches to only include matches with a timestamp greater than or equal to the specified value.
@@ -458,10 +458,10 @@ class Matcher:
                     - score: Matching confidence score (0-100)
                     - status: Current status of the match
             """
-            logger.info(f"Getting matches limit={limit} offset={offset}")
+            logger.info(f"Getting matches limit={limit} after_id={after_id}")
             matches = await self.__cache_db.get_matches(
                 limit=limit,
-                last_match_id=offset,
+                last_match_id=after_id,
                 origin_uri=origin_uri,
                 time_lte=time_lte,
                 time_gte=time_gte,
@@ -519,7 +519,16 @@ class Matcher:
             return {"id": task.id}
 
         @task_route.get("/running")
-        async def running_tasks() -> list[MatchingTaskInfo]:
+        async def running_tasks(
+            limit: int = 100,
+            after_id: int = 0,
+        ) -> list[MatchingTaskInfo]:
+            tasks = [
+                task for task in self.__active_tasks.values() if task.task.id > after_id
+            ]
+            tasks.sort(key=lambda task: task.task.id)
+            if limit is not None:
+                tasks = tasks[:limit]
             return [
                 MatchingTaskInfo(
                     id=task.task.id,
@@ -528,7 +537,7 @@ class Matcher:
                     state="running",
                     start_time=task.start_time,
                 )
-                for task in self.__active_tasks.values()
+                for task in tasks
             ]
 
         @task_route.get("/status")
