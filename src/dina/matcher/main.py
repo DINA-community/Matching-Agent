@@ -64,14 +64,19 @@ class MatchingTask(BaseModel):
     id: int
     assets: list[HttpUrl]
     csaf_documents: list[HttpUrl]
+    trigger: Literal["manual", "automated"]
 
 
 class MatchingTaskInfo(BaseModel):
     id: int
     assets: list[HttpUrl]
     csaf_documents: list[HttpUrl]
+    trigger: Literal["manual", "automated"]
     state: Literal["pending", "running"]
     start_time: float | None = None
+    processed_pairs: int = 0
+    total_pairs: int = 0
+    progress: float | None = None
 
 
 # TODO: Define correct fields
@@ -108,6 +113,8 @@ class _ActiveMatchingTask:
     task: MatchingTask
     batch_iter: AsyncGenerator[list[tuple[CsafProduct, Asset]]]
     start_time: float
+    total_pairs: int
+    processed_pairs: int = 0
 
 
 class Matcher:
@@ -161,12 +168,16 @@ class Matcher:
             tg.create_task(self.__trigger_task())
 
     def __new_matching_task(
-        self, assets: list[HttpUrl], csaf_documents: list[HttpUrl]
+        self,
+        assets: list[HttpUrl],
+        csaf_documents: list[HttpUrl],
+        trigger: Literal["manual", "automated"],
     ) -> MatchingTask:
         return MatchingTask(
             id=next(self.__next_task_id),
             assets=assets,
             csaf_documents=csaf_documents,
+            trigger=trigger,
         )
 
     async def __log_task(self, log_queue: multiprocessing.Queue) -> None:
@@ -244,7 +255,9 @@ class Matcher:
                 try:
                     if should_run and not active_tasks and not self.__matching_tasks:
                         # If no task is queued, try to match all assets and all csaf products.
-                        self.__matching_tasks.append(self.__new_matching_task([], []))
+                        self.__matching_tasks.append(
+                            self.__new_matching_task([], [], trigger="automated")
+                        )
 
                     now = datetime.datetime.now()
                     if (now - last_log_output).total_seconds() >= 5:
@@ -258,12 +271,18 @@ class Matcher:
                             self.__cancelled_task_ids.discard(task.id)
                             continue
                         logger.info(f"Starting matching task: {task}")
+                        asset_count = await self.__cache_db.count_assets(task.assets)
+                        csaf_count = await self.__cache_db.count_csaf_products(
+                            task.csaf_documents
+                        )
+                        total_pairs = asset_count * csaf_count
                         active_task = _ActiveMatchingTask(
                             task=task,
                             batch_iter=self.__cache_db.fetch_pairs_batches(
                                 task.assets, task.csaf_documents, batch_size_sqrt=20
                             ),
                             start_time=time.time(),
+                            total_pairs=total_pairs,
                         )
                         active_tasks.append(active_task)
                         self.__active_tasks[task.id] = active_task
@@ -305,6 +324,7 @@ class Matcher:
                         continue
 
                     self.__total_pairs_processed += len(batch)
+                    task_state.processed_pairs += len(batch)
                     while self.__matches.qsize() > num_processes * 2:
                         await asyncio.sleep(0.1)
                     parallel_tasks.append(
@@ -385,7 +405,9 @@ class Matcher:
                 if triggers:
                     last_trigger_id = triggers[-1].id
                     if not self.__matching_tasks:
-                        self.__matching_tasks.append(self.__new_matching_task([], []))
+                        self.__matching_tasks.append(
+                            self.__new_matching_task([], [], trigger="automated")
+                        )
             except Exception as e:
                 logger.error(f"Error consuming matcher triggers: {e}", exc_info=True)
             await asyncio.sleep(0.5)
@@ -514,9 +536,26 @@ class Matcher:
             if csaf_documents is None:
                 csaf_documents = []
             logger.info("Starting matching task")
-            task = self.__new_matching_task(assets, csaf_documents)
+            task = self.__new_matching_task(assets, csaf_documents, trigger="manual")
             self.__matching_tasks.append(task)
             return {"id": task.id}
+
+        def _build_running_task_info(task: _ActiveMatchingTask) -> MatchingTaskInfo:
+            total_pairs = task.total_pairs
+            progress = None
+            if total_pairs > 0:
+                progress = min(task.processed_pairs / total_pairs, 1.0)
+            return MatchingTaskInfo(
+                id=task.task.id,
+                assets=task.task.assets,
+                csaf_documents=task.task.csaf_documents,
+                trigger=task.task.trigger,
+                state="running",
+                start_time=task.start_time,
+                processed_pairs=task.processed_pairs,
+                total_pairs=total_pairs,
+                progress=progress,
+            )
 
         @task_route.get("/running")
         async def running_tasks(
@@ -529,16 +568,14 @@ class Matcher:
             tasks.sort(key=lambda task: task.task.id)
             if limit is not None:
                 tasks = tasks[:limit]
-            return [
-                MatchingTaskInfo(
-                    id=task.task.id,
-                    assets=task.task.assets,
-                    csaf_documents=task.task.csaf_documents,
-                    state="running",
-                    start_time=task.start_time,
-                )
-                for task in tasks
-            ]
+            return [_build_running_task_info(task) for task in tasks]
+
+        @task_route.get("/running/{task_id}")
+        async def running_task(task_id: int) -> MatchingTaskInfo:
+            task = self.__active_tasks.get(task_id)
+            if task is None:
+                raise HTTPException(status_code=404, detail="Task not found")
+            return _build_running_task_info(task)
 
         @task_route.get("/status")
         async def status() -> MatcherStatus:

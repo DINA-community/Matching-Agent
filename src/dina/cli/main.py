@@ -116,6 +116,19 @@ class CLI:
         task_status = task_sub.add_parser("status", help="Get matcher status")
         task_status.set_defaults(action="matcher_task_status")
 
+        task_running = task_sub.add_parser(
+            "running", help="List running matching tasks"
+        )
+        task_running.add_argument("--limit", type=int, default=100)
+        task_running.add_argument("--after-id", type=int, default=0)
+        task_running.set_defaults(action="matcher_task_running")
+
+        task_running_get = task_sub.add_parser(
+            "running-get", help="Get a single running matching task"
+        )
+        task_running_get.add_argument("id", type=int, help="Task ID")
+        task_running_get.set_defaults(action="matcher_task_running_get")
+
         task_stop = task_sub.add_parser("stop", help="Stop the matcher")
         task_stop.set_defaults(action="matcher_task_stop")
 
@@ -305,6 +318,19 @@ class CLI:
 
             elif action == "matcher_task_status":
                 resp = await client.get(f"{base.rstrip('/')}/task/status")
+                resp.raise_for_status()
+                self._print_json(resp.json())
+
+            elif action == "matcher_task_running":
+                params = {"limit": args.limit, "after_id": args.after_id}
+                resp = await client.get(
+                    f"{base.rstrip('/')}/task/running", params=params
+                )
+                resp.raise_for_status()
+                self._print_json(resp.json())
+
+            elif action == "matcher_task_running_get":
+                resp = await client.get(f"{base.rstrip('/')}/task/running/{args.id}")
                 resp.raise_for_status()
                 self._print_json(resp.json())
 
