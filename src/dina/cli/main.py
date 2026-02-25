@@ -24,6 +24,11 @@ class CLI:
             prog="csaf_matcher_cli",
             description="DINA command-line utilities",
         )
+        parser.add_argument(
+            "--json",
+            action="store_true",
+            help="Output machine-readable JSON",
+        )
         # Allow passing common API args at the root level (before selecting a group)
         # These are optional here; we'll validate when dispatching a specific group.
         self._add_common_api_args(parser)
@@ -174,6 +179,7 @@ class CLI:
     async def run(self):
         """Run the CLI."""
         args = self.parser.parse_args()
+        self._output_json = bool(getattr(args, "json", False))
         if args.command == "user" and args.user_command == "create":
             # Prompt for password if not provided
             resolved_pwd = self._resolve_password(getattr(args, "password", None))
@@ -228,11 +234,39 @@ class CLI:
                 data={"username": username, "password": password},
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
-            resp.raise_for_status()
+            self._raise_for_status(resp, "auth")
             data = resp.json()
             if not isinstance(data, dict) or "access_token" not in data:
                 raise RuntimeError("Unexpected token response")
             return str(data["access_token"])
+
+    def _raise_for_status(self, resp: httpx.Response, context: str) -> None:
+        if resp.status_code < 400:
+            return
+        detail = ""
+        try:
+            payload = resp.json()
+            if isinstance(payload, dict) and "detail" in payload:
+                detail = str(payload["detail"])
+        except Exception:
+            detail = resp.text.strip()
+        if resp.status_code == 401:
+            msg = "Unauthorized. Check username/password."
+        elif resp.status_code == 403:
+            msg = "Forbidden. The account lacks permission."
+        elif resp.status_code == 404:
+            msg = "Not found. Check the ID or endpoint."
+        elif resp.status_code == 409:
+            msg = "Conflict. The request could not be completed."
+        elif resp.status_code == 422:
+            msg = "Unprocessable entity. Check parameter types."
+        elif resp.status_code >= 500:
+            msg = "Server error. Try again or check server logs."
+        else:
+            msg = f"HTTP {resp.status_code}"
+        if detail:
+            msg = f"{msg} ({detail})"
+        raise RuntimeError(f"{context} failed: {msg}")
 
     def _auth_headers(self, token: str) -> dict[str, str]:
         return {"Authorization": f"Bearer {token}"}
@@ -243,6 +277,44 @@ class CLI:
         import json
 
         print(json.dumps(data, indent=2, ensure_ascii=False))
+
+    def _format_value(self, value: Any, indent: int = 0) -> str:
+        pad = "  " * indent
+        if isinstance(value, dict):
+            if not value:
+                return "{}"
+            lines = []
+            for key, val in value.items():
+                formatted = self._format_value(val, indent + 1)
+                if "\n" in formatted:
+                    lines.append(f"{pad}{key}:\n{formatted}")
+                else:
+                    lines.append(f"{pad}{key}: {formatted}")
+            return "\n".join(lines)
+        if isinstance(value, list):
+            if not value:
+                return "[]"
+            # If list of dicts, show each item as a block
+            if all(isinstance(item, dict) for item in value):
+                blocks = []
+                for idx, item in enumerate(value, start=1):
+                    blocks.append(f"{pad}- [{idx}]")
+                    blocks.append(self._format_value(item, indent + 1))
+                return "\n".join(blocks)
+            # Simple list
+            items = ", ".join(self._format_value(item, 0) for item in value)
+            return f"[{items}]"
+        if isinstance(value, str):
+            return value
+        if value is None:
+            return "null"
+        return str(value)
+
+    def _print_output(self, data: Any, *, force_json: bool = False) -> None:
+        if force_json or self._output_json:
+            self._print_json(data)
+            return
+        print(self._format_value(data))
 
     # ------------- matcher commands -------------
     async def _dispatch_matcher(self, args: argparse.Namespace) -> None:
@@ -293,15 +365,15 @@ class CLI:
                     params["threshold"] = args.threshold
 
                 resp = await client.get(f"{base.rstrip('/')}/matches/", params=params)
-                resp.raise_for_status()
-                self._print_json(resp.json())
+                self._raise_for_status(resp, "matches list")
+                self._print_output(resp.json())
 
             elif action == "matcher_matches_get":
                 resp = await client.get(
                     f"{base.rstrip('/')}/matches/{args.id}",
                 )
-                resp.raise_for_status()
-                self._print_json(resp.json())
+                self._raise_for_status(resp, "match get")
+                self._print_output(resp.json())
 
             elif action == "matcher_task_start":
                 qparams: dict[str, Any] = {}
@@ -312,43 +384,43 @@ class CLI:
                 resp = await client.post(
                     f"{base.rstrip('/')}/task/start", params=qparams
                 )
-                resp.raise_for_status()
+                self._raise_for_status(resp, "task start")
                 print("Started.")
 
             elif action == "matcher_task_status":
                 resp = await client.get(f"{base.rstrip('/')}/task/status")
-                resp.raise_for_status()
-                self._print_json(resp.json())
+                self._raise_for_status(resp, "task status")
+                self._print_output(resp.json())
 
             elif action == "matcher_task_running":
                 params = {"limit": args.limit, "after_id": args.after_id}
                 resp = await client.get(
                     f"{base.rstrip('/')}/task/running", params=params
                 )
-                resp.raise_for_status()
-                self._print_json(resp.json())
+                self._raise_for_status(resp, "task running")
+                self._print_output(resp.json())
 
             elif action == "matcher_task_running_get":
                 resp = await client.get(f"{base.rstrip('/')}/task/running/{args.id}")
-                resp.raise_for_status()
-                self._print_json(resp.json())
+                self._raise_for_status(resp, "task running get")
+                self._print_output(resp.json())
 
             elif action == "matcher_task_stop":
                 params = {}
                 if args.task_id is not None:
                     params["task_id"] = args.task_id
                 resp = await client.post(f"{base.rstrip('/')}/task/stop", params=params)
-                resp.raise_for_status()
+                self._raise_for_status(resp, "task stop")
                 print("Stop requested.")
 
             elif action == "matcher_clear_all":
                 resp = await client.post(f"{base.rstrip('/')}/clear/all")
-                resp.raise_for_status()
+                self._raise_for_status(resp, "clear all")
                 print("Cleared all caches.")
 
             elif action == "matcher_clear_matches":
                 resp = await client.post(f"{base.rstrip('/')}/clear/matches")
-                resp.raise_for_status()
+                self._raise_for_status(resp, "clear matches")
                 print("Cleared matches cache.")
 
             elif action == "matcher_clear_assets":
@@ -356,7 +428,7 @@ class CLI:
                     f"{base.rstrip('/')}/clear/assets",
                     params={"origin_uri": args.origin_uri},
                 )
-                resp.raise_for_status()
+                self._raise_for_status(resp, "clear assets")
                 print("Cleared assets cache.")
 
             elif action == "matcher_clear_csaf":
@@ -364,7 +436,7 @@ class CLI:
                     f"{base.rstrip('/')}/clear/csaf",
                     params={"origin_uri": args.origin_uri},
                 )
-                resp.raise_for_status()
+                self._raise_for_status(resp, "clear csaf")
                 print("Cleared CSAF cache.")
 
             else:
@@ -401,13 +473,13 @@ class CLI:
             action = getattr(args, "action", None)
             if action == "sync_task_start":
                 resp = await client.post(f"{base.rstrip('/')}/task/start")
-                resp.raise_for_status()
+                self._raise_for_status(resp, "sync start")
                 print("Synchronization start requested.")
 
             elif action == "sync_task_status":
                 resp = await client.get(f"{base.rstrip('/')}/task/status")
-                resp.raise_for_status()
-                self._print_json(resp.json())
+                self._raise_for_status(resp, "sync status")
+                self._print_output(resp.json())
 
             else:
                 self.parser.error("Unknown sync command")
@@ -447,6 +519,10 @@ async def run_cli():
 
     try:
         await cli.run()
+
+    except RuntimeError as e:
+        logger.error(str(e))
+        raise SystemExit(1)
 
     except Exception as e:
         logger.error(f"CLI failed: {str(e)}")

@@ -195,6 +195,7 @@ Argument placement
 
 - Common options like ``--base-url`` and ``-u/--username`` must appear at the root level
   (before ``matcher``).
+- By default, output is human-readable; pass ``--json`` for machine-readable output.
 
 Non‑interactive usage (automation/CI)
 -------------------------------------
