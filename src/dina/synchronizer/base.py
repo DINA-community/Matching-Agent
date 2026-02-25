@@ -121,6 +121,8 @@ class BaseSynchronizer(ABC):
         self.__total_products_fetched: int = 0
         self.__total_relationships_fetched: int = 0
         self.__root_path: str = root_path
+        self.__store_idle_event = asyncio.Event()
+        self.__store_idle_event.set()
         self.cache_db: CacheDB = cache_db
         self.pending_products: list[Asset | CsafProduct] = []
         self.pending_relationships: dict[HttpUrl, list[Relationship]] = defaultdict(
@@ -298,6 +300,9 @@ class BaseSynchronizer(ABC):
                         await fetcher_view.set_last_run(
                             datetime.datetime.fromtimestamp(self.__sync_start_time)
                         )
+                        await self.__wait_for_pipeline_drain()
+                        if self.config.Synchronizer.trigger_matcher_on_sync:
+                            await self.cache_db.add_matcher_trigger()
 
                 except Exception as e:
                     logger.error(
@@ -360,6 +365,7 @@ class BaseSynchronizer(ABC):
         while True:
             if self.preprocessed_data or any(self.pending_relationships.values()):
                 logger.info(f"Storing {len(self.preprocessed_data)} items in cacheDB")
+                self.__store_idle_event.clear()
                 data = self.preprocessed_data
                 self.preprocessed_data = []
                 mapped_relations = []
@@ -381,12 +387,20 @@ class BaseSynchronizer(ABC):
                         )
                     )
                 await self.cache_db.store(data, mapped_relations)
-                if (
-                    data or mapped_relations
-                ) and self.config.Synchronizer.trigger_matcher_on_sync:
-                    await self.cache_db.add_matcher_trigger()
+                self.__store_idle_event.set()
             else:
+                self.__store_idle_event.set()
                 await asyncio.sleep(0.1)
+
+    async def __wait_for_pipeline_drain(self) -> None:
+        """Wait until pending data/relations are fully stored."""
+        while (
+            self.pending_products
+            or self.preprocessed_data
+            or any(self.pending_relationships.values())
+            or not self.__store_idle_event.is_set()
+        ):
+            await asyncio.sleep(0.1)
 
     async def cleanup_task(self, source: DataSourcePlugin):
         while True:

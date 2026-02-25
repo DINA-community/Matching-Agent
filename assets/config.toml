@@ -36,7 +36,7 @@ host = "0.0.0.0"
 # The port to serve on.
 port = 8992
 
-access_token_expire_minutes = 10
+access_token_expire_minutes = 120
 
 # Optional logging configuration for the assetsync component
 # If omitted, logs go to console with INFO level (or LOG_LEVEL env).
