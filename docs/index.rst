@@ -16,6 +16,7 @@ Contents
    authentication
    api
    matcher-cli
+   cachedb
    matching-agent
    production-setup
    troubleshooting
