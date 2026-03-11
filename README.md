@@ -332,9 +332,12 @@ uv run pytest -v  -s tests/matcher/test_matching.py
 
 ## Production Docker Setup
 
-This repository ships a simple production‑ready Docker setup that runs the three services (assetsync, csafsync, matcher) with a shared PostgreSQL database and exposes all three APIs over HTTPS using a self‑signed certificate.
+This repository ships a simple production‑ready Docker setup that runs the three services (assetsync, csafsync, matcher) with a shared PostgreSQL database and exposes all three APIs over HTTPS via an NGINX reverse proxy.
+
+The core services themselves do not implement native TLS listeners. Without a reverse proxy, there is no TLS support for external traffic. This separation is intentional and follows common industry practice (TLS termination at the edge proxy, application services kept lean).
 
 For instructions on how to set up the environment, see the corresponding section in the docs.
+For professional deployments, use the SSL/TLS guidance in the production docs (trusted certificates, reverse proxy hardening, and NGINX example configuration).
 The docs are built with `make docs` and can be found in the `docs/_build/html/production-setup.html` directory.
 
 > Note Under development see [Issue #9](https://github.com/DINA-community/Matching-Agent/issues/9)
