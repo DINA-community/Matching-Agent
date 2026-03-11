@@ -132,6 +132,22 @@ class CLI:
         task_running_get.add_argument("id", type=int, help="Task ID")
         task_running_get.set_defaults(action="matcher_task_running_get")
 
+        task_history = task_sub.add_parser("history", help="List past matching runs")
+        task_history.add_argument("--limit", type=int, default=100)
+        task_history.add_argument("--after-id", type=int, default=0)
+        task_history.add_argument(
+            "--state",
+            type=str,
+            help="Optional run state filter (e.g. running, completed, cancelled)",
+        )
+        task_history.set_defaults(action="matcher_task_history")
+
+        task_history_get = task_sub.add_parser(
+            "history-get", help="Get a single historical matching run"
+        )
+        task_history_get.add_argument("id", type=int, help="Run ID")
+        task_history_get.set_defaults(action="matcher_task_history_get")
+
         task_stop = task_sub.add_parser("stop", help="Stop the matcher")
         task_stop.add_argument("--task-id", type=int, help="Stop a specific task")
         task_stop.set_defaults(action="matcher_task_stop")
@@ -147,6 +163,9 @@ class CLI:
 
         clear_matches = clear_sub.add_parser("matches", help="Clear matches cache")
         clear_matches.set_defaults(action="matcher_clear_matches")
+
+        clear_runs = clear_sub.add_parser("runs", help="Clear matcher run history")
+        clear_runs.set_defaults(action="matcher_clear_runs")
 
         clear_assets = clear_sub.add_parser("assets", help="Clear assets cache")
         clear_assets.add_argument("--origin-uri", required=True)
@@ -474,6 +493,24 @@ class CLI:
                 self._raise_for_status(resp, "task running get")
                 self._print_output(resp.json())
 
+            elif action == "matcher_task_history":
+                params: dict[str, Any] = {
+                    "limit": args.limit,
+                    "after_id": args.after_id,
+                }
+                if args.state:
+                    params["state"] = args.state
+                resp = await client.get(
+                    f"{base.rstrip('/')}/task/history", params=params
+                )
+                self._raise_for_status(resp, "task history")
+                self._print_output(resp.json())
+
+            elif action == "matcher_task_history_get":
+                resp = await client.get(f"{base.rstrip('/')}/task/history/{args.id}")
+                self._raise_for_status(resp, "task history get")
+                self._print_output(resp.json())
+
             elif action == "matcher_task_stop":
                 params = {}
                 if args.task_id is not None:
@@ -491,6 +528,11 @@ class CLI:
                 resp = await client.post(f"{base.rstrip('/')}/clear/matches")
                 self._raise_for_status(resp, "clear matches")
                 print("Cleared matches cache.")
+
+            elif action == "matcher_clear_runs":
+                resp = await client.post(f"{base.rstrip('/')}/clear/runs")
+                self._raise_for_status(resp, "clear runs")
+                print("Cleared matcher run history.")
 
             elif action == "matcher_clear_assets":
                 resp = await client.post(

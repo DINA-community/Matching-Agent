@@ -94,6 +94,44 @@ class MatcherTrigger(Base):
     )
 
 
+class MatcherRun(Base):
+    __tablename__ = "matcher_run"
+    __table_args__ = (Index("ix_matcher_run_started_at", "started_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    trigger: Mapped[str] = mapped_column(Text, nullable=False)
+    state: Mapped[str] = mapped_column(Text, nullable=False, default="running")
+    started_at: Mapped[float] = mapped_column(
+        Float, nullable=False, default=lambda: datetime.datetime.now().timestamp()
+    )
+    finished_at: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    total_pairs: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    processed_pairs: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    matches_found: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    assets: Mapped[List[str]] = mapped_column(JSONB, nullable=False, default=list)
+    csaf_documents: Mapped[List[str]] = mapped_column(
+        JSONB, nullable=False, default=list
+    )
+    error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    def to_dict(self) -> Dict[str, Any]:
+        result: Dict[str, Any] = {
+            "trigger": self.trigger,
+            "state": self.state,
+            "started_at": self.started_at,
+            "finished_at": self.finished_at,
+            "total_pairs": self.total_pairs,
+            "processed_pairs": self.processed_pairs,
+            "matches_found": self.matches_found,
+            "assets": self.assets,
+            "csaf_documents": self.csaf_documents,
+            "error": self.error,
+        }
+        if self.id is not None:
+            result["id"] = self.id
+        return result
+
+
 class ProductType(enum.Enum):
     Software = "Software"
     Device = "Device"

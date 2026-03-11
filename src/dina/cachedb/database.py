@@ -27,6 +27,7 @@ from dina.cachedb.model import (
     Base,
     CsafProduct,
     Match,
+    MatcherRun,
     MatcherTrigger,
     Product,
     SynchronizerMetadata,
@@ -505,6 +506,37 @@ class CacheDB:
                 stmt = stmt.where(CsafProduct.uri.in_([str(p) for p in csaf_documents]))
             return int((await session.execute(stmt)).scalar_one())
 
+    async def count_pairs_to_match(
+        self,
+        assets: list[HttpUrl],
+        csaf_documents: list[HttpUrl],
+    ) -> int:
+        async with AsyncSession(self.engine) as session:
+            stmt = (
+                select(func.count())
+                .select_from(CsafProduct)
+                .join(Asset, literal(True))
+                .outerjoin(
+                    Match,
+                    and_(
+                        Match.asset_id == Asset.id,
+                        Match.csaf_product_id == CsafProduct.id,
+                    ),
+                )
+                .where(
+                    or_(
+                        Match.id.is_(None),
+                        Match.timestamp < Asset.last_update,
+                        Match.timestamp < CsafProduct.last_update,
+                    )
+                )
+            )
+            if assets:
+                stmt = stmt.where(Asset.uri.in_([str(a) for a in assets]))
+            if csaf_documents:
+                stmt = stmt.where(CsafProduct.uri.in_([str(p) for p in csaf_documents]))
+            return int((await session.execute(stmt)).scalar_one())
+
     async def store_matches(self, matches: list[Match]) -> list[int]:
         if not matches:
             return []
@@ -544,6 +576,137 @@ class CacheDB:
                         )
                     )
                 return triggers
+
+    async def create_matcher_run(
+        self,
+        trigger: str,
+        assets: list[HttpUrl],
+        csaf_documents: list[HttpUrl],
+        *,
+        state: str = "pending",
+        started_at: float | None = None,
+        total_pairs: int = 0,
+    ) -> MatcherRun:
+        if started_at is None:
+            started_at = datetime.datetime.now().timestamp()
+        async with AsyncSession(self.engine) as session:
+            async with session.begin():
+                run = MatcherRun(
+                    trigger=trigger,
+                    state=state,
+                    started_at=started_at,
+                    total_pairs=total_pairs,
+                    assets=[str(a) for a in assets],
+                    csaf_documents=[str(c) for c in csaf_documents],
+                )
+                session.add(run)
+                await session.flush()
+                session.expunge(run)
+                return run
+
+    async def start_matcher_run(
+        self,
+        run_id: int,
+        *,
+        started_at: float | None = None,
+        total_pairs: int = 0,
+    ) -> None:
+        if started_at is None:
+            started_at = datetime.datetime.now().timestamp()
+        async with AsyncSession(self.engine) as session:
+            async with session.begin():
+                stmt = (
+                    update(MatcherRun)
+                    .where(MatcherRun.id == run_id)
+                    .values(
+                        state="running",
+                        started_at=started_at,
+                        total_pairs=total_pairs,
+                    )
+                )
+                await session.execute(stmt)
+
+    async def finish_matcher_run(
+        self,
+        run_id: int,
+        *,
+        state: str,
+        finished_at: float | None = None,
+        processed_pairs: int = 0,
+        matches_found: int = 0,
+        error: str | None = None,
+    ) -> None:
+        if finished_at is None:
+            finished_at = datetime.datetime.now().timestamp()
+        async with AsyncSession(self.engine) as session:
+            async with session.begin():
+                stmt = (
+                    update(MatcherRun)
+                    .where(MatcherRun.id == run_id)
+                    .values(
+                        state=state,
+                        finished_at=finished_at,
+                        processed_pairs=processed_pairs,
+                        matches_found=matches_found,
+                        error=error,
+                    )
+                )
+                await session.execute(stmt)
+
+    async def update_matcher_run_progress(
+        self,
+        run_id: int,
+        *,
+        processed_pairs: int,
+    ) -> None:
+        async with AsyncSession(self.engine) as session:
+            async with session.begin():
+                stmt = (
+                    update(MatcherRun)
+                    .where(MatcherRun.id == run_id)
+                    .values(processed_pairs=processed_pairs)
+                )
+                await session.execute(stmt)
+
+    async def update_matcher_run_matches_found(
+        self,
+        run_id: int,
+        *,
+        matches_found: int,
+    ) -> None:
+        async with AsyncSession(self.engine) as session:
+            async with session.begin():
+                stmt = (
+                    update(MatcherRun)
+                    .where(MatcherRun.id == run_id)
+                    .values(matches_found=matches_found)
+                )
+                await session.execute(stmt)
+
+    async def get_matcher_runs(
+        self,
+        limit: int | None = 100,
+        after_id: int = 0,
+        state: str | None = None,
+    ) -> list[MatcherRun]:
+        async with AsyncSession(self.engine) as session:
+            stmt = select(MatcherRun).where(MatcherRun.id > after_id)
+            if state is not None:
+                stmt = stmt.where(MatcherRun.state == state)
+            stmt = stmt.order_by(MatcherRun.started_at.desc(), MatcherRun.id.desc())
+            if limit is not None:
+                stmt = stmt.limit(limit)
+            return (await session.execute(stmt)).scalars().all()
+
+    async def get_matcher_run(self, run_id: int) -> MatcherRun | None:
+        async with AsyncSession(self.engine) as session:
+            stmt = select(MatcherRun).where(MatcherRun.id == run_id)
+            return (await session.execute(stmt)).scalars().first()
+
+    async def clear_matcher_runs(self) -> None:
+        async with AsyncSession(self.engine) as session:
+            async with session.begin():
+                await session.execute(delete(MatcherRun))
 
     async def get_matches(
         self,
@@ -672,6 +835,8 @@ class CacheDB:
     async def clear(self) -> None:
         async with AsyncSession(self.engine) as session:
             async with session.begin():
+                stmt = delete(MatcherRun)
+                await session.execute(stmt)
                 stmt = delete(CsafProduct)
                 await session.execute(stmt)
                 stmt = delete(Asset)
