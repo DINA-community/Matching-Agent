@@ -25,3 +25,28 @@ jobs:
         env:
           JWT_SECRET_KEY: dummy_secret_key_for_testing
         run: uv run pytest
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: "3.13"
+
+      - name: Build
+        run: uv build --all
+
+      - name: Generate sbom
+        run: uv export --format cyclonedx1.5 --output-file sbom.json
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: github.ref_type == 'tag'
+        with:
+          files: |
+            dist/*.whl
+            sbom.json
