@@ -1,8 +1,16 @@
 """
-Base classes for manager daemons.
+Base classes for synchronizer daemons.
 
-This module provides the base infrastructure for manager daemons
-that fetch data, transform it, and preprocess it using plugins.
+This module provides the base infrastructure for synchronizer daemons that orchestrate
+data fetching, preprocessing, and storage pipelines. It handles plugin loading, task
+scheduling, and exposes a FastAPI interface for monitoring and control.
+
+The synchronizer operates as a multi-task async system with separate tasks for:
+- Fetching data from configured data sources
+- Preprocessing fetched data through plugin chains
+- Storing processed data to the cache database
+- Periodic cleanup of stale data
+- API server for status and control endpoints
 """
 
 from __future__ import annotations
@@ -44,10 +52,27 @@ type TomlEntry = (
 
 
 class PluginLoadError(Exception):
+    """Raised when a plugin fails to load from entry points or configuration."""
+
     pass
 
 
 class BaseSynchronizer(ABC):
+    """
+    Abstract base class for data synchronizer daemons.
+
+    Orchestrates a pipeline of asynchronous tasks to fetch data from configured sources,
+    preprocess it through plugin chains, and store results to a cache database. Provides
+    a FastAPI-based API for monitoring and controlling synchronization operations.
+
+    The synchronizer supports both interval-based and fixed-time scheduling, automatic
+    cleanup of stale data, and graceful handling of stop requests. Authentication is
+    required for control endpoints.
+
+    Subclasses should inherit from this class to implement specific synchronizer types
+    (e.g., asset synchronizer, CSAF synchronizer).
+    """
+
     starttime = 0
 
     def __init__(
@@ -56,13 +81,13 @@ class BaseSynchronizer(ABC):
         config: SynchronizerConfig,
         root_path: str = "",
     ):
-        """Initialize the BaseManager.
+        """
+        Initialize the synchronizer.
 
         Args:
-            cache_db: The cache database to use.
-            data_source_plugin_configs: Path to a directory containing data source plugin configuration files.
-            root_path: The root path for the API when behind a reverse proxy (e.g., "/assetsync").
-            config_class: The Pydantic model class to use for configuration.
+            cache_db: Connected cache database instance for data storage.
+            config: Configuration object containing synchronizer, API, and plugin settings.
+            root_path: Base path prefix for the API when behind a reverse proxy (e.g., "/assetsync").
         """
         self.__last_synchronization: float | None = None
         self.__sync_start_time: float | None = None
@@ -93,6 +118,15 @@ class BaseSynchronizer(ABC):
 
     @staticmethod
     def get_installed_plugins(group: str) -> EntryPoints:
+        """
+        Retrieve all installed plugins for a given entry point group.
+
+        Args:
+            group: Entry point group name (e.g., "dina.plugins.datasource").
+
+        Returns:
+            Collection of entry points found for the specified group.
+        """
         installed_plugins = entry_points(group=group)
         logger.debug(f"Found {len(installed_plugins)} installed plugins:")
         for installed_plugin in installed_plugins:
@@ -106,15 +140,18 @@ class BaseSynchronizer(ABC):
         config_data: DataSourcePlugin.Config | None,
     ) -> DataSourcePlugin | PreprocessorPlugin:
         """
-        Load a single plugin from entry points.
+        Load and instantiate a plugin from its entry point.
 
         Args:
-            plugin_name: Name of the plugin to load
-            entry_points_group: Entry points group to search in
-            config_data: Configuration data for the plugin
+            plugin_name: Name of the plugin to load.
+            entry_points_group: Entry point group to search in.
+            config_data: Optional configuration to pass to the plugin constructor.
 
         Returns:
-            Loaded plugin instance or None if loading failed
+            Instantiated plugin object.
+
+        Raises:
+            PluginLoadError: If the plugin cannot be found, is ambiguous, or fails to load.
         """
         installed_plugins = BaseSynchronizer.get_installed_plugins(entry_points_group)
 
@@ -147,9 +184,17 @@ class BaseSynchronizer(ABC):
         preprocessor_plugin_names: list[str],
     ) -> list[PreprocessorPlugin]:
         """
-        Load preprocessor plugins specified in the configuration file.
+        Load and instantiate preprocessor plugins from configuration.
+
+        Args:
+            preprocessor_plugin_names: List of preprocessor plugin names to load.
+
+        Returns:
+            List of instantiated preprocessor plugins in the order specified.
+
         Raises:
-            KeyError: If the configuration file is missing required fields.
+            KeyError: If no preprocessor plugins are specified.
+            ValueError: If a loaded plugin is not a preprocessor plugin.
         """
         preprocessor_plugins: list[PreprocessorPlugin] = []
         try:
@@ -179,10 +224,23 @@ class BaseSynchronizer(ABC):
         return preprocessor_plugins
 
     async def setup(self):
+        """
+        Perform initial setup before running the synchronizer.
+
+        Connects to the cache database. Must be called before run().
+        """
         await self.cache_db.connect()
 
     async def run(self):
-        """Run the manager."""
+        """
+        Run the synchronizer daemon with all its concurrent tasks.
+
+        Starts an API server and creates concurrent tasks for data fetching, preprocessing,
+        storage, and cleanup for each configured data source. Runs indefinitely until
+        cancelled or an unhandled exception occurs.
+
+        Exceptions within individual tasks are logged but do not stop other tasks.
+        """
         try:
             async with asyncio.TaskGroup() as tg:
                 tg.create_task(self.__api_client())
@@ -200,7 +258,15 @@ class BaseSynchronizer(ABC):
                 logger.error("TaskGroup exception:", exc_info=e)
 
     def __should_run_sync(self) -> bool:
-        """Determine if synchronization should run based on configured schedule."""
+        """
+        Determine whether a synchronization run should begin based on scheduling configuration.
+
+        Supports both interval-based (run every N seconds) and fixed time-of-day scheduling.
+        Always returns True if no synchronization has run yet.
+
+        Returns:
+            True if a sync should run now, False otherwise.
+        """
         if self.__last_synchronization is None:
             return True
 
@@ -229,6 +295,16 @@ class BaseSynchronizer(ABC):
             return last_sync_dt < target_time <= now
 
     async def fetch_data_task(self, source: DataSourcePlugin):
+        """
+        Continuously fetch data from a specific data source according to the schedule.
+
+        Runs products and relationships fetching in sequence, respecting stop requests.
+        Updates statistics and triggers matcher if configured. Runs in an infinite loop,
+        checking the schedule between iterations.
+
+        Args:
+            source: The data source plugin to fetch from.
+        """
         while True:
             if self.__should_run_sync():
                 try:
@@ -270,6 +346,16 @@ class BaseSynchronizer(ABC):
                 await asyncio.sleep(1)
 
     async def fetch_products(self, fetcher_view: FetcherView, source: DataSourcePlugin):
+        """
+        Fetch products from a data source and add them to the pending queue.
+
+        Args:
+            fetcher_view: Database view for the specific data source.
+            source: The data source plugin to fetch from.
+
+        Returns:
+            True if more products are available and should be fetched again, False otherwise.
+        """
         logger.debug(f"Fetching data from {source.debug_info()}")
         result = await source.fetch_products(fetcher_view)
         self.__total_products_fetched += len(result.data)
@@ -282,6 +368,15 @@ class BaseSynchronizer(ABC):
     async def fetch_relationships(
         self, fetcher_view: FetcherView, source: DataSourcePlugin
     ):
+        """
+        Fetch all available relationships from a data source.
+
+        Continues fetching until the source indicates no more relationships are available.
+
+        Args:
+            fetcher_view: Database view for the specific data source.
+            source: The data source plugin to fetch from.
+        """
         again = True
         while again:
             logger.debug(f"Fetching relationships from {source.debug_info()}")
@@ -292,7 +387,12 @@ class BaseSynchronizer(ABC):
             again = result.again
 
     async def preprocess_data_task(self):
-        """Process data using the loaded preprocessor plugins."""
+        """
+        Continuously preprocess pending products through the plugin chain.
+
+        Processes products sequentially through each configured preprocessor plugin,
+        then moves them to the preprocessed data queue. Runs in an infinite loop.
+        """
         assert self.preprocessor_plugins, "No preprocessor plugins loaded"
         while True:
             if self.pending_products:
@@ -313,7 +413,12 @@ class BaseSynchronizer(ABC):
                 await asyncio.sleep(0.1)
 
     async def store_data_task(self):
-        """Store the preprocessed data."""
+        """
+        Continuously store preprocessed data and relationships to the cache database.
+
+        Processes preprocessed products first, then relationships. Maps relationships
+        to their appropriate entities before storage. Runs in an infinite loop.
+        """
         while True:
             if self.preprocessed_data:
                 logger.info(f"Storing {len(self.preprocessed_data)} items in cacheDB")
@@ -349,7 +454,12 @@ class BaseSynchronizer(ABC):
                 await asyncio.sleep(0.1)
 
     async def __wait_for_pipeline_drain(self) -> None:
-        """Wait until pending data/relations are fully stored."""
+        """
+        Wait until all pending data has been fully processed and stored.
+
+        Blocks until all queues (pending products, preprocessed data, pending relationships)
+        are empty and the storage task is idle.
+        """
         while (
             self.pending_products
             or self.preprocessed_data
@@ -359,6 +469,15 @@ class BaseSynchronizer(ABC):
             await asyncio.sleep(0.1)
 
     async def cleanup_task(self, source: DataSourcePlugin):
+        """
+        Periodically clean up stale data for a specific data source.
+
+        Removes entries that haven't been updated recently, based on the configured
+        grace period and the source's last successful run time. Runs in an infinite loop.
+
+        Args:
+            source: The data source plugin to clean up data for.
+        """
         while True:
             if (
                 self.__last_cleanup is None
@@ -375,9 +494,20 @@ class BaseSynchronizer(ABC):
                 await asyncio.sleep(1)
 
     async def cleanup(self):
+        """
+        Clean up resources before shutdown.
+
+        Disconnects from the cache database. Should be called during graceful shutdown.
+        """
         await self.cache_db.disconnect()
 
     async def __api_client(self):
+        """
+        Run the FastAPI server for monitoring and control.
+
+        Provides endpoints for authentication, starting/stopping synchronization, and
+        querying status. Protected endpoints require authentication via OAuth2 bearer tokens.
+        """
         api = FastAPI(root_path=self.__root_path)
         task_route = APIRouter(
             prefix="/task", dependencies=[Depends(AccessChecker(self.cache_db))]
@@ -446,18 +576,20 @@ class BaseSynchronizer(ABC):
 
 def load_datasource_plugins(plugin_configs: Path) -> dict[HttpUrl, DataSourcePlugin]:
     """
-    Load plugins from configuration files in the specified directory.
+    Load and instantiate data source plugins from TOML configuration files.
+
+    Scans the specified directory for .toml files, parses each one, and loads the
+    corresponding plugin. Ensures no duplicate origin URIs are configured.
 
     Args:
-        plugin_configs: Path to a directory containing plugin configuration files in TOML format.
+        plugin_configs: Path to directory containing plugin configuration TOML files.
 
     Returns:
-        A list of initialized DataSourcePlugin instances.
+        Dictionary mapping origin URIs to instantiated data source plugin objects.
 
     Raises:
-        FileNotFoundError: If the plugin_configs path does not exist or is not a directory.
-        ImportError: If a plugin module cannot be imported.
-        KeyError: If a plugin configuration is missing required fields.
+        FileNotFoundError: If the plugin_configs path doesn't exist or isn't a directory.
+        PluginLoadError: If a plugin fails to load or duplicate origins are detected.
     """
     plugin_configs = plugin_configs.resolve()
     if not plugin_configs.exists() or not plugin_configs.is_dir():
@@ -507,12 +639,24 @@ def load_datasource_plugins(plugin_configs: Path) -> dict[HttpUrl, DataSourcePlu
 
 
 class SynchronizerState(enum.Enum):
+    """
+    Enumeration of possible synchronizer execution states.
+
+    Used to track and control the synchronizer lifecycle.
+    """
+
     STOPPED = "stopped"
     STOP_REQUESTED = "stop_requested"
     RUNNING = "running"
 
 
 class SynchronizerStatus(BaseModel):
+    """
+    Status information about the synchronizer's current state and statistics.
+
+    Returned by the /task/status API endpoint to provide monitoring information.
+    """
+
     state: SynchronizerState
     start: float | None = None
     last_synchronization: float | None
