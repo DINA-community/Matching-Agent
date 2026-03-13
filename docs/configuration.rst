@@ -221,6 +221,12 @@ Data source and preprocessor plugins have their own configuration files. Each da
 is a TOML document with a top-level ``[DataSource]`` section and a ``[DataSource.Plugin]`` section.
 Container images include a copy under ``docker/assets/plugin_configs`` with the same structure.
 
+Data validity assumption
+~~~~~~~~~~~~~~~~~~~~~~~~
+For CSAF ingestion, Matching Agent assumes that datasource plugins only provide valid CSAF documents.
+Validation is expected to happen at the upstream source system. In other words, data fetched by CSAF
+datasource plugins is assumed to come from a valid source and to already satisfy CSAF validity constraints.
+
 Common data source flags (required unless noted):
 
 - ``DataSource.plugin_name`` (str, required): Plugin entry point name. Must match the installed plugin.
@@ -288,4 +294,3 @@ These variables are used by the development stack under ``dev/``. All are requir
 - ``NETBOX_SUPERUSER_NAME`` (str, required): Netbox superuser username.
 - ``NETBOX_SUPERUSER_EMAIL`` (str, required): Netbox superuser email.
 - ``BUILD_VERSION`` (str, required): Build/version tag for dev images.
-
