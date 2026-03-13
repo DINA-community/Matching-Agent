@@ -2,7 +2,7 @@ import datetime
 from typing import Any, AsyncGenerator, List, Optional, Type, Union
 
 import sqlalchemy.exc
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl
 from sqlalchemy import (
     and_,
     delete,
@@ -47,11 +47,11 @@ logger = get_logger(__name__)
 
 class CacheDB:
     class Config(BaseModel):
-        host: str
-        port: int
-        database: str
-        username: str
-        password: str
+        host: str = Field(..., description="PostgreSQL host name or IP.")
+        port: int = Field(..., description="PostgreSQL TCP port.")
+        database: str = Field(..., description="PostgreSQL database name.")
+        username: str = Field(..., description="PostgreSQL user name.")
+        password: str = Field(..., description="PostgreSQL user password.")
 
     def __init__(self, config: Config) -> None:
         super().__init__()

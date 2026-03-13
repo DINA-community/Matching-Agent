@@ -31,6 +31,7 @@ from dina.common.config import (
     Config,
     MatchingConfig,
     apply_updates,
+    build_config_parameter_info,
     validate_update_keys,
     write_toml_file,
 )
@@ -1024,7 +1025,9 @@ class Matcher:
         @config_route.get("/")
         async def get_config() -> dict[str, Any]:
             """Return the current full application configuration."""
-            return self.__config.model_dump(mode="json")
+            config_data = self.__config.model_dump(mode="json")
+            config_data["parameter_info"] = build_config_parameter_info(Config)
+            return config_data
 
         @config_route.post("/")
         async def update_config(
@@ -1047,7 +1050,9 @@ class Matcher:
                 raise HTTPException(status_code=422, detail=str(e))
             write_toml_file(self.__config_path, validated.model_dump(mode="json"))
             self.__config = validated
-            return self.__config.model_dump(mode="json")
+            config_data = self.__config.model_dump(mode="json")
+            config_data["parameter_info"] = build_config_parameter_info(Config)
+            return config_data
 
         api.include_router(task_route)
         api.include_router(matches_route)

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 import colorlog
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 CRITICAL = lg.CRITICAL  # type: ignore
 FATAL = lg.FATAL  # type: ignore
@@ -19,10 +19,12 @@ NOTSET = lg.NOTSET  # type: ignore
 
 
 class LoggingConfig(BaseModel):
-    level: str = "INFO"
-    file: Path
-    max_bytes: int = 10_000_000
-    backup_count: int = 5
+    level: str = Field("INFO", description="Log level for file logging.")
+    file: Path = Field(..., description="Path to the log file.")
+    max_bytes: int = Field(
+        10_000_000, description="Maximum size of a log file before rotation."
+    )
+    backup_count: int = Field(5, description="Number of rotated log files to keep.")
 
 
 def configure_logging(
