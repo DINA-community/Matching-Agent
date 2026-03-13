@@ -1,3 +1,15 @@
+"""DINA command-line interface.
+
+This module provides a unified CLI for managing DINA services including:
+- User management (creating/updating users in the cache database)
+- Matcher API operations (querying matches, controlling tasks, managing configuration)
+- Synchronizer API operations (controlling asset and CSAF synchronization)
+
+The CLI supports both human-readable and JSON output formats via the --json flag.
+Authentication credentials and service URLs can be provided as command-line arguments
+or interactively when omitted.
+"""
+
 import argparse
 import asyncio
 import tomllib
@@ -15,11 +27,23 @@ logger = get_logger(__name__)
 
 
 class CLI:
+    """Main CLI application class for DINA utilities.
+
+    Provides command-line access to DINA services via an argument-based interface.
+    Supports multiple service groups (user, matcher, sync) with subcommands for
+    specific operations.
+    """
+
     def __init__(self):
         super().__init__()
         self.parser = self._build_parser()
 
     def _build_parser(self) -> argparse.ArgumentParser:
+        """Build the argument parser with all supported commands and options.
+
+        Returns:
+            Configured ArgumentParser instance with all CLI commands.
+        """
         parser = argparse.ArgumentParser(
             prog="csaf_matcher_cli",
             description="DINA command-line utilities",
@@ -212,7 +236,11 @@ class CLI:
         return parser
 
     async def run(self):
-        """Run the CLI."""
+        """Parse command-line arguments and execute the requested command.
+
+        Handles argument parsing, password resolution, and routing to the appropriate
+        command handler based on the selected service group.
+        """
         args = self.parser.parse_args()
         self._output_json = bool(getattr(args, "json", False))
         if args.command == "user" and args.user_command == "create":
@@ -232,10 +260,14 @@ class CLI:
 
     # ------------- helpers -------------
     def _add_common_api_args(self, p: argparse.ArgumentParser) -> None:
-        """Add common API arguments without making them parser-required.
+        """Add common API authentication arguments to a parser.
 
-        We validate their presence in the dispatch functions so callers can supply
-        them at the root level (before command/group).
+        Args:
+            p: ArgumentParser to add arguments to.
+
+        Note:
+            Arguments are not marked as required to allow flexibility in where they
+            are specified. Validation occurs in dispatch methods.
         """
         p.add_argument(
             "--base-url",
@@ -252,9 +284,16 @@ class CLI:
 
     @staticmethod
     def _resolve_password(pwd: str | None) -> str:
-        """Return provided password or interactively prompt for one.
+        """Obtain password from argument or interactive prompt.
 
-        Uses getpass to avoid echoing the password on the terminal.
+        Args:
+            pwd: Password provided via command-line argument, or None.
+
+        Returns:
+            The resolved password string.
+
+        Note:
+            Uses getpass for secure password entry when not provided via argument.
         """
         if pwd is not None and pwd != "":
             return pwd
@@ -263,6 +302,19 @@ class CLI:
         return getpass.getpass("Password: ")
 
     async def _get_token(self, base_url: str, username: str, password: str) -> str:
+        """Obtain an access token from an API service.
+
+        Args:
+            base_url: Base URL of the service.
+            username: Username for authentication.
+            password: Password for authentication.
+
+        Returns:
+            JWT access token string.
+
+        Raises:
+            RuntimeError: If authentication fails or response is invalid.
+        """
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             resp = await client.post(
                 f"{base_url.rstrip('/')}/token",
@@ -276,6 +328,15 @@ class CLI:
             return str(data["access_token"])
 
     def _raise_for_status(self, resp: httpx.Response, context: str) -> None:
+        """Check HTTP response status and raise on error.
+
+        Args:
+            resp: HTTP response to check.
+            context: Context string for error messages (e.g., "auth", "matches list").
+
+        Raises:
+            RuntimeError: If response status code indicates an error (>= 400).
+        """
         if resp.status_code < 400:
             return
         detail = ""
@@ -304,10 +365,29 @@ class CLI:
         raise RuntimeError(f"{context} failed: {msg}")
 
     def _auth_headers(self, token: str) -> dict[str, str]:
+        """Create HTTP headers with bearer token authentication.
+
+        Args:
+            token: JWT access token.
+
+        Returns:
+            Dictionary with Authorization header.
+        """
         return {"Authorization": f"Bearer {token}"}
 
     @staticmethod
     def _parse_update_value(raw: str) -> Any:
+        """Parse a string value into an appropriate Python type.
+
+        Args:
+            raw: String value to parse.
+
+        Returns:
+            Parsed value as bool, None, int, float, JSON object/array, or string.
+
+        Note:
+            Attempts parsing in order: boolean, null, JSON, int, float, string.
+        """
         lowered = raw.lower()
         if lowered in ("true", "false"):
             return lowered == "true"
@@ -331,6 +411,17 @@ class CLI:
         return raw
 
     def _parse_updates(self, updates: list[str]) -> dict[str, Any]:
+        """Parse configuration update strings into a dictionary.
+
+        Args:
+            updates: List of "key=value" strings.
+
+        Returns:
+            Dictionary mapping keys to parsed values.
+
+        Raises:
+            RuntimeError: If any update string is malformed.
+        """
         result: dict[str, Any] = {}
         for item in updates:
             if "=" not in item:
@@ -344,12 +435,26 @@ class CLI:
 
     @staticmethod
     def _print_json(data: Any) -> None:
+        """Print data as formatted JSON.
+
+        Args:
+            data: Data to serialize and print.
+        """
         # Avoid additional dependency; use built-in print of dict/list
         import json
 
         print(json.dumps(data, indent=2, ensure_ascii=False))
 
     def _format_value(self, value: Any, indent: int = 0) -> str:
+        """Format a value as human-readable text.
+
+        Args:
+            value: Value to format (dict, list, primitive).
+            indent: Current indentation level.
+
+        Returns:
+            Formatted string representation.
+        """
         pad = "  " * indent
         if isinstance(value, dict):
             if not value:
@@ -382,6 +487,12 @@ class CLI:
         return str(value)
 
     def _print_output(self, data: Any, *, force_json: bool = False) -> None:
+        """Print output in JSON or human-readable format.
+
+        Args:
+            data: Data to print.
+            force_json: If True, always use JSON output regardless of --json flag.
+        """
         if force_json or self._output_json:
             self._print_json(data)
             return
@@ -389,6 +500,17 @@ class CLI:
 
     # ------------- matcher commands -------------
     async def _dispatch_matcher(self, args: argparse.Namespace) -> None:
+        """Execute a matcher API command.
+
+        Args:
+            args: Parsed command-line arguments.
+
+        Raises:
+            RuntimeError: If required arguments are missing or API call fails.
+
+        Note:
+            Validates presence of --base-url and --username before proceeding.
+        """
         # Validate required auth/base options (can be provided at root or group level)
         missing: list[str] = []
         base = getattr(args, "base_url", None)
@@ -556,6 +678,17 @@ class CLI:
 
     # ------------- synchronizer commands -------------
     async def _dispatch_sync(self, args: argparse.Namespace) -> None:
+        """Execute a synchronizer API command.
+
+        Args:
+            args: Parsed command-line arguments.
+
+        Raises:
+            RuntimeError: If required arguments are missing or API call fails.
+
+        Note:
+            Validates presence of --base-url and --username before proceeding.
+        """
         # Validate required auth/base options (can be provided at root or group level)
         missing: list[str] = []
         base = getattr(args, "base_url", None)
@@ -600,6 +733,18 @@ class CLI:
 
     @staticmethod
     def _load_cachedb_config(config_path: Path) -> CacheDB.Config:
+        """Load cache database configuration from TOML file.
+
+        Args:
+            config_path: Path to TOML configuration file.
+
+        Returns:
+            Parsed CacheDB configuration object.
+
+        Raises:
+            FileNotFoundError: If config file does not exist.
+            ValueError: If config file lacks [Cachedb] section.
+        """
         try:
             with config_path.open("rb") as f:
                 data = tomllib.load(f)
@@ -616,6 +761,17 @@ class CLI:
     async def _cmd_user_create(
         self, *, config_path: Path, username: str, password: str
     ) -> None:
+        """Create or update a user in the cache database.
+
+        Args:
+            config_path: Path to TOML configuration file with [Cachedb] section.
+            username: Username for the new or updated user.
+            password: Password for the user.
+
+        Raises:
+            FileNotFoundError: If config file does not exist.
+            ValueError: If config file is invalid.
+        """
         # Load DB config
         config = self._load_cachedb_config(config_path)
 
@@ -628,7 +784,12 @@ class CLI:
 
 
 async def run_cli():
-    """Run the CLI."""
+    """Execute the CLI application.
+
+    Raises:
+        SystemExit: On RuntimeError with exit code 1.
+        Exception: On unexpected errors (re-raised).
+    """
     cli = CLI()
 
     try:
@@ -644,7 +805,10 @@ async def run_cli():
 
 
 def main():
-    """Entry point for the CLI."""
+    """Entry point for the CLI application.
+
+    Handles keyboard interrupts gracefully and logs any errors that occur.
+    """
     try:
         asyncio.run(run_cli())
     except KeyboardInterrupt:
