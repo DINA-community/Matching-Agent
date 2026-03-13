@@ -227,8 +227,8 @@ Subcommands:
           matcher task stop --task-id 12
 
 4) Configuration
-   - ``matcher config --get`` — Show the current matcher + Cachedb configuration.
-   - ``matcher config --set KEY=VALUE`` — Update configuration keys (dotted keys for nested fields).
+   - ``matcher config --get`` — Show the full application configuration.
+   - ``matcher config --set KEY=VALUE`` — Update any top-level configuration section via the matcher API (dotted keys for nested fields).
 
    Example:
 
@@ -243,19 +243,11 @@ Subcommands:
       uv run csaf_matcher_cli --base-url http://localhost:8998 -u admin \
         matcher config --set Cachedb.host=localhost
 
-   - ``sync config --get`` — Show the current synchronizer + Cachedb configuration.
-   - ``sync config --set KEY=VALUE`` — Update synchronizer configuration keys.
+      uv run csaf_matcher_cli --base-url http://localhost:8998 -u admin \
+        matcher config --set Assetsync.Synchronizer.sync_interval=3600
 
-   .. code-block:: bash
-
-      uv run csaf_matcher_cli --base-url http://localhost:8999 -u admin \
-        sync config --get
-
-      uv run csaf_matcher_cli --base-url http://localhost:8999 -u admin \
-        sync config --set Assetsync.Synchronizer.sync_interval=3600
-
-      uv run csaf_matcher_cli --base-url http://localhost:9000 -u admin \
-        sync config --set Csafsync.Synchronizer.sync_interval=3600
+      uv run csaf_matcher_cli --base-url http://localhost:8998 -u admin \
+        matcher config --set Csafsync.Synchronizer.sync_interval=3600
 
 5) Clear caches
    - ``matcher clear all`` — Stop all matching tasks, wait for pending batches, then clear all matcher-related caches

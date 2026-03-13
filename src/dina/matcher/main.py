@@ -32,7 +32,6 @@ from dina.common.config import (
     MatchingConfig,
     apply_updates,
     validate_update_keys,
-    validate_update_prefixes,
     write_toml_file,
 )
 from dina.common.log import configure_logging, get_logger, LoggingConfig
@@ -1024,23 +1023,16 @@ class Matcher:
 
         @config_route.get("/")
         async def get_config() -> dict[str, Any]:
-            """Return the current matcher configuration."""
-            return {
-                "Matcher": self.__config.Matcher.model_dump(mode="json"),
-                "Cachedb": self.__config.Cachedb.model_dump(mode="json"),
-            }
+            """Return the current full application configuration."""
+            return self.__config.model_dump(mode="json")
 
         @config_route.post("/")
         async def update_config(
             updates: Annotated[dict[str, Any], fastapi.Body(...)],
         ) -> dict[str, Any]:
-            """Validate and persist matcher configuration updates."""
+            """Validate and persist full application configuration updates."""
             with open(self.__config_path, "rb") as f:
                 raw = tomllib.load(f)
-            try:
-                validate_update_prefixes(updates, {"Matcher", "Cachedb"})
-            except ValueError as e:
-                raise HTTPException(status_code=422, detail=str(e))
             try:
                 validate_update_keys(Config, updates)
             except ValueError as e:
@@ -1055,10 +1047,7 @@ class Matcher:
                 raise HTTPException(status_code=422, detail=str(e))
             write_toml_file(self.__config_path, validated.model_dump(mode="json"))
             self.__config = validated
-            return {
-                "Matcher": self.__config.Matcher.model_dump(mode="json"),
-                "Cachedb": self.__config.Cachedb.model_dump(mode="json"),
-            }
+            return self.__config.model_dump(mode="json")
 
         api.include_router(task_route)
         api.include_router(matches_route)
