@@ -6,6 +6,8 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -28,6 +30,8 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -49,4 +53,12 @@ jobs:
         with:
           files: |
             dist/*.whl
+            dist/*.tar.gz
             sbom.json
+
+      - name: Publish to PyPI
+        if: github.ref_type == 'tag'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
