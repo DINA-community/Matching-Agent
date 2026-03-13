@@ -235,8 +235,10 @@ def test_build_resource_path_returns_path(mock_config):
     """Tests that build_resource_path correctly returns the document path or an empty string."""
     plugin = IsdubaDataSource(mock_config)
     assert (
-        plugin.build_resource_path({"path": "/api/documents/123"})
-        == "/api/documents/123"
+        plugin.build_resource_path(
+            {"path": "/api/documents/123", "product_name_id": "42"}
+        )
+        == "/api/documents/123#product_id=42"
     )
     assert plugin.build_resource_path({}) == ""
 
