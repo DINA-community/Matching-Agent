@@ -1,3 +1,15 @@
+"""
+Database models for the DINA cache database.
+
+This module defines the SQLAlchemy ORM models representing the cache database schema.
+It includes models for user authentication, asset and CSAF product management,
+matching operations, and synchronization metadata. All models inherit from a common
+Base class and reside in the 'cacheDB' schema.
+
+The module provides hierarchical product relationships through both assets and CSAF
+products, along with tracking mechanisms for synchronization runs and matching operations.
+"""
+
 import datetime
 import enum
 from dataclasses import asdict, dataclass, field
@@ -33,13 +45,11 @@ password_hash = PasswordHash.recommended()
 
 class MetaInfo:
     """
-    Represents metadata information related to a resource.
+    Mixin class providing metadata fields for tracking resource origin and updates.
 
-    The MetaInfo class is a representation for defining metadata
-    about a specific resource, such as origin details and the
-    timestamp of the latest update. It provides a structured
-    way to encapsulate this information for consistent access
-    and manipulation.
+    This class is intended to be inherited by ORM models that need to track
+    resource provenance and modification timestamps. It provides standardized
+    fields for origin tracking and update history.
 
     :ivar origin_uri: URI base of the originating resource.
     :type origin_uri: str
@@ -60,23 +70,63 @@ class MetaInfo:
 
 
 class Base(AsyncAttrs, DeclarativeBase):
+    """
+    Base class for all ORM models in the cache database.
+
+    All database models inherit from this base, which configures async support
+    and sets the database schema to 'cacheDB'.
+    """
+
     metadata = MetaData(schema="cacheDB")
 
 
 class User(Base):
+    """
+    Represents an authenticated user in the system.
+
+    This model stores user credentials and account status. Passwords are hashed
+    using the pwdlib library before storage.
+
+    :ivar username: Unique username serving as the primary key.
+    :ivar password_hash: Hashed password for authentication.
+    :ivar active: Whether the user account is active.
+    """
+
     __tablename__ = "users"
     username: Mapped[str] = mapped_column(Text, primary_key=True)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     active: Mapped[bool] = mapped_column(nullable=False, default=True)
 
     def set_password(self, password: str):
+        """
+        Hash and store the provided password.
+
+        :param password: Plain text password to hash and store.
+        """
         self.password_hash = password_hash.hash(password)
 
     def check_password(self, password: str) -> bool:
+        """
+        Verify a password against the stored hash.
+
+        :param password: Plain text password to verify.
+        :return: True if the password matches, False otherwise.
+        """
         return password_hash.verify(password, self.password_hash)
 
 
 class SynchronizerMetadata(Base):
+    """
+    Tracks metadata and execution state for data source synchronizers.
+
+    Each record represents the synchronization state for a specific origin URI,
+    storing plugin-specific metadata and the timestamp of the last successful run.
+
+    :ivar origin_uri: URI identifying the data source (primary key).
+    :ivar plugin_metadata: Plugin-specific metadata stored as JSON.
+    :ivar last_run: Timestamp of the most recent synchronization run.
+    """
+
     __tablename__ = "synchronizer_metadata"
     origin_uri: Mapped[str] = mapped_column(Text, primary_key=True)
     plugin_metadata: Mapped[dict[str, Any]] = mapped_column(JSONB, default={})
@@ -86,6 +136,17 @@ class SynchronizerMetadata(Base):
 
 
 class MatcherTrigger(Base):
+    """
+    Records requests to trigger the matcher process.
+
+    Used to queue and track matcher execution requests, optionally scoped
+    to a specific origin URI.
+
+    :ivar id: Auto-incrementing primary key.
+    :ivar origin_uri: Optional URI to limit matching scope.
+    :ivar created_at: Timestamp when the trigger was created.
+    """
+
     __tablename__ = "matcher_trigger"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     origin_uri: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -95,6 +156,30 @@ class MatcherTrigger(Base):
 
 
 class MatcherRun(Base):
+    """
+    Represents a single execution of the matcher process.
+
+    Tracks the complete lifecycle of a matching run, including progress metrics,
+    configuration, and resulting matches. The state field indicates whether the
+    run is ongoing, completed, or failed.
+
+    :ivar id: Auto-incrementing primary key.
+    :ivar trigger: Description of what triggered this run.
+    :ivar state: Current state of the run (e.g., 'running', 'completed', 'failed').
+    :ivar started_at: Timestamp when the run began.
+    :ivar finished_at: Timestamp when the run completed (None if still running).
+    :ivar total_pairs: Total number of asset-CSAF pairs to evaluate.
+    :ivar processed_pairs: Number of pairs processed so far.
+    :ivar matches_found: Number of matches identified.
+    :ivar assets: List of asset URIs included in this run.
+    :ivar csaf_documents: List of CSAF document URIs included in this run.
+    :ivar matching_config_hash: Hash of the matching configuration used.
+    :ivar matching_config: The actual matching configuration as JSON.
+    :ivar force_recompute: Whether this run forced recomputation of all matches.
+    :ivar error: Error message if the run failed.
+    :ivar matches: Relationship to Match records created by this run.
+    """
+
     __tablename__ = "matcher_run"
     __table_args__ = (Index("ix_matcher_run_started_at", "started_at"),)
 
@@ -121,6 +206,11 @@ class MatcherRun(Base):
     matches: Mapped[List["Match"]] = relationship(back_populates="matcher_run")
 
     def to_dict(self) -> Dict[str, Any]:
+        """
+        Convert the matcher run to a dictionary representation.
+
+        :return: Dictionary containing all matcher run fields.
+        """
         result: Dict[str, Any] = {
             "trigger": self.trigger,
             "state": self.state,
@@ -142,6 +232,12 @@ class MatcherRun(Base):
 
 
 class ProductType(enum.Enum):
+    """
+    Enumeration of product types.
+
+    Distinguishes between software products, hardware devices, and undefined types.
+    """
+
     Software = "Software"
     Device = "Device"
     Undefined = "Undefined"
@@ -149,6 +245,14 @@ class ProductType(enum.Enum):
 
 @dataclass
 class File:
+    """
+    Represents a file with its cryptographic hash.
+
+    :ivar name: The filename.
+    :ivar file_hash: The hash value of the file.
+    :ivar hash_algorithm: The algorithm used to compute the hash.
+    """
+
     name: str
     file_hash: str
     hash_algorithm: str
@@ -156,16 +260,37 @@ class File:
 
 @dataclass
 class FileList:
+    """
+    Container for a list of File objects.
+
+    Provides a structured way to store multiple files as a collection.
+    """
+
     files: List[File] = field(default_factory=list)
 
 
 class FileListType(TypeDecorator):
+    """
+    SQLAlchemy custom type for storing FileList objects as JSONB.
+
+    Handles bidirectional conversion between FileList instances and their
+    JSON representation for database storage.
+    """
+
     impl = JSONB
     cache_ok = True
 
     def process_bind_param(
         self, value: Optional[FileList], dialect: Dialect
     ) -> Optional[List[Dict[str, str]]]:
+        """
+        Convert FileList to JSON for database storage.
+
+        :param value: FileList instance to convert.
+        :param dialect: SQLAlchemy dialect (unused).
+        :return: List of file dictionaries or empty list if None.
+        :raises TypeError: If value is not a FileList instance.
+        """
         if value is None:
             return []
         if isinstance(value, FileList):
@@ -175,6 +300,14 @@ class FileListType(TypeDecorator):
     def process_result_value(
         self, value: Optional[Any], dialect: Dialect
     ) -> Optional[FileList]:
+        """
+        Convert JSON from database to FileList instance.
+
+        :param value: JSON data from database.
+        :param dialect: SQLAlchemy dialect (unused).
+        :return: FileList instance or empty FileList if None.
+        :raises TypeError: If value is not a list.
+        """
         if value is None:
             return FileList(files=[])
         if isinstance(value, list):
@@ -183,6 +316,37 @@ class FileListType(TypeDecorator):
 
 
 class Product(Base):
+    """
+    Represents product information extracted from either assets or CSAF documents.
+
+    A Product record consolidates identifying information about a software or hardware
+    product. Each Product is associated with exactly one Asset OR one CsafProduct
+    (enforced by database constraint).
+
+    Supports both software identifiers (CPE, PURL, version) and device-specific
+    attributes (model, part numbers, manufacturer).
+
+    :ivar id: Auto-incrementing primary key.
+    :ivar product_type: Type of product (Software, Device, or Undefined).
+    :ivar name: Product name.
+    :ivar version: List of version strings.
+    :ivar cpe: Common Platform Enumeration identifier.
+    :ivar purl: Package URL identifier.
+    :ivar sbom_urls: List of Software Bill of Materials URLs.
+    :ivar serial_numbers: List of device serial numbers.
+    :ivar files: List of associated files with hashes.
+    :ivar model: Device model identifier.
+    :ivar model_numbers: List of model numbers.
+    :ivar part_numbers: List of part numbers.
+    :ivar device_family: Device family/series name.
+    :ivar hardware_name: Hardware platform name.
+    :ivar manufacturer_name: Manufacturer/vendor name.
+    :ivar csaf_product_id: Foreign key to CsafProduct (mutually exclusive with asset_id).
+    :ivar asset_id: Foreign key to Asset (mutually exclusive with csaf_product_id).
+    :ivar csaf_product: Relationship to the associated CsafProduct.
+    :ivar asset: Relationship to the associated Asset.
+    """
+
     __tablename__ = "product"
     __table_args__ = (
         CheckConstraint(
@@ -229,6 +393,11 @@ class Product(Base):
     )
 
     def to_dict(self) -> Dict[str, Any]:
+        """
+        Convert the product to a dictionary representation.
+
+        :return: Dictionary containing all product fields.
+        """
         result = {
             "product_type": self.product_type.value,
             "name": self.name,
@@ -271,9 +440,29 @@ csaf_product_relationship = Table(
     Column("origin_info", JSONB, default={}),
     Column("last_update", Float, nullable=False, default=0.0),
 )
+"""
+Association table for hierarchical relationships between CSAF products.
+
+Enables parent-child relationships between CsafProduct instances, storing
+metadata about the relationship origin and last update timestamp.
+"""
 
 
 class CsafProduct(Base, MetaInfo):
+    """
+    Represents a product referenced in a CSAF security advisory document.
+
+    Each CsafProduct has exactly one associated Product record containing the
+    product details, and can participate in parent-child relationships with
+    other CSAF products. CSAF products can be matched against Assets.
+
+    :ivar id: Auto-incrementing primary key.
+    :ivar product: One-to-one relationship with the Product record.
+    :ivar matches: All matches between this CSAF product and assets.
+    :ivar children: Child CSAF products in the product hierarchy.
+    :ivar parents: Parent CSAF products in the product hierarchy.
+    """
+
     __tablename__ = "csaf_product"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -304,6 +493,11 @@ class CsafProduct(Base, MetaInfo):
     )
 
     def to_dict(self) -> Dict[str, Any]:
+        """
+        Convert the CSAF product to a dictionary representation.
+
+        :return: Dictionary containing metadata fields and ID.
+        """
         result = {
             "origin_uri": self.origin_uri,
             "origin_info": self.origin_info,
@@ -334,9 +528,29 @@ product_relationship = Table(
     Column("origin_info", JSONB, default={}),
     Column("last_update", Float, nullable=False, default=0.0),
 )
+"""
+Association table for hierarchical relationships between assets.
+
+Enables parent-child relationships between Asset instances, storing
+metadata about the relationship origin and last update timestamp.
+"""
 
 
 class Asset(Base, MetaInfo):
+    """
+    Represents a product instance from an asset inventory system.
+
+    Each Asset has exactly one associated Product record containing the
+    product details, and can participate in parent-child relationships with
+    other assets. Assets can be matched against CSAF products.
+
+    :ivar id: Auto-incrementing primary key.
+    :ivar product: One-to-one relationship with the Product record.
+    :ivar matches: All matches between this asset and CSAF products.
+    :ivar children: Child assets in the asset hierarchy.
+    :ivar parents: Parent assets in the asset hierarchy.
+    """
+
     __tablename__ = "asset"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -367,6 +581,11 @@ class Asset(Base, MetaInfo):
     )
 
     def to_dict(self) -> Dict[str, Any]:
+        """
+        Convert the asset to a dictionary representation.
+
+        :return: Dictionary containing metadata fields and ID.
+        """
         result = {
             "origin_uri": self.origin_uri,
             "origin_info": self.origin_info,
@@ -379,6 +598,26 @@ class Asset(Base, MetaInfo):
 
 
 class Match(Base):
+    """
+    Represents a match between a CSAF product and an asset.
+
+    Matches are created by the matcher process and indicate potential applicability
+    of security advisories to specific assets. Each match includes a confidence score
+    and tracks the configuration used to generate it.
+
+    :ivar id: Auto-incrementing primary key.
+    :ivar score: Confidence score of the match (0.0 to 1.0).
+    :ivar status: Current status of the match (e.g., 'confirmed', 'rejected').
+    :ivar timestamp: When the match was created.
+    :ivar csaf_product_id: Foreign key to the CSAF product.
+    :ivar asset_id: Foreign key to the asset.
+    :ivar matcher_run_id: Foreign key to the run that created this match (nullable).
+    :ivar matching_config_hash: Hash of the matching configuration used.
+    :ivar csaf_product: Relationship to the CsafProduct.
+    :ivar asset: Relationship to the Asset.
+    :ivar matcher_run: Relationship to the MatcherRun that created this match.
+    """
+
     __tablename__ = "match"
     __table_args__ = (
         Index("ix_match_csaf_product_id", "csaf_product_id"),
@@ -408,6 +647,11 @@ class Match(Base):
     matcher_run: Mapped[Optional["MatcherRun"]] = relationship(back_populates="matches")
 
     def to_dict(self) -> Dict[str, Any]:
+        """
+        Convert the match to a dictionary representation.
+
+        :return: Dictionary containing all match fields.
+        """
         result = {
             "score": self.score,
             "status": self.status,
