@@ -79,8 +79,8 @@ subpath = 0.03
 max_distance = 2
 
 [threshold]
-vendor = 50
-product_family = 5
-product_name = 70 
-keyword = 5
+vendor = 73
+product_family = 50
+product_name = 80
+keyword = 50
 version = 50
