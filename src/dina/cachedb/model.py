@@ -112,7 +112,13 @@ class MatcherRun(Base):
     csaf_documents: Mapped[List[str]] = mapped_column(
         JSONB, nullable=False, default=list
     )
+    matching_config_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    matching_config: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, default=dict
+    )
+    force_recompute: Mapped[bool] = mapped_column(nullable=False, default=False)
     error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    matches: Mapped[List["Match"]] = relationship(back_populates="matcher_run")
 
     def to_dict(self) -> Dict[str, Any]:
         result: Dict[str, Any] = {
@@ -125,6 +131,9 @@ class MatcherRun(Base):
             "matches_found": self.matches_found,
             "assets": self.assets,
             "csaf_documents": self.csaf_documents,
+            "matching_config_hash": self.matching_config_hash,
+            "matching_config": self.matching_config,
+            "force_recompute": self.force_recompute,
             "error": self.error,
         }
         if self.id is not None:
@@ -374,6 +383,7 @@ class Match(Base):
     __table_args__ = (
         Index("ix_match_csaf_product_id", "csaf_product_id"),
         Index("ix_match_asset_id", "asset_id"),
+        Index("ix_match_matcher_run_id", "matcher_run_id"),
         Index("ix_match_csaf_product_asset", "csaf_product_id", "asset_id"),
     )
 
@@ -388,9 +398,14 @@ class Match(Base):
     asset_id: Mapped[int] = mapped_column(
         ForeignKey("cacheDB.asset.id", ondelete="CASCADE"), nullable=False
     )
+    matcher_run_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("cacheDB.matcher_run.id", ondelete="SET NULL"), nullable=True
+    )
+    matching_config_hash: Mapped[str] = mapped_column(Text, nullable=False)
 
     csaf_product: Mapped["CsafProduct"] = relationship(back_populates="matches")
     asset: Mapped["Asset"] = relationship(back_populates="matches")
+    matcher_run: Mapped[Optional["MatcherRun"]] = relationship(back_populates="matches")
 
     def to_dict(self) -> Dict[str, Any]:
         result = {
@@ -399,6 +414,8 @@ class Match(Base):
             "timestamp": self.timestamp,
             "csaf_product_id": self.csaf_product_id,
             "asset_id": self.asset_id,
+            "matcher_run_id": self.matcher_run_id,
+            "matching_config_hash": self.matching_config_hash,
         }
         if self.id is not None:
             result["id"] = self.id

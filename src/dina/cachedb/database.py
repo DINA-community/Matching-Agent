@@ -1,5 +1,5 @@
 import datetime
-from typing import AsyncGenerator, List, Optional, Type, Union
+from typing import Any, AsyncGenerator, List, Optional, Type, Union
 
 import sqlalchemy.exc
 from pydantic import BaseModel, HttpUrl
@@ -10,6 +10,7 @@ from sqlalchemy import (
     literal,
     or_,
     select,
+    tuple_,
     update,
 )
 from sqlalchemy.dialects.postgresql import insert
@@ -431,6 +432,8 @@ class CacheDB:
         self,
         assets: list[HttpUrl],
         csaf_documents: list[HttpUrl],
+        matching_config_hash: str,
+        force_recompute: bool = False,
         batch_size_sqrt: int = 50,
     ) -> AsyncGenerator[list[tuple[CsafProduct, Asset]]]:
         async with AsyncSession(self.engine) as session:
@@ -461,31 +464,34 @@ class CacheDB:
 
                     next_asset_id = asset_ids[-1] + 1
 
-                    # Find pairs within this block that need matching
                     query = (
                         select(CsafProduct, Asset)
                         .select_from(CsafProduct)
                         .join(Asset, literal(True))
                         .where(CsafProduct.id.in_(csaf_ids))
                         .where(Asset.id.in_(asset_ids))
-                        .outerjoin(
+                        .options(
+                            joinedload(CsafProduct.product), joinedload(Asset.product)
+                        )
+                    )
+                    if not force_recompute:
+                        # Recompute when pair has no match, has stale match, or was
+                        # matched with a different configuration hash.
+                        query = query.outerjoin(
                             Match,
                             and_(
                                 Match.asset_id == Asset.id,
                                 Match.csaf_product_id == CsafProduct.id,
                             ),
-                        )
-                        .where(
+                        ).where(
                             or_(
                                 Match.id.is_(None),
                                 Match.timestamp < Asset.last_update,
                                 Match.timestamp < CsafProduct.last_update,
+                                Match.matching_config_hash.is_(None),
+                                Match.matching_config_hash != matching_config_hash,
                             )
                         )
-                        .options(
-                            joinedload(CsafProduct.product), joinedload(Asset.product)
-                        )
-                    )
 
                     if result := (await session.execute(query)).tuples().all():
                         yield result  # type: ignore
@@ -510,27 +516,29 @@ class CacheDB:
         self,
         assets: list[HttpUrl],
         csaf_documents: list[HttpUrl],
+        matching_config_hash: str,
+        force_recompute: bool = False,
     ) -> int:
         async with AsyncSession(self.engine) as session:
             stmt = (
-                select(func.count())
-                .select_from(CsafProduct)
-                .join(Asset, literal(True))
-                .outerjoin(
+                select(func.count()).select_from(CsafProduct).join(Asset, literal(True))
+            )
+            if not force_recompute:
+                stmt = stmt.outerjoin(
                     Match,
                     and_(
                         Match.asset_id == Asset.id,
                         Match.csaf_product_id == CsafProduct.id,
                     ),
-                )
-                .where(
+                ).where(
                     or_(
                         Match.id.is_(None),
                         Match.timestamp < Asset.last_update,
                         Match.timestamp < CsafProduct.last_update,
+                        Match.matching_config_hash.is_(None),
+                        Match.matching_config_hash != matching_config_hash,
                     )
                 )
-            )
             if assets:
                 stmt = stmt.where(Asset.uri.in_([str(a) for a in assets]))
             if csaf_documents:
@@ -542,6 +550,32 @@ class CacheDB:
             return []
         async with AsyncSession(self.engine) as session:
             async with session.begin():
+                stmt = (
+                    insert(Match)
+                    .returning(Match.id)
+                    .values([match.to_dict() for match in matches])
+                )
+                return (await session.execute(stmt)).scalars().all()
+
+    async def store_matches_for_run(
+        self,
+        run_id: int,
+        processed_pairs: list[tuple[int, int]],
+        matches: list[Match],
+    ) -> list[int]:
+        async with AsyncSession(self.engine) as session:
+            async with session.begin():
+                if processed_pairs:
+                    delete_stmt = delete(Match).where(
+                        tuple_(Match.csaf_product_id, Match.asset_id).in_(
+                            processed_pairs
+                        )
+                    )
+                    await session.execute(delete_stmt)
+
+                if not matches:
+                    return []
+
                 stmt = (
                     insert(Match)
                     .returning(Match.id)
@@ -582,7 +616,10 @@ class CacheDB:
         trigger: str,
         assets: list[HttpUrl],
         csaf_documents: list[HttpUrl],
+        matching_config_hash: str,
+        matching_config: dict[str, Any],
         *,
+        force_recompute: bool = False,
         state: str = "pending",
         started_at: float | None = None,
         total_pairs: int = 0,
@@ -598,6 +635,9 @@ class CacheDB:
                     total_pairs=total_pairs,
                     assets=[str(a) for a in assets],
                     csaf_documents=[str(c) for c in csaf_documents],
+                    matching_config_hash=matching_config_hash,
+                    matching_config=matching_config,
+                    force_recompute=force_recompute,
                 )
                 session.add(run)
                 await session.flush()
@@ -727,7 +767,9 @@ class CacheDB:
                 .join(Match.asset)
                 .join(Match.csaf_product)
                 .options(
-                    contains_eager(Match.asset), contains_eager(Match.csaf_product)
+                    contains_eager(Match.asset),
+                    contains_eager(Match.csaf_product),
+                    joinedload(Match.matcher_run),
                 )
             )
             if origin_uri is not None:
@@ -762,7 +804,11 @@ class CacheDB:
         async with AsyncSession(self.engine) as session:
             stmt = (
                 select(Match)
-                .options(joinedload(Match.asset), joinedload(Match.csaf_product))
+                .options(
+                    joinedload(Match.asset),
+                    joinedload(Match.csaf_product),
+                    joinedload(Match.matcher_run),
+                )
                 .where(Match.id == match_id)
             )
             if result := (await session.execute(stmt)).scalars().first():
