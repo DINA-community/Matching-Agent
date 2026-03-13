@@ -748,6 +748,13 @@ class Matcher:
             csaf_documents: Annotated[list[HttpUrl] | None, Query()] = None,
             body: StartMatchingTaskRequest | None = fastapi.Body(default=None),
         ):
+            """Start a matcher run, optionally with custom matching weights.
+
+            Custom ``matching_config`` values are merged into the default configuration
+            for this run. Supplying custom weights can overwrite previously generated
+            matches for processed pairs. Prefer using a scoped subset via ``assets``
+            and/or ``csaf_documents`` when testing custom weights.
+            """
             request_assets = (
                 body.assets
                 if body is not None and body.assets

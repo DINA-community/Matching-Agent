@@ -149,6 +149,58 @@ Subcommands:
           matcher task start --assets http://assets.local/item/1001 http://assets.local/item/1002 \
           --csaf-documents http://csaf.local/doc/2001
 
+     Matcher API endpoint: ``POST /task/start``
+
+     - Query parameters:
+
+       - ``assets`` (repeatable, optional): Limit run scope to specific asset URLs.
+       - ``csaf_documents`` (repeatable, optional): Limit run scope to specific CSAF document URLs.
+
+     - Optional JSON body:
+
+       - ``matching_config`` (object): Partial matching configuration override.
+       - ``assets`` (list[URL], optional): Alternative way to pass asset scope.
+       - ``csaf_documents`` (list[URL], optional): Alternative way to pass CSAF scope.
+       - ``force_recompute`` (bool, optional): Force recomputation of all selected pairs.
+
+     - Example request with custom weights:
+
+     .. code-block:: bash
+
+        TOKEN="<bearer-token>"
+        curl -sS -X POST "http://localhost:8998/task/start?assets=http://assets.local/item/1001&csaf_documents=http://csaf.local/doc/2001" \
+          -H "Authorization: Bearer $TOKEN" \
+          -H "Content-Type: application/json" \
+          -d '{
+                "matching_config": {
+                  "database": {
+                    "freetext_fields_weights": {
+                      "token": 0.7,
+                      "ngram": 0.2,
+                      "overlap": 0.1
+                    }
+                  }
+                }
+              }'
+
+     - Example response:
+
+     .. code-block:: json
+
+        {
+          "id": 123,
+          "matching_config_hash": "4e4b2e9e4f0a4f38",
+          "force_recompute": true
+        }
+
+     .. warning::
+
+        Providing a custom ``matching_config`` changes matching behavior for that run and
+        can overwrite previously generated matches for processed pairs.
+        Use this with care and prefer a clearly defined subset via ``assets`` and/or
+        ``csaf_documents``. Avoid full-database custom-weight runs unless that overwrite
+        effect is explicitly intended.
+
    - ``matcher task status`` — Show current matcher status.
    - ``matcher task running`` — List running matching tasks.
    - ``matcher task running-get <id>`` — Get a single running matching task.
