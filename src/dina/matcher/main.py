@@ -557,7 +557,6 @@ class Matcher:
                     )
                     tasks.append(
                         self.__cache_db.store_matches_for_run(
-                            task_id,
                             processed_pairs=processed_pairs,
                             matches=matches_batch,
                         )
