@@ -235,11 +235,13 @@ class ProductType(enum.Enum):
     """
     Enumeration of product types.
 
-    Distinguishes between software products, hardware devices, and undefined types.
+    Distinguishes between software products, hardware devices, hardware modules,
+    and undefined types.
     """
 
     Software = "Software"
     Device = "Device"
+    Module = "Module"
     Undefined = "Undefined"
 
 
@@ -327,7 +329,7 @@ class Product(Base):
     attributes (model, part numbers, manufacturer).
 
     :ivar id: Auto-incrementing primary key.
-    :ivar product_type: Type of product (Software, Device, or Undefined).
+    :ivar product_type: Type of product (Software, Device, Module, or Undefined).
     :ivar name: Product name.
     :ivar version: List of version strings.
     :ivar cpe: Common Platform Enumeration identifier.
@@ -359,7 +361,13 @@ class Product(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     product_type: Mapped[ProductType] = mapped_column(
-        Enum(ProductType, name="product_type_enum"), default=ProductType.Undefined
+        Enum(
+            ProductType,
+            name="product_type_enum",
+            schema="cacheDB",
+            inherit_schema=True,
+        ),
+        default=ProductType.Undefined,
     )
     name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     version: Mapped[List[str]] = mapped_column(JSONB, nullable=True)
