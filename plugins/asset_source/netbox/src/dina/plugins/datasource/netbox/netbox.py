@@ -352,6 +352,42 @@ class NetboxDataSource(DataSourcePlugin):
                         }
                     )
 
+        # Fetch missing module types and manufacturers.
+        if modules:
+            missing_module_type_ids = {
+                module.module_type.id
+                for module in modules.values()
+                if module.module_type.id not in module_types
+            }
+            if missing_module_type_ids:
+                if module_types_result := await dcim_module_types_list.asyncio(
+                    client=self.client, id=list(missing_module_type_ids), ordering="-id"
+                ):
+                    module_types.update(
+                        {
+                            module_type.id: module_type
+                            for module_type in module_types_result.results
+                        }
+                    )
+
+            missing_manufacturer_ids = {
+                module.module_type.manufacturer.id
+                for module in modules.values()
+                if module.module_type.manufacturer.id not in manufacturers
+            }
+            if missing_manufacturer_ids:
+                if manufacturers_result := await dcim_manufacturers_list.asyncio(
+                    client=self.client,
+                    id=list(missing_manufacturer_ids),
+                    ordering="-id",
+                ):
+                    manufacturers.update(
+                        {
+                            manufacturer.id: manufacturer
+                            for manufacturer in manufacturers_result.results
+                        }
+                    )
+
         if software:
             missing_manufacturer_ids = {
                 sw.manufacturer.id
