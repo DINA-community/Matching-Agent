@@ -1,10 +1,12 @@
+from types import SimpleNamespace
+
 import httpx
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 from pydantic import HttpUrl
 import pytest
 
-from dina.cachedb.database import Asset, Match, Product, CsafProduct
+from dina.cachedb.database import Asset, Product, CsafProduct
 from dina.cachedb.fetcher_view import FetcherView
 from dina.cachedb.model import ProductType
 from dina.synchronizer.plugin_base.data_source import (
@@ -208,17 +210,38 @@ async def test_cleanup_products_returns_delete(monkeypatch, mock_config):
 
 @pytest.mark.asyncio
 async def test_notify_new_matches_success(monkeypatch, mock_config):
-    """Verifies that notify_new_matches triggers the async API call once."""
     fake_async_create = AsyncMock()
+
+    class FakeCsafMatchRequest(dict):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+
+        def to_dict(self):
+            return dict(self)
+
     monkeypatch.setattr(
         "dina.plugins.datasource.netbox.netbox.plugins_csaf_csafmatch_list_create.asyncio",
         fake_async_create,
     )
+    monkeypatch.setattr(
+        "dina.plugins.datasource.netbox.netbox.CsafMatchRequest",
+        FakeCsafMatchRequest,
+    )
 
     fake_asset = Asset(product=Product(), origin_info={"device_id": 42})
-    fake_csaf = CsafProduct(uri="https://example.com/csaf.json")
+    fake_csaf = CsafProduct(
+        uri="https://example.com/",
+        origin_info={"product_name_id": "prod-123", "path": "/api/documents/1"},
+    )
 
-    match = Match(asset=fake_asset, csaf_product=fake_csaf)
+    match = SimpleNamespace(
+        asset=fake_asset,
+        csaf_product=fake_csaf,
+        score=None,
+        status=None,
+        timestamp=None,
+    )
+
     await mock_config.notify_new_matches([match])
 
     fake_async_create.assert_awaited_once()
@@ -227,16 +250,39 @@ async def test_notify_new_matches_success(monkeypatch, mock_config):
 @pytest.mark.asyncio
 async def test_notify_new_matches_http_error(monkeypatch, mock_config, caplog):
     """Ensures notify_new_matches logs an error if an HTTPError occurs."""
+
+    class FakeCsafMatchRequest(dict):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+
+        def to_dict(self):
+            return dict(self)
+
     fake_async_create = AsyncMock(side_effect=httpx.HTTPError("network fail"))
+
     monkeypatch.setattr(
         "dina.plugins.datasource.netbox.netbox.plugins_csaf_csafmatch_list_create.asyncio",
         fake_async_create,
     )
+    monkeypatch.setattr(
+        "dina.plugins.datasource.netbox.netbox.CsafMatchRequest",
+        FakeCsafMatchRequest,
+    )
 
     fake_asset = Asset(product=Product(), origin_info={"device_id": 123})
-    fake_csaf = CsafProduct(uri="https://fake.doc/csaf.json")
+    fake_csaf = CsafProduct(
+        uri="https://fake.doc/csaf.json",
+        origin_info={"product_name_id": "prod-123", "path": "/api/documents/1"},
+    )
 
-    match = Match(asset=fake_asset, csaf_product=fake_csaf)
+    match = SimpleNamespace(
+        asset=fake_asset,
+        csaf_product=fake_csaf,
+        score=None,
+        status=None,
+        timestamp=None,
+    )
+
     await mock_config.notify_new_matches([match])
 
     assert "Failed to notify new matches" in caplog.text
