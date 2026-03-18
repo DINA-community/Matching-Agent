@@ -311,7 +311,7 @@ def test_calculate_overall_score_triggers_cpe_shortcut_1_0(scorer):
             "version_csaf_purl_match": [0.5],
         }
     )
-    flag, msg, score_percent = scorer.calculate_overall_score(df)
+    flag, msg, score_percent, logs = scorer.calculate_overall_score(df)
     assert score_percent == 1.0
 
 
@@ -331,7 +331,7 @@ def test_calculate_overall_score_weighted_average_path(scorer):
             "version_csaf_purl_match": [0.92],
         }
     )
-    flag, msg, score_percent = scorer.calculate_overall_score(df)
+    flag, msg, score_percent, logs = scorer.calculate_overall_score(df)
     assert 0.0 <= score_percent <= 100.0
 
 
@@ -346,7 +346,7 @@ def test_calculate_overall_score_outputs_tuple_and_message(scorer):
             "purl_match": [0.2],
         }
     )
-    flag, msg, score_percent = scorer.calculate_overall_score(df)
+    flag, msg, score_percent, logs = scorer.calculate_overall_score(df)
     assert flag in (0, 1)
     assert isinstance(msg, str)
     assert isinstance(score_percent, float)
@@ -361,7 +361,7 @@ def test_calculate_overall_score_handles_missing_some_fields(scorer):
             "purl_match": [0.0],
         }
     )
-    flag, msg, score_percent = scorer.calculate_overall_score(df)
+    flag, msg, score_percent, logs = scorer.calculate_overall_score(df)
     assert flag == 0
     assert 52.0 <= score_percent <= 100.0
 
@@ -375,6 +375,6 @@ def test_calculate_overall_score_handles_with_none_values(scorer):
             "purl_match": [None],
         }
     )
-    flag, msg, score_percent = scorer.calculate_overall_score(df)
+    flag, msg, score_percent, logs = scorer.calculate_overall_score(df)
     assert flag == 0
     assert score_percent == 0.0

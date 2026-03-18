@@ -1403,7 +1403,9 @@ def match_pairs(
         df_matches = matching.df_matching(df)
 
         score = Score(matching_config)
-        result, reason, score_percent = score.calculate_overall_score(df_matches)
+        result, reason, score_percent, trace_result = score.calculate_overall_score(
+            df_matches
+        )
 
         if score_percent < threshold:
             continue
@@ -1413,7 +1415,7 @@ def match_pairs(
         match.csaf_product_id = csaf.id
         match.score = score_percent
         match.timestamp = datetime.datetime.now().timestamp()
-        match.status = f"result: {result}, reason: {reason}"
+        match.status = f"result: {result}, reason: {reason}, logs: {trace_result}"
         match.matcher_run_id = task_id
         match.matching_config_hash = matching_config_hash
 
