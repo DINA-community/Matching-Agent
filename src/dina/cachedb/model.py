@@ -516,6 +516,22 @@ class CsafProduct(Base, MetaInfo):
             result["id"] = self.id
         return result
 
+    def document_url(self) -> str:
+        """
+        Generate the URL for the CSAF document associated with this product.
+
+        :return: URL string for the CSAF document.
+        """
+        return str(self.origin_uri) + f"{self.origin_info['path']}".lstrip("/")
+
+    def product_id(self) -> str:
+        """
+        Retrieve the product ID associated with this CSAF document.
+
+        :return: Product ID as an integer.
+        """
+        return self.origin_info["product_name_id"]
+
 
 product_relationship = Table(
     "product_relationship",
