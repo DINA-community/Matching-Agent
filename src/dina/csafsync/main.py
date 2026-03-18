@@ -25,6 +25,7 @@ class CSAFSynchronizer(BaseSynchronizer):
         """
         Initialize the CSAF Manager.
         """
+        print(f"Initializing CSAF Synchronizer with config: {config_path}")
         config = Config.load(config_path)
         cache_db = CacheDB(config.Cachedb)
         super().__init__(
@@ -57,7 +58,10 @@ async def run_csaf_manager(config_path: Path = Path("./assets/config.toml")):
 def main():
     """Entry point for the CSAF Manager."""
     try:
-        parser = argparse.ArgumentParser(description="Run the CSAF Synchronizer")
+        parser = argparse.ArgumentParser(
+            description="Run the CSAF Synchronizer",
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        )
         parser.add_argument(
             "--config",
             type=Path,

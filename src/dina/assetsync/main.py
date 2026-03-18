@@ -25,6 +25,7 @@ class AssetSynchronizer(BaseSynchronizer):
         """
         Initialize the Asset Manager.
         """
+        print(f"Initializing Asset Synchronizer with config: {config_path}")
         config = Config.load(config_path)
         cache_db = CacheDB(config.Cachedb)
         super().__init__(
@@ -57,7 +58,10 @@ async def run_asset_manager(config_path: Path = Path("./assets/config.toml")):
 def main():
     """Entry point for the Asset Manager."""
     try:
-        parser = argparse.ArgumentParser(description="Run the Asset Synchronizer")
+        parser = argparse.ArgumentParser(
+            description="Run the Asset Synchronizer",
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        )
         parser.add_argument(
             "--config",
             type=Path,
