@@ -4,7 +4,7 @@ import argparse
 
 from dina.cachedb.database import CacheDB
 from dina.common.config import Config
-from dina.common.log import configure_logging, get_logger
+from dina.common.log import get_logger
 from dina.synchronizer.base import BaseSynchronizer
 import sys
 
@@ -33,8 +33,6 @@ class AssetSynchronizer(BaseSynchronizer):
             config.Assetsync,
             root_path="/assetsync",
         )
-        # Configure logging
-        configure_logging(self.config.Logging)
 
 
 async def run_asset_manager(config_path: Path = Path("./assets/config.toml")):

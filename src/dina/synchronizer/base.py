@@ -37,7 +37,7 @@ from dina.cachedb.database import CacheDB
 from dina.cachedb.fetcher_view import FetcherView
 from dina.cachedb.model import Asset, CsafProduct
 from dina.common.config import SynchronizerConfig
-from dina.common.log import get_logger
+from dina.common.log import get_logger, configure_logging
 
 from dina.common.auth import AccessChecker, create_access_token, SessionData, Token
 from dina.synchronizer.plugin_base.data_source import DataSourcePlugin, Relationship
@@ -89,6 +89,8 @@ class BaseSynchronizer(ABC):
             config: Configuration object containing synchronizer, API, and plugin settings.
             root_path: Base path prefix for the API when behind a reverse proxy (e.g., "/assetsync").
         """
+        # Configure logging
+        configure_logging(config.Logging)
         self.__last_synchronization: float | None = None
         self.__sync_start_time: float | None = None
         self.__sync_state: SynchronizerState = SynchronizerState.STOPPED
@@ -591,6 +593,7 @@ def load_datasource_plugins(plugin_configs: Path) -> dict[HttpUrl, DataSourcePlu
         FileNotFoundError: If the plugin_configs path doesn't exist or isn't a directory.
         PluginLoadError: If a plugin fails to load or duplicate origins are detected.
     """
+    logger.info(f"Loading data source plugins from {plugin_configs}")
     plugin_configs = plugin_configs.resolve()
     if not plugin_configs.exists() or not plugin_configs.is_dir():
         raise FileNotFoundError(
