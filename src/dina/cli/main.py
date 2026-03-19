@@ -580,7 +580,7 @@ class CLI:
                     f"{base.rstrip('/')}/task/start", params=qparams
                 )
                 self._raise_for_status(resp, "task start")
-                print("Started.")
+                self._print_output(resp.json())
 
             elif action == "matcher_task_status":
                 resp = await client.get(f"{base.rstrip('/')}/task/status")

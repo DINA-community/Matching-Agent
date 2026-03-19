@@ -31,6 +31,7 @@ import queue
 import time
 import tomllib
 import traceback
+import uuid
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from pathlib import Path
@@ -56,7 +57,13 @@ from dina.common.config import (
     validate_update_keys,
     write_toml_file,
 )
-from dina.common.log import configure_logging, get_logger, LoggingConfig
+from dina.common.log import (
+    clear_match_uuid_context,
+    configure_logging,
+    get_logger,
+    LoggingConfig,
+    match_uuid_context,
+)
 import sys
 import argparse
 
@@ -126,6 +133,7 @@ class MatchingTask(BaseModel):
 class MatchUpdate(BaseModel):
     asset_id: int
     csaf_id: int
+    trace_uuid: str
     matching_reason: str
     score: float
 
@@ -145,6 +153,7 @@ class APIMatch(BaseModel):
     score: float
     status: str
     matcher_run_id: int | None = None
+    trace_uuid: str
     matching_config_hash: str | None = None
 
 
@@ -818,6 +827,7 @@ class Matcher:
                     - id: Unique identifier of the match
                     - csaf_origin: Full URL to the CSAF advisory
                     - asset_origin: Full URL to the matched asset
+                    - trace_uuid: Stable UUID for traceability independent of DB id
                     - timestamp: Unix timestamp when the match was created
                     - score: Matching confidence score (0-100)
                     - status: Current status of the match
@@ -846,6 +856,7 @@ class Matcher:
                     score=match.score,
                     status=match.status,
                     matcher_run_id=match.matcher_run_id,
+                    trace_uuid=match.trace_uuid,
                     matching_config_hash=match.matching_config_hash,
                 )
                 for match in matches
@@ -870,6 +881,7 @@ class Matcher:
                 score=match.score,
                 status=match.status,
                 matcher_run_id=match.matcher_run_id,
+                trace_uuid=match.trace_uuid,
                 matching_config_hash=match.matching_config_hash,
             )
 
@@ -1386,40 +1398,49 @@ def match_pairs(
         matching_config_hash: Hash of the matching config for cache invalidation.
     """
     configure_logging(logging_config, log_queue)
+    clear_match_uuid_context()
     logger.debug(f"Matching batch with {len(pairs)} pairs")
     batch = []
     processed_pairs: list[tuple[int, int]] = []
     for csaf, asset in pairs:
-        if not (csaf and csaf.product and asset and asset.product):
-            continue
-        processed_pairs.append((csaf.id, asset.id))
+        trace_uuid = str(uuid.uuid4())
+        with match_uuid_context(trace_uuid):
+            if not (csaf and csaf.product and asset and asset.product):
+                logger.debug("Skipping pair with missing CSAF/asset product data")
+                continue
+            processed_pairs.append((csaf.id, asset.id))
 
-        csaf_dict = {f"csaf_{k}": v for k, v in csaf.product.to_dict().items()}
-        asset_dict = {f"asset_{k}": v for k, v in asset.product.to_dict().items()}
+            csaf_dict = {f"csaf_{k}": v for k, v in csaf.product.to_dict().items()}
+            asset_dict = {f"asset_{k}": v for k, v in asset.product.to_dict().items()}
 
-        df = pl.DataFrame([{**csaf_dict, **asset_dict}], strict=False)
+            df = pl.DataFrame([{**csaf_dict, **asset_dict}], strict=False)
 
-        matching = Matching(matching_config)
-        df_matches = matching.df_matching(df)
+            matching = Matching(matching_config)
+            df_matches = matching.df_matching(df)
 
-        score = Score(matching_config)
-        result, reason, score_percent, trace_result = score.calculate_overall_score(
-            df_matches
-        )
+            score = Score(matching_config)
+            result, reason, score_percent, trace_result = score.calculate_overall_score(df_matches)
 
-        if score_percent < threshold:
-            continue
+            if score_percent < threshold:
+                logger.debug(
+                    "Discarded candidate below threshold score=%.3f threshold=%.3f",
+                    score_percent,
+                    threshold,
+                )
+                continue
 
-        match = Match()
-        match.asset_id = asset.id
-        match.csaf_product_id = csaf.id
-        match.score = score_percent
-        match.timestamp = datetime.datetime.now().timestamp()
-        match.status = f"result: {result}, reason: {reason}, logs: {trace_result}"
-        match.matcher_run_id = task_id
-        match.matching_config_hash = matching_config_hash
+            match = Match()
+            match.asset_id = asset.id
+            match.csaf_product_id = csaf.id
+            match.score = score_percent
+            match.timestamp = datetime.datetime.now().timestamp()
+            match.status = f"result: {result}, reason: {reason}, logs: {trace_result}"
+            match.matcher_run_id = task_id
+            match.trace_uuid = trace_uuid
+            match.matching_config_hash = matching_config_hash
 
-        batch.append(match)
+            logger.debug("Accepted match candidate score=%.3f", score_percent)
+            batch.append(match)
     matches.put((task_id, processed_pairs, batch))
 
 

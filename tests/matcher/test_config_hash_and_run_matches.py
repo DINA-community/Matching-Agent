@@ -1,5 +1,6 @@
 import multiprocessing
 import queue
+import uuid
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -70,4 +71,5 @@ def test_match_pairs_sets_run_and_config_hash():
     assert task_id == 99
     assert processed_pairs == [(11, 22)]
     assert all(m.matcher_run_id == 99 for m in matches)
+    assert all(uuid.UUID(m.trace_uuid) for m in matches)
     assert all(m.matching_config_hash == cfg_hash for m in matches)
