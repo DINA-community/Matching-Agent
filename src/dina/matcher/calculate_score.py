@@ -191,7 +191,7 @@ class Score:
         trace_result = "\n".join(trace) + "\n"
         logger.trace(trace_result)
 
-        result, reason, score_percent = self._evaluate_thresholds(
+        return self._evaluate_thresholds(
             vendor_score,
             product_name_score,
             product_family_score,
@@ -199,8 +199,6 @@ class Score:
             keyword_score,
             score_percent,
         )
-
-        return result, reason, score_percent, trace
 
     def _compute_field_score(
         self, df: pl.DataFrame, field: str, base_value: float
