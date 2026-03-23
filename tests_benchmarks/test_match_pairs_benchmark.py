@@ -18,8 +18,6 @@ from dina.cachedb.model import Asset, CsafProduct
 from dina.common.config import Config
 from dina.matcher.main import match_pairs
 
-# uv run python tests_benchmarks/test_match_pairs_benchmark.py --limits 10 20 30 --rounds 5 --threshold 50 --output-dir ./tests_benchmarks/reports_match_pairs_benchmark
-
 
 def percentile(values: list[float], p: float) -> float:
     if not values:

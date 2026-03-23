@@ -19,10 +19,6 @@ from dina.common.config import Config
 from dina.matcher.main import match_pairs
 
 
-# uv run python tests_benchmarks/test_measure_matcher_resources.py --pairs 5:30 10:30 15:30 20:30 25:30 30:30 --threshold 20 --output-dir ./tests_benchmarks/reports_measure_matcher_resources/plots_A
-# uv run python tests_benchmarks/test_measure_matcher_resources.py --pairs 30:5 30:10 30:15 30:20 30:25 30:30 --threshold 20 --output-dir ./tests_benchmarks/reports_measure_matcher_resources/plots_B
-# uv run python tests_benchmarks/test_measure_matcher_resources.py --pairs 5:5 10:10 15:15 20:20 25:25 30:30 --threshold 20 --output-dir ./tests_benchmarks/reports_measure_matcher_resources/plots_C
-# uv run python tests_benchmarks/test_measure_matcher_resources.py --pairs 5:30 10:30 15:30 30:5 30:10 30:15 --threshold 20 --output-dir ./tests_benchmarks/reports_measure_matcher_resources/plots_D
 def parse_asset_csaf_pair(value: str) -> tuple[int, int]:
     try:
         asset_count_str, csaf_count_str = value.split(":")

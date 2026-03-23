@@ -5,7 +5,6 @@ CSAFSYNC_HOST = None
 REGISTERED_USER_CLASSES: list[tuple[type, str]] = []
 
 
-# uv run locust -f tests_api_performance --assetsync-host http://localhost:8992 --csafsync-host http://localhost:8991 --matcher-host http://localhost:8998
 def register_user_class(target: str):
     def decorator(cls):
         REGISTERED_USER_CLASSES.append((cls, target))
