@@ -859,6 +859,8 @@ class NetboxDataSource(DataSourcePlugin):
             - Processes in batches of 100 to avoid overwhelming the API
         """
 
+        logger.debug("Notifying NetBox of %i new matches", len(new_matches))
+
         class BulkBody:
             def __init__(self, items: List[Any]):
                 self.items = items

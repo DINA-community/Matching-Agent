@@ -710,7 +710,7 @@ class Matcher:
                     else:
                         self.__store_in_progress_by_task[task_id] = count
                 match_ids = itertools.chain.from_iterable(match_ids)
-                matches = await self.__cache_db.get_matches(ids=match_ids)
+                matches = await self.__cache_db.get_matches(ids=match_ids, limit=None)
                 # Categorize by asset origin
                 categorized_matches = defaultdict(list)
                 for match in matches:
@@ -720,7 +720,9 @@ class Matcher:
                     if ds := self.__data_source_plugins.get(origin):
                         if ds.config.DataSource.publish_matches:
                             logger.debug(
-                                f"Notifying subscribers of new matches from {origin}"
+                                "Notifying subscribers of %i new matches from %s",
+                                len(matches),
+                                origin,
                             )
                             await self.__data_source_plugins[origin].notify_new_matches(
                                 matches
@@ -1439,7 +1441,7 @@ def match_pairs(
             match.trace_uuid = trace_uuid
             match.matching_config_hash = matching_config_hash
 
-            logger.debug("Accepted match candidate score=%.3f", score_percent)
+            logger.trace("Accepted match candidate score=%.3f", score_percent)
             batch.append(match)
     matches.put((task_id, processed_pairs, batch))
 
