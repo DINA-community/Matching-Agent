@@ -427,8 +427,8 @@ class Normalizer:
 
                 results.append(
                     {
-                        "min": min_v,
-                        "max": max_v,
+                        "min": self._clean_min_max_version(min_v),
+                        "max": self._clean_min_max_version(max_v),
                         "min_inclusive": min_inclusive,
                         "max_inclusive": max_inclusive,
                     }
@@ -453,7 +453,12 @@ class Normalizer:
 
         d = self._base_dict(Standards.CALVER.value, expr)
         d["date"] = {"year": year, "month": month, "day": day}
-        d["min_max_version"] = [{"min": expr, "max": expr}]
+        d["min_max_version"] = [
+            {
+                "min": self._clean_min_max_version(expr),
+                "max": self._clean_min_max_version(expr),
+            }
+        ]
 
         return d
 
@@ -468,7 +473,10 @@ class Normalizer:
         max_parts = ["9999" if p == "+" else p for p in parts]
 
         d["min_max_version"] = [
-            {"min": ".".join(min_parts), "max": ".".join(max_parts)}
+            {
+                "min": self._clean_min_max_version(".".join(min_parts)),
+                "max": self._clean_min_max_version(".".join(max_parts)),
+            }
         ]
 
         return d
@@ -494,7 +502,12 @@ class Normalizer:
             d["epoch"] = g["epoch"]
             d["architecture"] = g["arch"]
             d["build_number"] = g["release"]
-            d["min_max_version"] = [{"min": g["version"], "max": g["version"]}]
+            d["min_max_version"] = [
+                {
+                    "min": self._clean_min_max_version(g["version"]),
+                    "max": self._clean_min_max_version(g["version"]),
+                }
+            ]
             return d
 
         evr = re.match(
@@ -509,7 +522,12 @@ class Normalizer:
             d = self._base_dict(Standards.RPM.value, expr)
             d["epoch"] = g["epoch"]
             d["build_number"] = g["release"]
-            d["min_max_version"] = [{"min": g["version"], "max": g["version"]}]
+            d["min_max_version"] = [
+                {
+                    "min": self._clean_min_max_version(g["version"]),
+                    "max": self._clean_min_max_version(g["version"]),
+                }
+            ]
             return d
 
         return None
@@ -528,7 +546,12 @@ class Normalizer:
         d = self._base_dict(Standards.DEB.value, expr)
         d["build_number"] = revision
         d["epoch"] = epoch
-        d["min_max_version"] = [{"min": upstream, "max": upstream}]
+        d["min_max_version"] = [
+            {
+                "min": self._clean_min_max_version(upstream),
+                "max": self._clean_min_max_version(upstream),
+            }
+        ]
 
         return d
 
@@ -555,7 +578,12 @@ class Normalizer:
         d["build_number"] = f"upd{upd}" if upd else None
 
         normalized_version = f"{major}.{minor}.{sp}.{upd}"
-        d["min_max_version"] = [{"min": normalized_version, "max": normalized_version}]
+        d["min_max_version"] = [
+            {
+                "min": self._clean_min_max_version(normalized_version),
+                "max": self._clean_min_max_version(normalized_version),
+            }
+        ]
 
         return d
 
@@ -605,7 +633,10 @@ class Normalizer:
                 d["build_number"] = build
 
         d["min_max_version"] = [
-            {"min": f"{major}.{minor}.{patch}", "max": f"{major}.{minor}.{patch}"}
+            {
+                "min": self._clean_min_max_version(f"{major}.{minor}.{patch}"),
+                "max": self._clean_min_max_version(f"{major}.{minor}.{patch}"),
+            }
         ]
 
         return d
@@ -627,7 +658,12 @@ class Normalizer:
 
         norm = f"{rel}.{branch}.{qnum}" if qnum else f"{rel}.{branch}"
 
-        d["min_max_version"] = [{"min": norm, "max": norm}]
+        d["min_max_version"] = [
+            {
+                "min": self._clean_min_max_version(norm),
+                "max": self._clean_min_max_version(norm),
+            }
+        ]
 
         return d
 
@@ -656,7 +692,12 @@ class Normalizer:
         elif dev_num:
             d["qualifier"] = ["dev", int(dev_num)]
 
-        d["min_max_version"] = [{"min": expr, "max": expr}]
+        d["min_max_version"] = [
+            {
+                "min": self._clean_min_max_version(base),
+                "max": self._clean_min_max_version(base),
+            }
+        ]
 
         return d
 
@@ -672,6 +713,13 @@ class Normalizer:
         d = self._base_dict(Standards.FREETEXT.value, expr)
 
         return d
+
+    def _clean_min_max_version(self, value: str):
+        try:
+            value = re.sub(r"[A-Za-z]", "", value)
+            return str(value)
+        except (TypeError, ValueError):
+            return None
 
 
 # def main():

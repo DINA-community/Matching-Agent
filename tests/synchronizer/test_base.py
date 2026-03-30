@@ -617,10 +617,14 @@ def test_preprocessor_loader_missing(monkeypatch, tmp_path, fake_cache_db):
         SynchronizerConfig.model_validate(config_dict)
 
 
-def test_preprocessor_plugin_wrong_type(fake_cache_db, temp_config, monkeypatch):
+def test_preprocessor_plugin_wrong_type(
+    fake_cache_db, temp_config, monkeypatch, caplog
+):
     """
     Ensures incorrect plugin type raises ValueError during initialization.
     """
+
+    caplog.set_level("CRITICAL")
 
     def fake_loader(*a, **kw):
         return MagicMock()

@@ -44,9 +44,9 @@ class MatcherConfig(BaseModel):
     @model_validator(mode="after")
     def validate_scheduling_config(self):
         """Ensure sync_interval and fixed_time_of_day are mutually exclusive."""
-        if self.sync_interval is None and self.fixed_time_of_day is None:
+        if self.sync_interval is not None and self.fixed_time_of_day is not None:
             raise ValueError(
-                "Either sync_interval or fixed_time_of_day must be specified"
+                "sync_interval and fixed_time_of_day are mutually exclusive"
             )
         if self.sync_interval is not None and self.fixed_time_of_day is not None:
             raise ValueError(

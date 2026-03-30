@@ -1,4 +1,5 @@
 import json
+import re
 
 # from pathlib import Path
 # import tomllib
@@ -64,7 +65,7 @@ class Matching:
         if not val or val is None or val == {}:
             return None
 
-        if isinstance(val, dict):
+        if isinstance(val, (dict, list)):
             return val
 
         try:
@@ -424,17 +425,19 @@ class Matching:
         Missing inclusive flags default to True.
         """
 
-        def _to_float(value):
+        def _to_int(value: str):
             try:
-                return float(value)
+                value = value.replace(".", "")
+                value = re.sub(r"[A-Za-z]", "", value)
+                return int(value)
             except (TypeError, ValueError):
                 return None
 
         # --- Extract numbers ---
-        a_min = _to_float(asset_range.get("min"))
-        a_max = _to_float(asset_range.get("max"))
-        c_min = _to_float(csaf_range.get("min"))
-        c_max = _to_float(csaf_range.get("max"))
+        a_min = _to_int(str(asset_range.get("min")))
+        a_max = _to_int(str(asset_range.get("max")))
+        c_min = _to_int(str(csaf_range.get("min")))
+        c_max = _to_int(str(csaf_range.get("max")))
 
         # --- Inclusivity flags (default True) ---
         a_min_inc = self._bool_or_default(asset_range.get("min_inclusive"))
@@ -492,9 +495,11 @@ class Matching:
             return None
         if not csaf_version or not asset_version:
             return 0.0
+        if asset_version and "vers:all/*" in csaf_version:
+            return 1.0
 
         # --- 2. Handle list of versions recursively ---
-        if isinstance(csaf_version, list):
+        if isinstance(csaf_version, list) or isinstance(asset_version, list):
             return self._compare_version_lists(csaf_version, asset_version)
 
         # --- 3. Ensure both are dicts ---
@@ -508,7 +513,7 @@ class Matching:
             csaf_version, asset_version
         )
 
-        if score_min_max_version > 0:
+        if score_min_max_version > 0 or score_min_max_version is None:
             for field, w in (self.version_weights or {}).items():
                 if not isinstance(w, float):
                     continue
@@ -541,7 +546,7 @@ class Matching:
         self, csaf_list: list, asset_versions: dict | list | None
     ) -> float | None:
         """Compare lists of version dictionaries recursively."""
-        if not csaf_list:
+        if not csaf_list or not asset_versions:
             return None
 
         scores = []

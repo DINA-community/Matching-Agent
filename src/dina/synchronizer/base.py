@@ -53,6 +53,7 @@ class SynchronizerSectionConfig(BaseModel):
     fixed_time_of_day: str | None = None  # Format: "HH:MM" in 24-hour format
     preprocessor_plugins: list[str]
     plugin_configs_path: Path
+    trigger_matcher_on_sync: bool = True
     # Number of seconds before last_run to consider records stale for cleanup
     cleanup_grace_period: int
     # The cleanup procedure is executed every cleanup_interval seconds
@@ -380,7 +381,9 @@ class BaseSynchronizer(ABC):
                         )
                     )
                 await self.cache_db.store(data, mapped_relations)
-                if data or mapped_relations:
+                if (
+                    data or mapped_relations
+                ) and self.config.Synchronizer.trigger_matcher_on_sync:
                     await self.cache_db.add_matcher_trigger()
             else:
                 await asyncio.sleep(0.1)

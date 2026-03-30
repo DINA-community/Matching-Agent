@@ -401,33 +401,27 @@ class Score:
         if val is None:
             return default
 
-        preferred = self._extract_raw_from_obj_string(val)
+        if isinstance(val, pl.Series):
+            items = val.to_list()
+            raws = []
+            for e in items:
+                if isinstance(e, dict):
+                    raws.append(e.get("raw") or e.get("name"))
+                elif isinstance(e, str):
+                    try:
+                        obj = json.loads(e)
+                        if isinstance(obj, dict):
+                            raws.append(obj.get("raw") or obj.get("name"))
+                    except Exception:
+                        pass
 
-        if preferred:
-            return str(preferred)
+            raws = [r for r in raws if r is not None]
+            return raws[0] if raws else default
+
+        if isinstance(val, (dict)):
+            return val.get("raw") or val.get("name")
 
         return str(val).replace(sep, " ")
-
-    def _extract_raw_from_obj_string(self, text: str):
-        """Try to parse a JSON object stored as a string and return its preferred display field.
-
-        Returns:
-            The value of "raw" or "name" if `text` is a JSON object string; otherwise None.
-        """
-
-        t = text.strip()
-
-        if not (t.startswith("{") and t.endswith("}")):
-            return None
-
-        try:
-            obj = json.loads(t)
-            if isinstance(obj, dict):
-                return obj.get("raw") or obj.get("name")
-        except Exception:
-            pass
-
-        return None
 
     def _fmt(self, v):
         """Format numeric values for trace output (two decimals) and keep None readable."""
