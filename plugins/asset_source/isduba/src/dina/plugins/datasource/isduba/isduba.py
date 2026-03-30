@@ -84,8 +84,21 @@ class IsdubaDataSource(DataSourcePlugin):
                     *[
                         api_instance.documents_id_get(document["id"])
                         for document in api_response.documents
-                    ]
+                    ],
+                    return_exceptions=True,
                 )
+
+                # Filter out exceptions and log failed document IDs
+                successful_results = []
+                for document, result in zip(api_response.documents, document_results):
+                    if isinstance(result, Exception):
+                        logger.error(
+                            f"Failed to fetch document with ID {document['id']}: {result}"
+                        )
+                    else:
+                        successful_results.append(result)
+
+                document_results = successful_results
                 logger.info(f"Fetched {len(document_results)} documents")
 
                 with concurrent.futures.ProcessPoolExecutor() as pool:
