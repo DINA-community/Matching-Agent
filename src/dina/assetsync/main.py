@@ -31,8 +31,6 @@ class AssetSynchronizer(BaseSynchronizer):
             cache_db,
             config.Assetsync,
             root_path="/assetsync",
-            config_path=config_path,
-            config_section="Assetsync",
         )
         # Configure logging
         configure_logging(self.config.Logging)

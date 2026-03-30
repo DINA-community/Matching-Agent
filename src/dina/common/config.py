@@ -1,19 +1,29 @@
 from __future__ import annotations
 import tomllib
+from types import UnionType
 from pathlib import Path
-from typing import Self, get_args, get_origin
+from typing import Any, Self, Union, get_args, get_origin
 
 from pydantic import BaseModel, Field, model_validator
+from pydantic_core import PydanticUndefined
 
 from dina.cachedb.database import CacheDB
 from dina.common.log import LoggingConfig
 
 
 class Config(BaseModel):
-    Cachedb: CacheDB.Config
-    Assetsync: SynchronizerConfig
-    Csafsync: SynchronizerConfig
-    Matcher: MatcherConfig
+    Cachedb: CacheDB.Config = Field(
+        ..., description="Database connection settings for the cache database."
+    )
+    Assetsync: SynchronizerConfig = Field(
+        ..., description="Configuration for the asset synchronizer service."
+    )
+    Csafsync: SynchronizerConfig = Field(
+        ..., description="Configuration for the CSAF synchronizer service."
+    )
+    Matcher: MatcherConfig = Field(
+        ..., description="Configuration for the matcher service."
+    )
 
     @classmethod
     def load(cls, config_file: Path) -> Self:
@@ -149,15 +159,94 @@ def write_toml_file(path: Path, data: dict) -> None:
     path.write_text(dump_toml(data), encoding="utf-8")
 
 
+def _annotation_to_string(annotation: object) -> str:
+    origin = get_origin(annotation)
+    if origin is None:
+        if annotation is Any:
+            return "any"
+        if annotation is Path:
+            return "path"
+        if isinstance(annotation, type):
+            return annotation.__name__
+        return str(annotation)
+
+    args = get_args(annotation)
+    if origin in (Union, UnionType):
+        rendered = [_annotation_to_string(arg) for arg in args if arg is not type(None)]
+        if len(rendered) != len(args):
+            rendered.append("null")
+        return " | ".join(rendered)
+    if origin is list:
+        inner = _annotation_to_string(args[0]) if args else "any"
+        return f"list[{inner}]"
+    if origin is dict:
+        key_t = _annotation_to_string(args[0]) if args else "any"
+        val_t = _annotation_to_string(args[1]) if len(args) > 1 else "any"
+        return f"dict[{key_t}, {val_t}]"
+    if origin is set:
+        inner = _annotation_to_string(args[0]) if args else "any"
+        return f"set[{inner}]"
+    return str(annotation)
+
+
+def build_config_parameter_info(
+    model: type[BaseModel], prefix: str = ""
+) -> dict[str, dict[str, object]]:
+    """Build flattened metadata for all leaf configuration parameters."""
+    model.model_rebuild(force=True)
+    metadata: dict[str, dict[str, object]] = {}
+    for name, field in model.model_fields.items():
+        key = f"{prefix}.{name}" if prefix else name
+        nested_model = _model_for_annotation(field.annotation)
+        if nested_model is not None:
+            metadata.update(build_config_parameter_info(nested_model, key))
+            continue
+
+        required = field.is_required()
+        default: object | None
+        if required:
+            default = None
+        elif field.default is not PydanticUndefined:
+            default = field.default
+        elif field.default_factory is not None:
+            default = "<factory>"
+        else:
+            default = None
+
+        metadata[key] = {
+            "type": _annotation_to_string(field.annotation),
+            "required": required,
+            "default": default,
+            "description": field.description,
+        }
+    return metadata
+
+
 class MatcherConfig(BaseModel):
-    sync_interval: int | None = None
-    fixed_time_of_day: str | None = None  # Format: "HH:MM" in 24-hour format
-    max_duration: int | None = None  # Maximum duration in seconds for a matching run
-    match_threshold: float
-    Api: ApiConfig
-    asset_plugins_path: Path
-    csaf_plugins_path: Path
-    Logging: LoggingConfig | None = None
+    sync_interval: int | None = Field(
+        None,
+        description="Run matching every N seconds; mutually exclusive with fixed_time_of_day.",
+    )
+    fixed_time_of_day: str | None = Field(
+        None,
+        description='Run matching once per day at "HH:MM" (24-hour format); mutually exclusive with sync_interval.',
+    )
+    max_duration: int | None = Field(
+        None, description="Maximum allowed runtime (seconds) for one matching run."
+    )
+    match_threshold: float = Field(
+        ..., description="Minimum score required for a match to be accepted."
+    )
+    Api: ApiConfig = Field(..., description="Matcher API server configuration.")
+    asset_plugins_path: Path = Field(
+        ..., description="Path to asset data source plugin configuration files."
+    )
+    csaf_plugins_path: Path = Field(
+        ..., description="Path to CSAF data source plugin configuration files."
+    )
+    Logging: LoggingConfig | None = Field(
+        None, description="Optional matcher-specific logging configuration."
+    )
 
     @model_validator(mode="after")
     def validate_scheduling_config(self):
@@ -186,69 +275,130 @@ class MatcherConfig(BaseModel):
 
 
 class DatabaseConfig(BaseModel):
-    freetext_fields_separator: str
-    freetext_fields: dict[str, float] = Field(default_factory=dict)
-    ordered_fields: dict[str, float] = Field(default_factory=dict)
-    other_fields: dict[str, float] = Field(default_factory=dict)
-    freetext_fields_weights: dict[str, float] = Field(default_factory=dict)
+    freetext_fields_separator: str = Field(
+        ...,
+        description="Separator used to split free-text fields before tokenization.",
+    )
+    freetext_fields: dict[str, float] = Field(
+        default_factory=dict,
+        description="Mapping of free-text field names to field weights.",
+    )
+    ordered_fields: dict[str, float] = Field(
+        default_factory=dict,
+        description="Mapping of ordered-comparison field names to field weights.",
+    )
+    other_fields: dict[str, float] = Field(
+        default_factory=dict,
+        description="Mapping of exact/other field names to field weights.",
+    )
+    freetext_fields_weights: dict[str, float] = Field(
+        default_factory=dict,
+        description="Additional weighting rules for free-text scoring components.",
+    )
 
 
 class VersionConfig(BaseModel):
-    weights: dict[str, float] = Field(default_factory=dict)
+    weights: dict[str, float] = Field(
+        default_factory=dict,
+        description="Weights for version-comparison features used in matching.",
+    )
 
 
 class CpeConfig(BaseModel):
-    csaf_cpe_field_name: str
-    weights: dict[str, float] = Field(default_factory=dict)
+    csaf_cpe_field_name: str = Field(
+        ..., description="Name of the CSAF field containing CPE data."
+    )
+    weights: dict[str, float] = Field(
+        default_factory=dict,
+        description="Weights for CPE-comparison features used in matching.",
+    )
 
 
 class PurlConfig(BaseModel):
-    csaf_purl_field_name: str
-    weights: dict[str, float] = Field(default_factory=dict)
+    csaf_purl_field_name: str = Field(
+        ..., description="Name of the CSAF field containing PURL data."
+    )
+    weights: dict[str, float] = Field(
+        default_factory=dict,
+        description="Weights for PURL-comparison features used in matching.",
+    )
 
 
 class NgramConfig(BaseModel):
-    weights: dict[int, float] = Field(default_factory=dict)
+    weights: dict[int, float] = Field(
+        default_factory=dict, description="Per-ngram-size weights (e.g., 2, 3)."
+    )
 
 
 class LevenshteinConfig(BaseModel):
-    max_distance: int
+    max_distance: int = Field(
+        ..., description="Maximum Levenshtein edit distance considered similar."
+    )
 
 
 class ThresholdConfig(BaseModel):
-    vendor: int
-    product_family: int
-    product_name: int
-    keyword: int
-    version: int
+    vendor: int = Field(..., description="Threshold for vendor token matching.")
+    product_family: int = Field(
+        ..., description="Threshold for product family token matching."
+    )
+    product_name: int = Field(..., description="Threshold for product name matching.")
+    keyword: int = Field(..., description="Threshold for keyword matching.")
+    version: int = Field(..., description="Threshold for version matching.")
 
 
 class MatchingConfig(BaseModel):
-    database: DatabaseConfig
-    version: VersionConfig
-    cpe: CpeConfig
-    purl: PurlConfig
-    ngram: NgramConfig
-    levenshtein: LevenshteinConfig
-    threshold: ThresholdConfig
+    database: DatabaseConfig = Field(
+        ..., description="Settings for DB-backed field extraction and weighting."
+    )
+    version: VersionConfig = Field(
+        ..., description="Version-comparison scoring configuration."
+    )
+    cpe: CpeConfig = Field(..., description="CPE-comparison configuration.")
+    purl: PurlConfig = Field(..., description="PURL-comparison configuration.")
+    ngram: NgramConfig = Field(..., description="N-gram similarity configuration.")
+    levenshtein: LevenshteinConfig = Field(
+        ..., description="Levenshtein similarity configuration."
+    )
+    threshold: ThresholdConfig = Field(
+        ..., description="Thresholds used by the matching decision logic."
+    )
 
 
 class ApiConfig(BaseModel):
-    host: str
-    port: int
-    access_token_expire_minutes: int
+    host: str = Field(..., description="Host/interface the API server binds to.")
+    port: int = Field(..., description="Port the API server listens on.")
+    access_token_expire_minutes: int = Field(
+        ..., description="JWT access token lifetime in minutes."
+    )
 
 
 class SynchronizerSectionConfig(BaseModel):
-    sync_interval: int | None = None
-    fixed_time_of_day: str | None = None  # Format: "HH:MM" in 24-hour format
-    preprocessor_plugins: list[str]
-    plugin_configs_path: Path
-    trigger_matcher_on_sync: bool = True
+    sync_interval: int | None = Field(
+        None,
+        description="Run synchronization every N seconds; mutually exclusive with fixed_time_of_day.",
+    )
+    fixed_time_of_day: str | None = Field(
+        None,
+        description='Run synchronization once per day at "HH:MM" (24-hour format); mutually exclusive with sync_interval.',
+    )
+    preprocessor_plugins: list[str] = Field(
+        ..., description="Ordered list of preprocessor plugin names to apply."
+    )
+    plugin_configs_path: Path = Field(
+        ..., description="Path to datasource plugin TOML configuration files."
+    )
+    trigger_matcher_on_sync: bool = Field(
+        True, description="Trigger matcher automatically after successful sync."
+    )
     # Number of seconds before last_run to consider records stale for cleanup
-    cleanup_grace_period: int
+    cleanup_grace_period: int = Field(
+        ...,
+        description="Grace period in seconds before stale records are eligible for cleanup.",
+    )
     # The cleanup procedure is executed every cleanup_interval seconds
-    cleanup_interval: int
+    cleanup_interval: int = Field(
+        ..., description="Interval in seconds between cleanup runs."
+    )
 
     @model_validator(mode="after")
     def validate_scheduling_config(self):
@@ -277,6 +427,10 @@ class SynchronizerSectionConfig(BaseModel):
 
 
 class SynchronizerConfig(BaseModel):
-    Synchronizer: SynchronizerSectionConfig
-    Api: ApiConfig
-    Logging: LoggingConfig | None = None
+    Synchronizer: SynchronizerSectionConfig = Field(
+        ..., description="Core synchronization behavior and scheduling settings."
+    )
+    Api: ApiConfig = Field(..., description="Synchronizer API server configuration.")
+    Logging: LoggingConfig | None = Field(
+        None, description="Optional synchronizer-specific logging configuration."
+    )

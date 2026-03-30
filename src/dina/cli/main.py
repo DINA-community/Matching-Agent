@@ -209,21 +209,6 @@ class CLI:
         sync_status = sync_task_sub.add_parser("status", help="Sync status")
         sync_status.set_defaults(action="sync_task_status")
 
-        sync_config = sync_sub.add_parser("config", help="View or update config")
-        sync_config.add_argument(
-            "--get",
-            action="store_true",
-            help="Get synchronizer configuration",
-        )
-        sync_config.add_argument(
-            "--set",
-            dest="updates",
-            action="append",
-            default=[],
-            help="Update value (key=value). Use dotted keys for nested fields.",
-        )
-        sync_config.set_defaults(action="sync_config")
-
         return parser
 
     async def run(self):
@@ -609,22 +594,6 @@ class CLI:
                 resp = await client.get(f"{base.rstrip('/')}/task/status")
                 self._raise_for_status(resp, "sync status")
                 self._print_output(resp.json())
-
-            elif action == "sync_config":
-                if not args.get and not args.updates:
-                    raise RuntimeError("config requires --get or --set")
-                if args.get:
-                    resp = await client.get(f"{base.rstrip('/')}/config")
-                    self._raise_for_status(resp, "config get")
-                    self._print_output(resp.json())
-                if args.updates:
-                    updates = self._parse_updates(args.updates)
-                    resp = await client.post(
-                        f"{base.rstrip('/')}/config",
-                        json=updates,
-                    )
-                    self._raise_for_status(resp, "config set")
-                    self._print_output(resp.json())
 
             else:
                 self.parser.error("Unknown sync command")
