@@ -1,3 +1,15 @@
+"""
+Database module for DINA cache operations.
+
+This module provides the CacheDB class, which serves as the primary interface
+for interacting with the PostgreSQL database. It handles storage and retrieval
+of assets, CSAF products, matches, and their relationships, as well as managing
+matcher runs, triggers, and user authentication.
+
+The database uses SQLAlchemy for async PostgreSQL operations and stores data
+in a 'cacheDB' schema.
+"""
+
 import datetime
 from typing import Any, AsyncGenerator, List, Optional, Type, Union
 
@@ -46,7 +58,17 @@ logger = get_logger(__name__)
 
 
 class CacheDB:
+    """
+    Main database interface for DINA cache operations.
+
+    Provides async methods for storing and querying assets, CSAF products, matches,
+    and their relationships. Manages matcher runs, triggers, and user authentication.
+    Must be connected via connect() before use.
+    """
+
     class Config(BaseModel):
+        """Configuration for PostgreSQL database connection."""
+
         host: str = Field(..., description="PostgreSQL host name or IP.")
         port: int = Field(..., description="PostgreSQL TCP port.")
         database: str = Field(..., description="PostgreSQL database name.")
@@ -54,11 +76,23 @@ class CacheDB:
         password: str = Field(..., description="PostgreSQL user password.")
 
     def __init__(self, config: Config) -> None:
+        """
+        Initialize the database interface.
+
+        Args:
+            config: Database connection configuration.
+        """
         super().__init__()
         self.engine: Optional[AsyncEngine] = None
         self.config = config
 
     async def connect(self) -> None:
+        """
+        Establish database connection and initialize schema.
+
+        Creates the database engine, cacheDB schema if needed, and all tables.
+        Must be called before any other database operations.
+        """
         self.engine = create_async_engine(
             f"postgresql+psycopg://{self.config.username}:{self.config.password}@{self.config.host}:{self.config.port}/{self.config.database}",
         )
@@ -67,6 +101,18 @@ class CacheDB:
             await conn.run_sync(Base.metadata.create_all)
 
     def fetcher_view(self, origin: HttpUrl) -> FetcherView:
+        """
+        Create a view for querying synchronizer metadata by origin.
+
+        Args:
+            origin: The origin URI to create a view for.
+
+        Returns:
+            FetcherView instance for the specified origin.
+
+        Raises:
+            Exception: If database is not connected.
+        """
         if self.engine is not None:
             return FetcherView(origin, self.engine)
         else:
@@ -78,15 +124,14 @@ class CacheDB:
         relationships: List[MappedRelationship],
     ) -> None:
         """
-        Stores a list of assets or CSAF documents into the database. This function ensures
-        the provided data is added to the database in a single transaction using the
-        Session context management.
+        Store or update assets, CSAF products, and their relationships.
 
-        :param data: A list containing either Asset or CsafDocument objects to be stored
-            in the database.
-        :type data: List[Union[Asset, CsafDocument]]
+        Performs upserts for existing data (matched by ID) and inserts for new data.
+        All operations occur in a single transaction.
 
-        :return: None
+        Args:
+            data: Assets or CSAF products to store.
+            relationships: Parent-child relationships between products to store.
         """
         if not data and not relationships:
             return
@@ -201,6 +246,17 @@ class CacheDB:
     async def run_cleanup_for_plugin(
         self, source: DataSourcePlugin, grace_period_seconds: int
     ) -> None:
+        """
+        Clean up stale data for a specific data source plugin.
+
+        Identifies assets, CSAF products, and relationships that haven't been updated
+        since before the grace period. Delegates to the plugin to determine which items
+        can be deleted vs. refreshed.
+
+        Args:
+            source: The data source plugin to clean up for.
+            grace_period_seconds: Time in seconds before last run to consider data stale.
+        """
         async with AsyncSession(self.engine) as session:
             async with session.begin():
                 fetcher_view = self.fetcher_view(source.origin_uri)
@@ -436,6 +492,23 @@ class CacheDB:
         force_recompute: bool = False,
         batch_size_sqrt: int = 50,
     ) -> AsyncGenerator[list[tuple[CsafProduct, Asset]]]:
+        """
+        Generate batches of (CSAF product, asset) pairs for matching.
+
+        Yields batches of pairs that need to be matched. If force_recompute is False,
+        only yields pairs that are unmatched, have stale matches, or were matched
+        with a different configuration.
+
+        Args:
+            assets: Optional filter for specific asset URIs.
+            csaf_documents: Optional filter for specific CSAF document URIs.
+            matching_config_hash: Hash of current matching configuration.
+            force_recompute: If True, yield all pairs regardless of match status.
+            batch_size_sqrt: Square root of batch size (actual batch is this squared).
+
+        Yields:
+            Lists of (CsafProduct, Asset) tuples ready for matching.
+        """
         async with AsyncSession(self.engine) as session:
             next_csaf_product_id = 0
 
@@ -499,6 +572,15 @@ class CacheDB:
             return
 
     async def count_assets(self, assets: list[HttpUrl]) -> int:
+        """
+        Count total assets, optionally filtered by URIs.
+
+        Args:
+            assets: Optional list of asset URIs to count. If empty, counts all.
+
+        Returns:
+            Number of assets matching the filter.
+        """
         async with AsyncSession(self.engine) as session:
             stmt = select(func.count()).select_from(Asset)
             if assets:
@@ -506,6 +588,15 @@ class CacheDB:
             return int((await session.execute(stmt)).scalar_one())
 
     async def count_csaf_products(self, csaf_documents: list[HttpUrl]) -> int:
+        """
+        Count total CSAF products, optionally filtered by URIs.
+
+        Args:
+            csaf_documents: Optional list of CSAF document URIs to count. If empty, counts all.
+
+        Returns:
+            Number of CSAF products matching the filter.
+        """
         async with AsyncSession(self.engine) as session:
             stmt = select(func.count()).select_from(CsafProduct)
             if csaf_documents:
@@ -519,6 +610,21 @@ class CacheDB:
         matching_config_hash: str,
         force_recompute: bool = False,
     ) -> int:
+        """
+        Count how many (CSAF product, asset) pairs need to be matched.
+
+        Unless force_recompute is True, only counts pairs that are unmatched,
+        have stale matches, or were matched with a different configuration.
+
+        Args:
+            assets: Optional filter for specific asset URIs.
+            csaf_documents: Optional filter for specific CSAF document URIs.
+            matching_config_hash: Hash of current matching configuration.
+            force_recompute: If True, count all pairs regardless of match status.
+
+        Returns:
+            Number of pairs that need matching.
+        """
         async with AsyncSession(self.engine) as session:
             stmt = (
                 select(func.count()).select_from(CsafProduct).join(Asset, literal(True))
@@ -546,6 +652,15 @@ class CacheDB:
             return int((await session.execute(stmt)).scalar_one())
 
     async def store_matches(self, matches: list[Match]) -> list[int]:
+        """
+        Store new match records.
+
+        Args:
+            matches: List of Match objects to insert.
+
+        Returns:
+            List of IDs for the newly created matches.
+        """
         if not matches:
             return []
         async with AsyncSession(self.engine) as session:
@@ -559,10 +674,22 @@ class CacheDB:
 
     async def store_matches_for_run(
         self,
-        run_id: int,
         processed_pairs: list[tuple[int, int]],
         matches: list[Match],
     ) -> list[int]:
+        """
+        Store matches for a specific matcher run, replacing old matches for processed pairs.
+
+        Deletes existing matches for the specified pairs before inserting new ones,
+        ensuring each pair has only the most recent match results.
+
+        Args:
+            processed_pairs: List of (csaf_product_id, asset_id) tuples to replace matches for.
+            matches: New match records to insert.
+
+        Returns:
+            List of IDs for the newly created matches.
+        """
         async with AsyncSession(self.engine) as session:
             async with session.begin():
                 if processed_pairs:
@@ -584,6 +711,17 @@ class CacheDB:
                 return (await session.execute(stmt)).scalars().all()
 
     async def add_matcher_trigger(self, origin_uri: HttpUrl | None = None) -> None:
+        """
+        Add a trigger to signal the matcher to run.
+
+        Used by synchronizers to notify the matcher that new data is available.
+
+        Args:
+            origin_uri: Optional specific origin to match. If None, matcher runs for all origins.
+
+        Raises:
+            Exception: If database is not connected.
+        """
         if self.engine is None:
             raise Exception("Database not connected")
         async with AsyncSession(self.engine) as session:
@@ -593,6 +731,21 @@ class CacheDB:
                 )
 
     async def consume_matcher_triggers(self, last_id: int = 0) -> list[MatcherTrigger]:
+        """
+        Retrieve and delete all matcher triggers since the given ID.
+
+        This is used by the matcher to check if it should run and to clear
+        processed triggers.
+
+        Args:
+            last_id: Only return triggers with ID greater than this.
+
+        Returns:
+            List of triggers that were pending.
+
+        Raises:
+            Exception: If database is not connected.
+        """
         if self.engine is None:
             raise Exception("Database not connected")
         async with AsyncSession(self.engine) as session:
@@ -624,6 +777,23 @@ class CacheDB:
         started_at: float | None = None,
         total_pairs: int = 0,
     ) -> MatcherRun:
+        """
+        Create a new matcher run record.
+
+        Args:
+            trigger: Description of what triggered this run (e.g., "manual", "scheduled").
+            assets: Asset URIs to include in this run.
+            csaf_documents: CSAF document URIs to include in this run.
+            matching_config_hash: Hash of the matching configuration.
+            matching_config: The matching configuration dictionary.
+            force_recompute: Whether to recompute all pairs regardless of staleness.
+            state: Initial state (typically "pending").
+            started_at: Optional start timestamp (defaults to now).
+            total_pairs: Total number of pairs to process.
+
+        Returns:
+            The created MatcherRun object.
+        """
         if started_at is None:
             started_at = datetime.datetime.now().timestamp()
         async with AsyncSession(self.engine) as session:
@@ -651,6 +821,16 @@ class CacheDB:
         started_at: float | None = None,
         total_pairs: int = 0,
     ) -> None:
+        """
+        Mark a matcher run as started.
+
+        Updates the run state to "running" and sets the start time and total pairs.
+
+        Args:
+            run_id: ID of the run to start.
+            started_at: Optional start timestamp (defaults to now).
+            total_pairs: Total number of pairs to process.
+        """
         if started_at is None:
             started_at = datetime.datetime.now().timestamp()
         async with AsyncSession(self.engine) as session:
@@ -676,6 +856,19 @@ class CacheDB:
         matches_found: int = 0,
         error: str | None = None,
     ) -> None:
+        """
+        Mark a matcher run as finished.
+
+        Updates the run with final statistics and completion status.
+
+        Args:
+            run_id: ID of the run to finish.
+            state: Final state (e.g., "completed", "failed", "stopped").
+            finished_at: Optional finish timestamp (defaults to now).
+            processed_pairs: Number of pairs that were processed.
+            matches_found: Number of matches discovered.
+            error: Optional error message if the run failed.
+        """
         if finished_at is None:
             finished_at = datetime.datetime.now().timestamp()
         async with AsyncSession(self.engine) as session:
@@ -699,6 +892,13 @@ class CacheDB:
         *,
         processed_pairs: int,
     ) -> None:
+        """
+        Update the progress of a running matcher run.
+
+        Args:
+            run_id: ID of the run to update.
+            processed_pairs: Current number of processed pairs.
+        """
         async with AsyncSession(self.engine) as session:
             async with session.begin():
                 stmt = (
@@ -714,6 +914,13 @@ class CacheDB:
         *,
         matches_found: int,
     ) -> None:
+        """
+        Update the number of matches found in a running matcher run.
+
+        Args:
+            run_id: ID of the run to update.
+            matches_found: Current number of matches found.
+        """
         async with AsyncSession(self.engine) as session:
             async with session.begin():
                 stmt = (
@@ -729,6 +936,17 @@ class CacheDB:
         after_id: int = 0,
         state: str | None = None,
     ) -> list[MatcherRun]:
+        """
+        Retrieve matcher run records.
+
+        Args:
+            limit: Maximum number of runs to return. None for no limit.
+            after_id: Only return runs with ID greater than this (for pagination).
+            state: Optional filter by run state.
+
+        Returns:
+            List of matching MatcherRun objects, ordered by start time descending.
+        """
         async with AsyncSession(self.engine) as session:
             stmt = select(MatcherRun).where(MatcherRun.id > after_id)
             if state is not None:
@@ -739,11 +957,21 @@ class CacheDB:
             return (await session.execute(stmt)).scalars().all()
 
     async def get_matcher_run(self, run_id: int) -> MatcherRun | None:
+        """
+        Retrieve a specific matcher run by ID.
+
+        Args:
+            run_id: ID of the run to retrieve.
+
+        Returns:
+            The MatcherRun object if found, None otherwise.
+        """
         async with AsyncSession(self.engine) as session:
             stmt = select(MatcherRun).where(MatcherRun.id == run_id)
             return (await session.execute(stmt)).scalars().first()
 
     async def clear_matcher_runs(self) -> None:
+        """Delete all matcher run records."""
         async with AsyncSession(self.engine) as session:
             async with session.begin():
                 await session.execute(delete(MatcherRun))
@@ -760,6 +988,23 @@ class CacheDB:
         csaf_products: list[HttpUrl] | None = None,
         threshold: float | None = None,
     ) -> list[Match]:
+        """
+        Query match records with optional filters.
+
+        Args:
+            limit: Maximum number of matches to return. None for no limit.
+            last_match_id: Only return matches with ID >= this (for pagination).
+            origin_uri: Filter by asset or CSAF product origin URI.
+            ids: Filter by specific match IDs.
+            time_lte: Filter matches with timestamp <= this value.
+            time_gte: Filter matches with timestamp >= this value.
+            assets: Filter by specific asset URIs.
+            csaf_products: Filter by specific CSAF product URIs.
+            threshold: Filter matches with score >= this value.
+
+        Returns:
+            List of Match objects with related asset and CSAF product loaded.
+        """
         origin_uri = str(origin_uri) if origin_uri else None  # type: ignore
         async with AsyncSession(self.engine) as session:
             stmt = (
@@ -801,6 +1046,15 @@ class CacheDB:
         return []
 
     async def get_match(self, match_id: int) -> Match | None:
+        """
+        Retrieve a specific match by ID.
+
+        Args:
+            match_id: ID of the match to retrieve.
+
+        Returns:
+            The Match object with related asset, CSAF product, and run loaded, or None.
+        """
         async with AsyncSession(self.engine) as session:
             stmt = (
                 select(Match)
@@ -816,12 +1070,19 @@ class CacheDB:
         return None
 
     async def clear_matches(self) -> None:
+        """Delete all match records."""
         async with AsyncSession(self.engine) as session:
             async with session.begin():
                 stmt = delete(Match)
                 await session.execute(stmt)
 
     async def clear_assets(self, origin: HttpUrl) -> None:
+        """
+        Delete all assets from a specific origin and reset its sync metadata.
+
+        Args:
+            origin: The origin URI to clear assets for.
+        """
         origin = str(origin)  # type: ignore
         async with AsyncSession(self.engine) as session:
             async with session.begin():
@@ -835,6 +1096,12 @@ class CacheDB:
                 await session.execute(stmt)
 
     async def clear_csaf_products(self, origin: HttpUrl) -> None:
+        """
+        Delete all CSAF products from a specific origin and reset its sync metadata.
+
+        Args:
+            origin: The origin URI to clear CSAF products for.
+        """
         origin = str(origin)
         async with AsyncSession(self.engine) as session:
             async with session.begin():
@@ -848,6 +1115,15 @@ class CacheDB:
                 await session.execute(stmt)
 
     async def user_active(self, username: str) -> bool:
+        """
+        Check if a user exists and is active.
+
+        Args:
+            username: The username to check.
+
+        Returns:
+            True if the user exists and is active, False otherwise.
+        """
         async with AsyncSession(self.engine) as session:
             async with session.begin():
                 stmt = select(User).where(User.username == username)
@@ -857,6 +1133,16 @@ class CacheDB:
         return False
 
     async def authenticate_user(self, username: str, password: str) -> User | None:
+        """
+        Authenticate a user with username and password.
+
+        Args:
+            username: The username to authenticate.
+            password: The password to verify.
+
+        Returns:
+            The User object if authentication succeeds, None otherwise.
+        """
         async with AsyncSession(self.engine) as session:
             async with session.begin():
                 stmt = select(User).where(User.username == username)
@@ -867,6 +1153,15 @@ class CacheDB:
         return None
 
     async def create_user(self, username: str, password: str):
+        """
+        Create a new active user.
+
+        Silently succeeds if the user already exists.
+
+        Args:
+            username: Username for the new user.
+            password: Password for the new user (will be hashed).
+        """
         try:
             async with AsyncSession(self.engine) as session:
                 async with session.begin():
@@ -879,6 +1174,11 @@ class CacheDB:
             pass
 
     async def clear(self) -> None:
+        """
+        Clear all matcher runs, CSAF products, and assets from the database.
+
+        Also resets all synchronizer metadata to epoch time.
+        """
         async with AsyncSession(self.engine) as session:
             async with session.begin():
                 stmt = delete(MatcherRun)
@@ -897,5 +1197,10 @@ class CacheDB:
         await session.execute(stmt)
 
     async def disconnect(self) -> None:
+        """
+        Close the database connection and dispose of the engine.
+
+        Should be called when shutting down the application.
+        """
         if self.engine is not None:
             await self.engine.dispose()

@@ -1,3 +1,19 @@
+"""
+NetBox Data Source Plugin Module
+
+This module provides integration with NetBox as a data source for asset and vulnerability management.
+It synchronizes devices, software, and their relationships from a NetBox instance, supporting both
+the core NetBox DCIM API and the optional D3C plugin for software inventory.
+
+The plugin handles incremental synchronization of assets and relationships, cleanup of stale data,
+and optionally pushes vulnerability matches back to NetBox when the CSAF plugin is installed.
+
+Dependencies:
+    - NetBox instance with API access
+    - Optional: D3C plugin for software inventory
+    - Optional: CSAF plugin for vulnerability match notifications
+"""
+
 import asyncio
 import time
 from datetime import timezone, datetime
@@ -47,11 +63,36 @@ logger = log.get_logger(__name__)
 
 
 class NetboxDataSource(DataSourcePlugin):
+    """
+    NetBox data source plugin for synchronizing assets from a NetBox instance.
+
+    Fetches devices, device types, manufacturers, and optionally software inventory
+    from NetBox. Supports incremental updates and bidirectional synchronization of
+    vulnerability matches.
+
+    Caveats:
+        - Requires valid API token with appropriate permissions
+        - Software inventory requires D3C plugin to be installed on NetBox
+        - Match notifications require CSAF plugin to be installed on NetBox
+        - Authentication failures (403) will raise RuntimeError with guidance
+    """
+
     class Config(BaseModel):
+        """Configuration schema for NetBox data source."""
+
         api_url: HttpUrl
         api_token: str
 
     def __init__(self, config: DataSourcePlugin.Config):
+        """
+        Initialize the NetBox data source plugin.
+
+        Args:
+            config: Plugin configuration including api_url and api_token
+
+        Raises:
+            KeyError: If required configuration parameters are missing
+        """
         if config.DataSource.Plugin is not None:
             config.DataSource.Plugin = NetboxDataSource.Config.model_validate(
                 config.DataSource.Plugin
@@ -76,6 +117,24 @@ class NetboxDataSource(DataSourcePlugin):
         self,
         fetcher_view: FetcherView,
     ) -> FetchProductsResult:
+        """
+        Fetch devices and software products that have been updated since the last run.
+
+        Retrieves devices, device types, manufacturers, and software from NetBox, performing
+        incremental synchronization based on last_updated timestamps. Handles cascading updates
+        where changes to manufacturers or device types require fetching related devices.
+
+        Args:
+            fetcher_view: Database view for accessing existing assets and metadata
+
+        Returns:
+            FetchProductsResult containing list of Asset objects for devices and software
+
+        Caveats:
+            - May perform multiple API calls to resolve relationships
+            - Returns empty results for software if D3C plugin is not installed
+            - 403 errors will raise RuntimeError with authentication guidance
+        """
         last_run = (await fetcher_view.last_run()).astimezone(tz=timezone.utc)
         current_time = time.time()
 
@@ -353,6 +412,22 @@ class NetboxDataSource(DataSourcePlugin):
     async def fetch_relationships(
         self, fetcher_view: FetcherView
     ) -> FetchRelationshipsResult:
+        """
+        Fetch product relationships that have been updated since the last run.
+
+        Retrieves parent-child relationships between devices and software from NetBox's
+        D3C plugin, representing installation or dependency relationships.
+
+        Args:
+            fetcher_view: Database view for accessing last run metadata
+
+        Returns:
+            FetchRelationshipsResult containing list of Relationship objects
+
+        Caveats:
+            - Requires D3C plugin to be installed on NetBox
+            - Returns empty result if plugin is not available (404 error)
+        """
         last_run = (await fetcher_view.last_run()).astimezone(tz=timezone.utc)
 
         try:
@@ -384,6 +459,23 @@ class NetboxDataSource(DataSourcePlugin):
     async def map_relationships(
         self, fetcher_view: FetcherView, relations: List[Relationship]
     ) -> List[MappedRelationship]:
+        """
+        Map NetBox relationships to internal database asset IDs.
+
+        Translates NetBox product IDs (device_id, software_id) to internal Asset table
+        primary keys, filtering out relationships where either endpoint is not found.
+        Deduplicates relationships by (parent, child) pair.
+
+        Args:
+            fetcher_view: Database view for querying existing assets
+            relations: List of relationships with NetBox IDs
+
+        Returns:
+            List of MappedRelationship objects with internal database IDs
+
+        Raises:
+            RuntimeError: If a product type is neither Device nor Software
+        """
         device_ids = set()
         software_ids = set()
         for relation in relations:
@@ -458,6 +550,22 @@ class NetboxDataSource(DataSourcePlugin):
     async def cleanup_products(
         self, data_to_check: List[Asset | CsafProduct]
     ) -> List[CleanUpDecision]:
+        """
+        Verify which assets still exist in NetBox and mark stale assets for deletion.
+
+        Queries NetBox to check if devices and software still exist. Assets that are
+        no longer present in NetBox are marked for deletion from the local database.
+
+        Args:
+            data_to_check: List of assets to verify
+
+        Returns:
+            List of CleanUpDecision objects indicating which assets can be deleted
+
+        Caveats:
+            - May return incomplete results if NetBox API calls fail
+            - Failed API calls are logged but don't prevent processing other assets
+        """
         logger.debug(f"Cleanup data: {data_to_check}")
         if not data_to_check:
             return []
@@ -524,6 +632,22 @@ class NetboxDataSource(DataSourcePlugin):
     async def cleanup_relationships(
         self, relationships_to_check: List[MappedRelationship]
     ) -> List[MappedRelationship]:
+        """
+        Verify which relationships still exist in NetBox and mark stale ones for deletion.
+
+        Queries NetBox to check if product relationships still exist. Relationships that
+        are no longer present are marked for deletion from the local database.
+
+        Args:
+            relationships_to_check: List of relationships to verify
+
+        Returns:
+            List of MappedRelationship objects with can_delete flag set appropriately
+
+        Caveats:
+            - Requires D3C plugin to be installed on NetBox
+            - Returns incomplete results if API call fails (logged but not raised)
+        """
         if not relationships_to_check:
             return []
 
@@ -550,6 +674,22 @@ class NetboxDataSource(DataSourcePlugin):
         return result
 
     async def notify_new_matches(self, new_matches: List[Match]):
+        """
+        Push newly discovered vulnerability matches back to NetBox.
+
+        Sends CSAF vulnerability matches to NetBox in batches, creating records that
+        associate assets with affected products from CSAF documents. This enables
+        vulnerability tracking within NetBox.
+
+        Args:
+            new_matches: List of Match objects representing vulnerabilities found
+
+        Caveats:
+            - Requires CSAF plugin to be installed on NetBox
+            - Failures are logged but do not raise exceptions
+            - Processes in batches of 100 to avoid overwhelming the API
+        """
+
         class BulkBody:
             def __init__(self, items: List[Any]):
                 self.items = items
@@ -608,12 +748,36 @@ class NetboxDataSource(DataSourcePlugin):
 
     @property
     def origin_uri(self):
+        """
+        Get the base URI of the NetBox instance.
+
+        Returns:
+            Base URL of the configured NetBox API
+        """
         return self.config.DataSource.Plugin.api_url
 
     def endpoint_info(self) -> str:
+        """
+        Get human-readable information about the NetBox endpoint.
+
+        Returns:
+            Base URL of the NetBox instance
+        """
         return f"{self.config.DataSource.Plugin.api_url}"
 
     def build_resource_path(self, origin_info: dict[str, Any]) -> str:
+        """
+        Construct the API path for a specific resource in NetBox.
+
+        Generates the appropriate NetBox API endpoint path based on the resource type
+        (device, software, or relationship) encoded in the origin_info dictionary.
+
+        Args:
+            origin_info: Dictionary containing resource type and ID information
+
+        Returns:
+            API path string (e.g., "/api/dcim/devices/123/") or empty string on error
+        """
         try:
             if "device_id" in origin_info:
                 return f"/api/dcim/devices/{int(origin_info['device_id'])}/"
@@ -629,7 +793,15 @@ class NetboxDataSource(DataSourcePlugin):
 
 def find_cachedb_type(netbox_type) -> ProductType:
     """
-    Determines the ProductType corresponding to the given NetBox type.
+    Map NetBox content type strings to ProductType enumeration values.
+
+    Args:
+        netbox_type: NetBox content type string (e.g., "dcim.device", "d3c.software")
+
+    Returns:
+        ProductType.Device for "dcim.device"
+        ProductType.Software for "d3c.software"
+        ProductType.Undefined for unknown types
     """
     if netbox_type == "dcim.device":
         return ProductType.Device
@@ -640,6 +812,23 @@ def find_cachedb_type(netbox_type) -> ProductType:
 
 
 def validate_response[T](response: T | BaseException | None) -> T:
+    """
+    Validate and unwrap API response objects.
+
+    Helper function to handle responses from asyncio.gather with return_exceptions=True.
+    Raises any exceptions that occurred during the API call, or raises RuntimeError
+    if the response is None.
+
+    Args:
+        response: API response, exception, or None
+
+    Returns:
+        The unwrapped response object
+
+    Raises:
+        RuntimeError: If response is None
+        BaseException: If response is an exception, re-raises it
+    """
     if response is None:
         raise RuntimeError("No response")
     if isinstance(response, BaseException):

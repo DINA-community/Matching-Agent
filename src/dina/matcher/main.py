@@ -1,3 +1,24 @@
+"""
+Matcher service module for discovering and scoring matches between CSAF advisories and assets.
+
+This module provides the core matching engine that compares CSAF vulnerability documents
+against asset inventories to identify potential security impacts. It offers a REST API
+for managing matching tasks, retrieving results, and configuring the matching behavior.
+
+The matcher operates asynchronously, processing batches of asset-CSAF pairs in parallel
+across multiple CPU cores. It can run on a schedule (interval or fixed time) or be
+triggered manually via API calls.
+
+Key Features:
+    - Parallel batch processing of asset-CSAF product pairs
+    - Configurable matching algorithms with custom weights
+    - Task management (start, stop, monitor progress)
+    - Match caching with configurable recomputation
+    - REST API with authentication
+    - Webhook notifications for new matches
+    - Historical run tracking and statistics
+"""
+
 from __future__ import annotations
 import asyncio
 import concurrent.futures
@@ -53,12 +74,16 @@ if sys.platform.startswith("win"):
 
 
 class MatchingState(enum.Enum):
+    """Current operational state of the matcher service."""
+
     STOPPED = "stopped"
     STOP_REQUESTED = "stop_requested"
     RUNNING = "running"
 
 
 class MatcherStatus(BaseModel):
+    """Real-time status and statistics of the matcher service."""
+
     state: MatchingState
     start: float | None = None
     last_matching: float | None = None
@@ -70,6 +95,14 @@ class MatcherStatus(BaseModel):
 
 
 class MatchingTask(BaseModel):
+    """
+    A matching task representing a single run of the matching engine.
+
+    Tasks can be scoped to specific assets and/or CSAF documents, or match
+    against the entire cached dataset. Each task tracks its progress, results,
+    and the matching configuration used.
+    """
+
     id: int
     assets: list[HttpUrl]
     csaf_documents: list[HttpUrl]
@@ -90,7 +123,6 @@ class MatchingTask(BaseModel):
     error: str | None = None
 
 
-# TODO: Define correct fields
 class MatchUpdate(BaseModel):
     asset_id: int
     csaf_id: int
@@ -99,6 +131,13 @@ class MatchUpdate(BaseModel):
 
 
 class APIMatch(BaseModel):
+    """
+    A discovered match between a CSAF advisory and an asset.
+
+    Contains the matching score, full URLs to the source documents,
+    and metadata about when and how the match was computed.
+    """
+
     id: int
     csaf_origin: HttpUrl
     asset_origin: HttpUrl
@@ -110,6 +149,14 @@ class APIMatch(BaseModel):
 
 
 class StartMatchingTaskRequest(BaseModel):
+    """
+    Request body for starting a new matching task.
+
+    Allows scoping the match to specific assets/documents and provides
+    custom matching configuration. If matching_config is provided, those
+    pairs may be recomputed even if previously matched.
+    """
+
     assets: list[HttpUrl] = []
     csaf_documents: list[HttpUrl] = []
     matching_config: dict[str, Any] | None = None
@@ -117,12 +164,6 @@ class StartMatchingTaskRequest(BaseModel):
 
 
 class MatchSubscription(BaseModel):
-    """
-    :ivar origin_filter: A list of strings representing filters to match specific origins.
-        Usually you will want to only subscribe to matches that match to an asset or csaf
-        that comes from an origin you are interested in.
-    """
-
     url: HttpUrl
     secret: str | None = None
     origin_filter: list[str]
@@ -130,6 +171,8 @@ class MatchSubscription(BaseModel):
 
 @dataclass
 class _ActiveMatchingTask:
+    """Internal state for a currently running matching task."""
+
     task: MatchingTask
     matching_config: dict[str, Any]
     batch_iter: AsyncGenerator[list[tuple[CsafProduct, Asset]]]
@@ -140,15 +183,35 @@ class _ActiveMatchingTask:
 
 @dataclass
 class _QueuedMatchingTask:
+    """Internal state for a matching task waiting to be executed."""
+
     task: MatchingTask
     matching_config: dict[str, Any]
     force_recompute: bool = False
 
 
 class Matcher:
+    """
+    Core matching service that discovers relationships between CSAF advisories and assets.
+
+    The Matcher loads configuration, initializes data source plugins, and runs background
+    tasks for scheduled matching, batch processing, result storage, and API serving.
+
+    Usage:
+        matcher = Matcher(config_path=Path("./config.toml"))
+        await matcher.run()
+    """
+
     def __init__(self, config_path: Path = Path("./assets/config.toml")) -> None:
         """
-        Initialize the Matcher.
+        Initialize the Matcher with configuration and prepare for operation.
+
+        Args:
+            config_path: Path to the TOML configuration file containing matcher settings,
+                database credentials, API configuration, and logging preferences.
+
+        Raises:
+            ValueError: If duplicate data source origins are detected in plugin configs.
         """
         self.__config_path = config_path
         self.__config = Config.load(config_path)
@@ -192,6 +255,7 @@ class Matcher:
 
     @staticmethod
     def _as_matching_task(run: Any) -> MatchingTask:
+        """Convert a database matcher run record to a MatchingTask model."""
         finished_at = run.finished_at
         start_time = run.started_at if run.state != "pending" else None
         duration_seconds = None
@@ -224,6 +288,16 @@ class Matcher:
     def _merge_matching_config(
         base_config: dict[str, Any], overrides: dict[str, Any]
     ) -> dict[str, Any]:
+        """
+        Recursively merge custom matching configuration into the default configuration.
+
+        Args:
+            base_config: Default matching configuration dictionary.
+            overrides: Custom overrides to apply.
+
+        Returns:
+            A new dictionary with overrides merged into base_config.
+        """
         merged = copy.deepcopy(base_config)
 
         def _merge(target: dict[str, Any], source: dict[str, Any]) -> None:
@@ -237,7 +311,12 @@ class Matcher:
         return merged
 
     async def run(self):
-        """Run the matcher."""
+        """
+        Start the matcher service and run until interrupted.
+
+        Launches background tasks for API serving, scheduled matching, log handling,
+        result storage, and trigger monitoring. This method blocks indefinitely.
+        """
         await self.__cache_db.connect()
         log_queue = self.__manager.Queue()
         async with asyncio.TaskGroup() as tg:
@@ -255,6 +334,19 @@ class Matcher:
         matching_config: dict[str, Any] | None = None,
         force_recompute: bool = False,
     ) -> _QueuedMatchingTask:
+        """
+        Create and persist a new matching task to the database.
+
+        Args:
+            assets: List of asset URLs to match, or empty for all assets.
+            csaf_documents: List of CSAF URLs to match, or empty for all documents.
+            trigger: Whether the task was started manually or automatically.
+            matching_config: Custom matching configuration, or None for defaults.
+            force_recompute: Whether to reprocess pairs already matched with this config.
+
+        Returns:
+            A queued task ready to be added to the matching queue.
+        """
         effective_matching_config = (
             copy.deepcopy(matching_config)
             if matching_config is not None
@@ -282,6 +374,11 @@ class Matcher:
         )
 
     async def __log_task(self, log_queue: multiprocessing.Queue) -> None:
+        """
+        Consume log records from worker processes and forward to the main logger.
+
+        Continuously drains the multiprocessing log queue and handles records in batches.
+        """
         while True:
             records = []
             try:
@@ -296,7 +393,13 @@ class Matcher:
                 await asyncio.sleep(0.01)
 
     def __should_run_matching(self) -> bool:
-        """Determine if matching should run based on configured schedule."""
+        """
+        Determine if matching should run based on schedule configuration and queued tasks.
+
+        Returns:
+            True if matching should start now based on sync_interval, fixed_time_of_day,
+            or pending tasks; False otherwise.
+        """
         # Always run if there are explicit matching tasks queued
         if len(self.__matching_tasks) > 0:
             return True
@@ -331,6 +434,12 @@ class Matcher:
             return False
 
     async def __matching_task(self, log_queue: multiprocessing.Queue) -> None:
+        """
+        Main matching loop that orchestrates task execution and batch processing.
+
+        Monitors the matching schedule, dispatches batches to worker processes,
+        handles cancellations, and enforces max_duration limits.
+        """
         active_tasks: deque[_ActiveMatchingTask] = deque()
         parallel_tasks: list[asyncio.Future] = []
         num_processes = multiprocessing.cpu_count()
@@ -536,6 +645,12 @@ class Matcher:
                 await asyncio.sleep(1)
 
     async def __store_matches_task(self):
+        """
+        Background task that persists computed matches to the database.
+
+        Drains the matches queue, writes to database in batches, and notifies
+        data source plugins of new matches for webhook delivery.
+        """
         while True:
             tasks = []
             stored_task_ids: list[int] = []
@@ -557,7 +672,6 @@ class Matcher:
                     )
                     tasks.append(
                         self.__cache_db.store_matches_for_run(
-                            task_id,
                             processed_pairs=processed_pairs,
                             matches=matches_batch,
                         )
@@ -605,6 +719,11 @@ class Matcher:
             await asyncio.sleep(0.1)
 
     async def __trigger_task(self):
+        """
+        Monitor the database for external matcher triggers and enqueue matching tasks.
+
+        Listens for triggers inserted by synchronizers after successful data updates.
+        """
         last_trigger_id = 0
         while True:
             try:
@@ -622,6 +741,16 @@ class Matcher:
             await asyncio.sleep(0.5)
 
     async def __serve_api(self):
+        """
+        Start the FastAPI REST API server for matcher control and queries.
+
+        Provides endpoints for:
+        - Authentication and token management
+        - Starting and stopping matching tasks
+        - Querying matches and task status
+        - Cache management
+        - Configuration updates
+        """
         api = FastAPI(root_path="/matcher")
 
         sub_route = APIRouter(
@@ -644,6 +773,7 @@ class Matcher:
         async def login_for_access_token(
             form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
         ) -> Token:
+            """Authenticate and receive a JWT access token for API access."""
             user = await self.__cache_db.authenticate_user(
                 form_data.username, form_data.password
             )
@@ -723,6 +853,7 @@ class Matcher:
 
         @matches_route.get("/{match_id}")
         async def get_match(match_id: int) -> APIMatch:
+            """Retrieve a single match by its unique identifier."""
             logger.info(f"Getting match {match_id}")
             match = await self.__cache_db.get_match(match_id)
             if match is None:
@@ -803,6 +934,7 @@ class Matcher:
             limit: int = 100,
             after_id: int = 0,
         ) -> list[MatchingTask]:
+            """List currently running matching tasks with real-time progress."""
             tasks = [
                 task for task in self.__active_tasks.values() if task.task.id > after_id
             ]
@@ -837,6 +969,7 @@ class Matcher:
 
         @task_route.get("/running/{task_id}")
         async def running_task(task_id: int) -> MatchingTask:
+            """Get detailed status of a specific running task."""
             task = self.__active_tasks.get(task_id)
             if task is None:
                 raise HTTPException(status_code=404, detail="Task not found")
@@ -863,6 +996,7 @@ class Matcher:
 
         @task_route.get("/status")
         async def status() -> MatcherStatus:
+            """Get overall matcher service status and statistics."""
             return MatcherStatus(
                 state=self.__matching_state,
                 start=self.__matching_start_time,
@@ -880,6 +1014,7 @@ class Matcher:
             after_id: int = 0,
             state: str | None = None,
         ) -> list[MatchingTask]:
+            """Query historical matching tasks with optional state filtering."""
             runs = await self.__cache_db.get_matcher_runs(
                 limit=limit, after_id=after_id, state=state
             )
@@ -887,6 +1022,7 @@ class Matcher:
 
         @task_route.get("/history/{run_id}")
         async def task_history_get(run_id: int) -> MatchingTask:
+            """Retrieve a specific historical matching task by ID."""
             run = await self.__cache_db.get_matcher_run(run_id)
             if run is None:
                 raise HTTPException(status_code=404, detail="Run not found")
@@ -894,6 +1030,12 @@ class Matcher:
 
         @task_route.post("/stop")
         async def stop(task_id: Annotated[int | None, Query()] = None):
+            """
+            Stop one or all matching tasks gracefully.
+
+            If task_id is provided, stops that specific task. If None, stops all tasks.
+            Running tasks will finish their current batch before stopping.
+            """
             if task_id is None:
                 logger.info("Stopping all matching tasks")
                 pending = list(self.__matching_tasks)
@@ -1013,6 +1155,7 @@ class Matcher:
 
         @sub_route.post("/new_match")
         async def subscribe(body: MatchSubscription) -> None:
+            """Register a webhook URL to receive notifications of new matches."""
             logger.info(f"Subscribed to match updates from {body.origin_filter}")
 
         @api.webhooks.post("new_match")
@@ -1071,12 +1214,15 @@ class Matcher:
     def build_full_origin_uri(
         self, origin_uri: str, origin_info: dict[str, Any]
     ) -> HttpUrl:
-        """Return origin_uri extended with a plugin-provided path derived from origin_info.
+        """
+        Construct a complete resource URL by combining origin_uri with plugin-derived path.
 
-        Strategy:
-            - Iterate over installed data source plugins and ask each one to build a path
-              for the given origin_info; return the first non-empty path.
-            - If no path is available, just return the origin_uri as-is.
+        Args:
+            origin_uri: Base origin URL (e.g., "https://example.com/api").
+            origin_info: Plugin-specific metadata used to generate the resource path.
+
+        Returns:
+            Full URL to the resource, or origin_uri unchanged if no path can be built.
         """
         path = self.__data_source_plugins[HttpUrl(origin_uri)].build_resource_path(
             origin_info
@@ -1091,13 +1237,23 @@ class Matcher:
 
     @staticmethod
     def _matches_origin(uris: list[HttpUrl], origin_uri: HttpUrl) -> bool:
-        """Return True if any URI matches the given origin, or list is empty (all)."""
+        """
+        Check if any URI in the list matches or descends from the given origin.
+
+        Args:
+            uris: List of URIs to check, or empty list to match all origins.
+            origin_uri: The origin to match against.
+
+        Returns:
+            True if any URI starts with origin_uri, or if uris is empty (all).
+        """
         if not uris:
             return True
         origin = str(origin_uri).rstrip("/")
         return any(str(uri).startswith(origin) for uri in uris)
 
     def __decrement_in_flight(self, task_id: int) -> None:
+        """Decrement in-flight batch counter for a task."""
         count = self.__in_flight_by_task.get(task_id, 0) - 1
         if count <= 0:
             self.__in_flight_by_task.pop(task_id, None)
@@ -1105,6 +1261,7 @@ class Matcher:
             self.__in_flight_by_task[task_id] = count
 
     async def __cancel_pending_tasks(self, tasks: list[_QueuedMatchingTask]) -> None:
+        """Mark pending (not yet started) tasks as cancelled in the database."""
         if not tasks:
             return
         now = time.time()
@@ -1124,6 +1281,14 @@ class Matcher:
         state: str,
         error: str | None = None,
     ) -> None:
+        """
+        Mark a matching task as finished and persist final statistics to the database.
+
+        Args:
+            task: The task to finalize.
+            state: Final state ("completed", "cancelled", "timed_out", "failed").
+            error: Optional error message if state is "failed".
+        """
         if state == "completed":
             # total_pairs already excludes skipped rows by design.
             task.processed_pairs = task.total_pairs
@@ -1165,7 +1330,12 @@ class Matcher:
         self.__store_in_progress_by_task.pop(task.task.id, None)
 
     async def __wait_for_tasks_idle(self, task_ids: set[int] | None) -> None:
-        """Wait until specified tasks have no in-flight or queued batches."""
+        """
+        Wait until specified tasks have no pending batches in flight or queued.
+
+        Args:
+            task_ids: Set of task IDs to wait for, or None to wait for all tasks.
+        """
         while True:
             logger.debug(
                 f"Waiting for {task_ids} to finish processing: {self.__in_flight_by_task}"
@@ -1198,6 +1368,23 @@ def match_pairs(
     matching_config: dict[str, Any],
     matching_config_hash: str,
 ):
+    """
+    Process a batch of asset-CSAF pairs and compute matches in a worker process.
+
+    This function runs in a separate process and uses the configured matching
+    algorithm to score each pair. Results are placed in a multiprocessing queue
+    for the main process to persist.
+
+    Args:
+        task_id: The matching task ID this batch belongs to.
+        matches: Queue to place discovered matches into.
+        log_queue: Queue for forwarding log records to the main process.
+        logging_config: Logging configuration for this worker.
+        pairs: List of (CsafProduct, Asset) tuples to evaluate.
+        threshold: Minimum score required to consider a pair a match.
+        matching_config: Configuration dictionary with matching weights and rules.
+        matching_config_hash: Hash of the matching config for cache invalidation.
+    """
     configure_logging(logging_config, log_queue)
     logger.debug(f"Matching batch with {len(pairs)} pairs")
     batch = []
@@ -1235,7 +1422,15 @@ def match_pairs(
 
 
 async def run_matcher(config_path: Path = Path("./assets/config.toml")):
-    """Run the Matcher."""
+    """
+    Initialize and run the matcher service.
+
+    Args:
+        config_path: Path to the configuration TOML file.
+
+    Raises:
+        Exception: If the matcher encounters a fatal error during operation.
+    """
     # Create and initialize the Matcher
     matcher = Matcher(config_path=config_path)
     try:
@@ -1251,7 +1446,12 @@ async def run_matcher(config_path: Path = Path("./assets/config.toml")):
 
 
 def main():
-    """Entry point for the Matcher."""
+    """
+    Command-line entry point for the matcher service.
+
+    Parses command-line arguments and starts the matcher. Handles keyboard
+    interrupts gracefully.
+    """
     try:
         parser = argparse.ArgumentParser(description="Run the Matching service")
         parser.add_argument(
