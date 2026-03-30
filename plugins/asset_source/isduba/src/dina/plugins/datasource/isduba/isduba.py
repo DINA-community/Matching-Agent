@@ -384,7 +384,11 @@ class IsdubaDataSource(DataSourcePlugin):
 
     def build_resource_path(self, origin_info: dict[str, Any]) -> str:
         path = origin_info.get("path")
-        return str(path) if path else ""
+        if path:
+            path = str(path) + f"#product_id={origin_info.get('product_name_id')}"
+        else:
+            path = ""
+        return path
 
 
 def process_document(

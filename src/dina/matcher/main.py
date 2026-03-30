@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 import concurrent.futures
+import copy
 import datetime
 import enum
 import itertools
@@ -39,6 +40,7 @@ import sys
 import argparse
 
 from dina.matcher.calculate_score import Score
+from dina.matcher.config_hash import hash_matching_config
 from dina.matcher.matching import Matching
 
 from dina.synchronizer.base import load_datasource_plugins
@@ -83,6 +85,8 @@ class MatchingTask(BaseModel):
     processed_pairs: int = 0
     matches_found: int = 0
     progress: float | None = None
+    matching_config_hash: str | None = None
+    force_recompute: bool = False
     error: str | None = None
 
 
@@ -101,6 +105,15 @@ class APIMatch(BaseModel):
     timestamp: float
     score: float
     status: str
+    matcher_run_id: int | None = None
+    matching_config_hash: str | None = None
+
+
+class StartMatchingTaskRequest(BaseModel):
+    assets: list[HttpUrl] = []
+    csaf_documents: list[HttpUrl] = []
+    matching_config: dict[str, Any] | None = None
+    force_recompute: bool | None = None
 
 
 class MatchSubscription(BaseModel):
@@ -118,10 +131,18 @@ class MatchSubscription(BaseModel):
 @dataclass
 class _ActiveMatchingTask:
     task: MatchingTask
+    matching_config: dict[str, Any]
     batch_iter: AsyncGenerator[list[tuple[CsafProduct, Asset]]]
     start_time: float
     total_pairs: int
     processed_pairs: int = 0
+
+
+@dataclass
+class _QueuedMatchingTask:
+    task: MatchingTask
+    matching_config: dict[str, Any]
+    force_recompute: bool = False
 
 
 class Matcher:
@@ -141,10 +162,12 @@ class Matcher:
         configure_logging(self.__config.Matcher.Logging)
 
         self.__manager = multiprocessing.Manager()
-        self.__matches: Queue[tuple[int, list[Match]]] = self.__manager.Queue()
+        self.__matches: Queue[tuple[int, list[tuple[int, int]], list[Match]]] = (
+            self.__manager.Queue()
+        )
         self.__cache_db = CacheDB(self.__config.Cachedb)
         self.__last_matching: float | None = None
-        self.__matching_tasks: deque[MatchingTask] = deque()
+        self.__matching_tasks: deque[_QueuedMatchingTask] = deque()
         self.__active_tasks: dict[int, _ActiveMatchingTask] = {}
         self.__cancelled_task_ids: set[int] = set()
         self.__in_flight_by_task: dict[int, int] = {}
@@ -192,8 +215,26 @@ class Matcher:
             processed_pairs=run.processed_pairs,
             matches_found=run.matches_found,
             progress=progress,
+            matching_config_hash=run.matching_config_hash,
+            force_recompute=run.force_recompute,
             error=run.error,
         )
+
+    @staticmethod
+    def _merge_matching_config(
+        base_config: dict[str, Any], overrides: dict[str, Any]
+    ) -> dict[str, Any]:
+        merged = copy.deepcopy(base_config)
+
+        def _merge(target: dict[str, Any], source: dict[str, Any]) -> None:
+            for key, value in source.items():
+                if isinstance(value, dict) and isinstance(target.get(key), dict):
+                    _merge(target[key], value)
+                else:
+                    target[key] = value
+
+        _merge(merged, overrides)
+        return merged
 
     async def run(self):
         """Run the matcher."""
@@ -211,16 +252,34 @@ class Matcher:
         assets: list[HttpUrl],
         csaf_documents: list[HttpUrl],
         trigger: Literal["manual", "automated"],
-    ) -> MatchingTask:
+        matching_config: dict[str, Any] | None = None,
+        force_recompute: bool = False,
+    ) -> _QueuedMatchingTask:
+        effective_matching_config = (
+            copy.deepcopy(matching_config)
+            if matching_config is not None
+            else copy.deepcopy(self.__matching_cfg_dict)
+        )
+        config_hash = hash_matching_config(effective_matching_config)
         run = await self.__cache_db.create_matcher_run(
             trigger=trigger,
             assets=assets,
             csaf_documents=csaf_documents,
+            matching_config_hash=config_hash,
+            matching_config=effective_matching_config,
+            force_recompute=force_recompute,
             state="pending",
             started_at=time.time(),
             total_pairs=0,
         )
-        return self._as_matching_task(run)
+        task = self._as_matching_task(run)
+        task.matching_config_hash = config_hash
+        task.force_recompute = force_recompute
+        return _QueuedMatchingTask(
+            task=task,
+            matching_config=effective_matching_config,
+            force_recompute=force_recompute,
+        )
 
     async def __log_task(self, log_queue: multiprocessing.Queue) -> None:
         while True:
@@ -314,7 +373,8 @@ class Matcher:
                         last_log_output = now
 
                     while self.__matching_tasks:
-                        task = self.__matching_tasks.popleft()
+                        queued_task = self.__matching_tasks.popleft()
+                        task = queued_task.task
                         if task.id in self.__cancelled_task_ids:
                             logger.info(f"Skipping cancelled task {task.id}")
                             self.__cancelled_task_ids.discard(task.id)
@@ -328,6 +388,9 @@ class Matcher:
                         total_pairs = await self.__cache_db.count_pairs_to_match(
                             assets=task.assets,
                             csaf_documents=task.csaf_documents,
+                            matching_config_hash=task.matching_config_hash
+                            or hash_matching_config(queued_task.matching_config),
+                            force_recompute=task.force_recompute,
                         )
                         start_time = time.time()
                         task.state = "running"
@@ -335,8 +398,14 @@ class Matcher:
                         task.total_pairs = total_pairs
                         active_task = _ActiveMatchingTask(
                             task=task,
+                            matching_config=queued_task.matching_config,
                             batch_iter=self.__cache_db.fetch_pairs_batches(
-                                task.assets, task.csaf_documents, batch_size_sqrt=20
+                                task.assets,
+                                task.csaf_documents,
+                                matching_config_hash=task.matching_config_hash
+                                or hash_matching_config(queued_task.matching_config),
+                                force_recompute=task.force_recompute,
+                                batch_size_sqrt=20,
                             ),
                             start_time=start_time,
                             total_pairs=total_pairs,
@@ -427,7 +496,9 @@ class Matcher:
                         self.__config.Matcher.Logging,
                         batch,
                         self.__config.Matcher.match_threshold,
-                        self.__matching_cfg_dict,
+                        task_state.matching_config,
+                        task_state.task.matching_config_hash
+                        or hash_matching_config(task_state.matching_config),
                     )
 
                     def _done_callback(_fut, done_task_id: int = task_id):
@@ -470,7 +541,9 @@ class Matcher:
             stored_task_ids: list[int] = []
             while not self.__matches.empty():
                 try:
-                    task_id, matches_batch = self.__matches.get(block=False)
+                    task_id, processed_pairs, matches_batch = self.__matches.get(
+                        block=False
+                    )
                     if task_id in self.__scheduled_batches_by_task:
                         self.__scheduled_batches_by_task[task_id] -= 1
                         if self.__scheduled_batches_by_task[task_id] <= 0:
@@ -482,7 +555,13 @@ class Matcher:
                     logger.debug(
                         f"Storing {len(matches_batch)} matches. ~{self.__matches.qsize()} batches remaining."
                     )
-                    tasks.append(self.__cache_db.store_matches(matches_batch))
+                    tasks.append(
+                        self.__cache_db.store_matches_for_run(
+                            task_id,
+                            processed_pairs=processed_pairs,
+                            matches=matches_batch,
+                        )
+                    )
                     self.__total_matches_found += len(matches_batch)
                     self.__matches_found_by_task[task_id] = (
                         self.__matches_found_by_task.get(task_id, 0)
@@ -636,6 +715,8 @@ class Matcher:
                     timestamp=match.timestamp,
                     score=match.score,
                     status=match.status,
+                    matcher_run_id=match.matcher_run_id,
+                    matching_config_hash=match.matching_config_hash,
                 )
                 for match in matches
             ]
@@ -657,23 +738,65 @@ class Matcher:
                 timestamp=match.timestamp,
                 score=match.score,
                 status=match.status,
+                matcher_run_id=match.matcher_run_id,
+                matching_config_hash=match.matching_config_hash,
             )
 
         @task_route.post("/start")
         async def start(
             assets: Annotated[list[HttpUrl] | None, Query()] = None,
             csaf_documents: Annotated[list[HttpUrl] | None, Query()] = None,
+            body: StartMatchingTaskRequest | None = fastapi.Body(default=None),
         ):
-            if assets is None:
-                assets = []
-            if csaf_documents is None:
-                csaf_documents = []
+            """Start a matcher run, optionally with custom matching weights.
+
+            Custom ``matching_config`` values are merged into the default configuration
+            for this run. Supplying custom weights can overwrite previously generated
+            matches for processed pairs. Prefer using a scoped subset via ``assets``
+            and/or ``csaf_documents`` when testing custom weights.
+            """
+            request_assets = (
+                body.assets
+                if body is not None and body.assets
+                else (assets if assets is not None else [])
+            )
+            request_csaf_documents = (
+                body.csaf_documents
+                if body is not None and body.csaf_documents
+                else (csaf_documents if csaf_documents is not None else [])
+            )
+            matching_config = copy.deepcopy(self.__matching_cfg_dict)
+            has_custom_matching_config = False
+            if body is not None and body.matching_config is not None:
+                matching_config = self._merge_matching_config(
+                    matching_config, body.matching_config
+                )
+                try:
+                    matching_config = MatchingConfig.model_validate(
+                        matching_config
+                    ).model_dump()
+                except ValidationError as e:
+                    raise HTTPException(status_code=422, detail=str(e))
+                has_custom_matching_config = True
+            force_recompute = (
+                body.force_recompute
+                if body is not None and body.force_recompute is not None
+                else has_custom_matching_config
+            )
             logger.info("Starting matching task")
             task = await self.__new_matching_task(
-                assets, csaf_documents, trigger="manual"
+                request_assets,
+                request_csaf_documents,
+                trigger="manual",
+                matching_config=matching_config,
+                force_recompute=force_recompute,
             )
             self.__matching_tasks.append(task)
-            return {"id": task.id}
+            return {
+                "id": task.task.id,
+                "matching_config_hash": task.task.matching_config_hash,
+                "force_recompute": task.task.force_recompute,
+            }
 
         @task_route.get("/running")
         async def running_tasks(
@@ -706,6 +829,8 @@ class Matcher:
                         processed_pairs=task.processed_pairs,
                         matches_found=self.__matches_found_by_task.get(task.task.id, 0),
                         progress=progress,
+                        matching_config_hash=task.task.matching_config_hash,
+                        force_recompute=task.task.force_recompute,
                     )
                 )
             return result
@@ -732,6 +857,8 @@ class Matcher:
                 processed_pairs=task.processed_pairs,
                 matches_found=self.__matches_found_by_task.get(task.task.id, 0),
                 progress=progress,
+                matching_config_hash=task.task.matching_config_hash,
+                force_recompute=task.task.force_recompute,
             )
 
         @task_route.get("/status")
@@ -778,13 +905,14 @@ class Matcher:
 
             removed_pending = False
             if self.__matching_tasks:
-                remaining: deque[MatchingTask] = deque()
+                remaining: deque[_QueuedMatchingTask] = deque()
                 while self.__matching_tasks:
-                    task = self.__matching_tasks.popleft()
+                    queued_task = self.__matching_tasks.popleft()
+                    task = queued_task.task
                     if task.id == task_id:
                         removed_pending = True
                     else:
-                        remaining.append(task)
+                        remaining.append(queued_task)
                 self.__matching_tasks = remaining
 
             if removed_pending:
@@ -835,16 +963,17 @@ class Matcher:
         async def clean_assets(origin_uri: HttpUrl):
             """Stop matching tasks for this origin, wait for pending batches, then clear assets for a specific origin."""
             affected_task_ids: set[int] = set()
-            removed_pending_tasks: list[MatchingTask] = []
+            removed_pending_tasks: list[_QueuedMatchingTask] = []
             if self.__matching_tasks:
-                remaining: deque[MatchingTask] = deque()
+                remaining: deque[_QueuedMatchingTask] = deque()
                 while self.__matching_tasks:
-                    task = self.__matching_tasks.popleft()
+                    queued_task = self.__matching_tasks.popleft()
+                    task = queued_task.task
                     if self._matches_origin(task.assets, origin_uri):
                         affected_task_ids.add(task.id)
-                        removed_pending_tasks.append(task)
+                        removed_pending_tasks.append(queued_task)
                         continue
-                    remaining.append(task)
+                    remaining.append(queued_task)
                 self.__matching_tasks = remaining
             await self.__cancel_pending_tasks(removed_pending_tasks)
             for task_id, task in self.__active_tasks.items():
@@ -860,16 +989,17 @@ class Matcher:
         async def clean_csaf(origin_uri: HttpUrl):
             """Stop matching tasks for this origin, wait for pending batches, then clear CSAF products for a specific origin."""
             affected_task_ids: set[int] = set()
-            removed_pending_tasks: list[MatchingTask] = []
+            removed_pending_tasks: list[_QueuedMatchingTask] = []
             if self.__matching_tasks:
-                remaining: deque[MatchingTask] = deque()
+                remaining: deque[_QueuedMatchingTask] = deque()
                 while self.__matching_tasks:
-                    task = self.__matching_tasks.popleft()
+                    queued_task = self.__matching_tasks.popleft()
+                    task = queued_task.task
                     if self._matches_origin(task.csaf_documents, origin_uri):
                         affected_task_ids.add(task.id)
-                        removed_pending_tasks.append(task)
+                        removed_pending_tasks.append(queued_task)
                         continue
-                    remaining.append(task)
+                    remaining.append(queued_task)
                 self.__matching_tasks = remaining
             await self.__cancel_pending_tasks(removed_pending_tasks)
             for task_id, task in self.__active_tasks.items():
@@ -980,11 +1110,12 @@ class Matcher:
         else:
             self.__in_flight_by_task[task_id] = count
 
-    async def __cancel_pending_tasks(self, tasks: list[MatchingTask]) -> None:
+    async def __cancel_pending_tasks(self, tasks: list[_QueuedMatchingTask]) -> None:
         if not tasks:
             return
         now = time.time()
-        for task in tasks:
+        for queued_task in tasks:
+            task = queued_task.task
             try:
                 await self.__cache_db.finish_matcher_run(
                     task.id, state="cancelled", finished_at=now
@@ -1065,19 +1196,22 @@ class Matcher:
 
 def match_pairs(
     task_id: int,
-    matches: queue.Queue[tuple[int, list[Match]]],
+    matches: queue.Queue[tuple[int, list[tuple[int, int]], list[Match]]],
     log_queue: multiprocessing.Queue,
     logging_config: LoggingConfig,
     pairs: list[tuple[CsafProduct, Asset]],
     threshold: float,
     matching_config: dict[str, Any],
+    matching_config_hash: str,
 ):
     configure_logging(logging_config, log_queue)
     logger.debug(f"Matching batch with {len(pairs)} pairs")
     batch = []
+    processed_pairs: list[tuple[int, int]] = []
     for csaf, asset in pairs:
         if not (csaf and csaf.product and asset and asset.product):
             continue
+        processed_pairs.append((csaf.id, asset.id))
 
         csaf_dict = {f"csaf_{k}": v for k, v in csaf.product.to_dict().items()}
         asset_dict = {f"asset_{k}": v for k, v in asset.product.to_dict().items()}
@@ -1099,9 +1233,11 @@ def match_pairs(
         match.score = score_percent
         match.timestamp = datetime.datetime.now().timestamp()
         match.status = f"result: {result}, reason: {reason}"
+        match.matcher_run_id = task_id
+        match.matching_config_hash = matching_config_hash
 
         batch.append(match)
-    matches.put((task_id, batch))
+    matches.put((task_id, processed_pairs, batch))
 
 
 async def run_matcher(config_path: Path = Path("./assets/config.toml")):

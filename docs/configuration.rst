@@ -190,6 +190,11 @@ error when the service starts. If neither option is set, matching only runs when
 **Note**: The Matcher will still run immediately when triggered via the API (``POST /task/start``),
 regardless of the configured schedule.
 
+**Warning**: If ``POST /task/start`` is called with a custom ``matching_config`` override,
+the resulting run may overwrite previously stored matches for the processed pairs.
+When testing custom weights, strongly prefer scoping the run to a subset by providing
+explicit ``assets`` and/or ``csaf_documents`` instead of running against all data.
+
 Parameters
 ~~~~~~~~~~
 
