@@ -125,6 +125,10 @@ Quick start
 
    Copy and adapt sample configuration files from ``assets/plugin_configs`` to enable data sources:
 
+   .. note::
+      Datasource plugins are expected to fetch valid source data. For CSAF sources, this means the
+      fetched CSAF documents must already be valid at the upstream source system.
+
    - NetBox fetcher (asset source):
 
      - Copy: ``assets/plugin_configs/data_source/asset/sample/netbox.toml``
