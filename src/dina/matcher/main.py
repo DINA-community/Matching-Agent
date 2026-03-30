@@ -1221,6 +1221,7 @@ class Matcher:
             app=api,
             host=self.__config.Matcher.Api.host,
             port=self.__config.Matcher.Api.port,
+            log_level="warning",
         )
         server = uvicorn.Server(config)
         await server.serve()
