@@ -345,10 +345,10 @@ class Match(Base):
     status: Mapped[str] = mapped_column(Text, nullable=False)
     timestamp: Mapped[float] = mapped_column(nullable=False)
     csaf_product_id: Mapped[int] = mapped_column(
-        ForeignKey("cacheDB.csaf_product.id"), nullable=False
+        ForeignKey("cacheDB.csaf_product.id", ondelete="CASCADE"), nullable=False
     )
     asset_id: Mapped[int] = mapped_column(
-        ForeignKey("cacheDB.asset.id"), nullable=False
+        ForeignKey("cacheDB.asset.id", ondelete="CASCADE"), nullable=False
     )
 
     csaf_product: Mapped["CsafProduct"] = relationship(back_populates="matches")

@@ -6,6 +6,7 @@ from pydantic import BaseModel, HttpUrl
 from sqlalchemy import (
     and_,
     delete,
+    func,
     literal,
     or_,
     select,
@@ -489,6 +490,20 @@ class CacheDB:
                         yield result  # type: ignore
 
             return
+
+    async def count_assets(self, assets: list[HttpUrl]) -> int:
+        async with AsyncSession(self.engine) as session:
+            stmt = select(func.count()).select_from(Asset)
+            if assets:
+                stmt = stmt.where(Asset.uri.in_([str(a) for a in assets]))
+            return int((await session.execute(stmt)).scalar_one())
+
+    async def count_csaf_products(self, csaf_documents: list[HttpUrl]) -> int:
+        async with AsyncSession(self.engine) as session:
+            stmt = select(func.count()).select_from(CsafProduct)
+            if csaf_documents:
+                stmt = stmt.where(CsafProduct.uri.in_([str(p) for p in csaf_documents]))
+            return int((await session.execute(stmt)).scalar_one())
 
     async def store_matches(self, matches: list[Match]) -> list[int]:
         if not matches:

@@ -4,12 +4,11 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 import asyncio
 
-from dina.common.config import Config
+from dina.common.config import Config, SynchronizerConfig
 from dina.synchronizer.base import (
     BaseSynchronizer,
     PluginLoadError,
     load_datasource_plugins,
-    SynchronizerConfig,
 )
 from dina.synchronizer.plugin_base.preprocessor import PreprocessorPlugin
 import uvicorn
