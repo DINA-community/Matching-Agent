@@ -735,6 +735,7 @@ class NetboxDataSource(DataSourcePlugin):
                                     match.csaf_product.origin_info or {}
                                 ).get("product_name_id", UNSET),
                                 score=match.score,
+                                description=match.status,
                                 time=datetime.fromtimestamp(
                                     match.timestamp or time.time()
                                 ),
