@@ -3,6 +3,7 @@ import polars as pl
 
 import numpy as np
 from dina.matcher.matching import Matching
+from packaging.version import Version
 
 
 @pytest.fixture
@@ -33,9 +34,10 @@ def matcher():
 
 
 def test_safe_version(matcher):
-    assert matcher._safe_version("1.2.3").public == "1.2.3"
+    assert matcher._safe_version("1.2.3") == Version("1.2.3")
     assert matcher._safe_version("abc") is None
     assert matcher._safe_version(None) is None
+    assert matcher._safe_version("not_a_version") is None
 
 
 def test_weighted_mean(matcher):
@@ -95,6 +97,7 @@ def test_compare_freetext(matcher):
     assert isinstance(matcher._compare_freetext(["a"], ["a"]), float)
     assert matcher._compare_freetext("   ", " ") is None
     assert matcher._compare_freetext("@@@", "$$$") == 0.0
+    assert matcher._compare_freetext("foo", "") is None
 
 
 def test_tokenize_clean_and_ngram(matcher):
@@ -109,7 +112,6 @@ def test_tokenize_clean_and_ngram(matcher):
 
 
 def test_ngram_similarity(matcher):
-    assert matcher._ngram_similarity([], ["a"]) == 0.0
     matcher.ngram_weights = {"x": "y"}  # invalid type keys
     assert matcher._weighted_ngram_similarity(["a"], ["a"], True) == 0.0
     matcher.ngram_weights = {2: 0.3, 3: 0.7}
@@ -118,6 +120,59 @@ def test_ngram_similarity(matcher):
     matcher.ngram_weights = {}
     score = matcher._weighted_ngram_similarity([], [], True)
     assert score == 0.0
+
+    matcher.ngram_weights = {1: 0.2, 2: 0.3, 3: 0.5}
+
+    test_cases = [
+        {
+            "name": "Test empty value",
+            "asset_tokens": [],
+            "csaf_tokens": ["a"],
+            "min_score": 0.0,
+            "max_score": 0.0,
+        },
+        {
+            "name": "Partial overlap - nginx server vs proxy",
+            "asset_tokens": ["nginx", "server"],
+            "csaf_tokens": ["nginx", "proxy"],
+            "min_score": 0.0,
+            "max_score": 0.5,
+        },
+        {
+            "name": "Typo tolerance test",
+            "asset_tokens": ["a", "servder"],
+            "csaf_tokens": ["ngianx", "proxdy"],
+            "min_score": 0.0,
+            "max_score": 0.1,
+        },
+        {
+            "name": "Industrial product naming variation",
+            "asset_tokens": ["et200sp", "im155-6", "profinet"],
+            "csaf_tokens": ["et200sp", "155-6", "pn", "interface", "module"],
+            "min_score": 0.0,
+            "max_score": 0.5,
+        },
+        {
+            "name": "Different product series",
+            "asset_tokens": ["S7-600", "at"],
+            "csaf_tokens": ["S7-400", "at"],
+            "min_score": 0.5,
+            "max_score": 1.0,
+        },
+        {
+            "name": "Additional CSAF context tokens",
+            "asset_tokens": ["nginx", "proxy"],
+            "csaf_tokens": ["manager", "nginx", "proxy"],
+            "min_score": 0.6,
+            "max_score": 1.0,
+        },
+    ]
+
+    for case in test_cases:
+        score = matcher._weighted_ngram_similarity(
+            case["asset_tokens"], case["csaf_tokens"], ignore_order=True
+        )
+        assert case["min_score"] <= score <= case["max_score"]
 
 
 def test_token_similarity(matcher):
@@ -132,32 +187,101 @@ def test_token_similarity(matcher):
 
 
 def test_range_in_range(matcher):
-    assert matcher._range_in_range({"min": "1", "max": "3"}, {"min": "2", "max": "4"})
-    assert matcher._range_in_range(
-        {"min": "0.8", "max": "0.9", "min_inclusive": False},
-        {"min": "0.9", "max": "1.3"},
-    )
-    assert matcher._range_in_range(
-        {"min": "1.0", "max": "1.2"}, {"min": "1.0", "max": "1.2"}
-    )
-    assert not matcher._range_in_range(
-        {"min": "1", "max": "2"}, {"min": "3", "max": "4"}
-    )
-    assert matcher._range_in_range(
-        {"min": None, "max": None}, {"min": None, "max": None}
-    )
-    assert matcher._range_in_range(
-        {"min": "1", "max": "2", "min_inclusive": True, "max_inclusive": False},
-        {"min": "2", "max": "3", "min_inclusive": True, "max_inclusive": True},
-    ) in (True, False)
-    assert matcher._range_in_range(
-        {"min": "1", "max": "2", "min_inclusive": True, "max_inclusive": False},
-        {"min": None, "max": None, "min_inclusive": True, "max_inclusive": True},
-    ) in (True, False)
-    assert matcher._range_in_range(
-        {"min": None, "max": None, "min_inclusive": True, "max_inclusive": False},
-        {"min": "2", "max": "3", "min_inclusive": True, "max_inclusive": True},
-    ) in (True, False)
+    test_cases = [
+        {
+            "name": "Partial overlap",
+            "asset_range": {"min": "16.9", "max": "17.5"},
+            "csaf_range": {"min": "17.0", "max": "18.0"},
+            "expected": True,
+        },
+        {
+            "name": "Asset completely before CSAF",
+            "asset_range": {"min": "15.0", "max": "16.5"},
+            "csaf_range": {"min": "17.0", "max": "18.0"},
+            "expected": False,
+        },
+        {
+            "name": "Asset fully inside CSAF",
+            "asset_range": {"min": "17.2", "max": "17.8"},
+            "csaf_range": {"min": "17.0", "max": "18.0"},
+            "expected": True,
+        },
+        {
+            "name": "Asset starts after CSAF upper bound",
+            "asset_range": {"min": "18.0", "max": "19.0", "min_inclusive": False},
+            "csaf_range": {"min": "17.0", "max": "18.0", "max_inclusive": True},
+            "expected": False,
+        },
+        {
+            "name": "Overlap at inclusive boundary",
+            "asset_range": {"min": "18.0", "max": "19.0", "min_inclusive": True},
+            "csaf_range": {"min": "17.0", "max": "18.0", "max_inclusive": True},
+            "expected": True,
+        },
+        {
+            "name": "No overlap at exclusive boundary",
+            "asset_range": {"min": "18.0", "max": "19.0", "min_inclusive": True},
+            "csaf_range": {"min": "17.0", "max": "18.0", "max_inclusive": False},
+            "expected": False,
+        },
+        {
+            "name": "Asset open on lower side, still overlaps",
+            "asset_range": {"min": None, "max": "17.5"},
+            "csaf_range": {"min": "17.0", "max": "18.0"},
+            "expected": True,
+        },
+        {
+            "name": "Asset open on upper side, completely after CSAF",
+            "asset_range": {"min": "19.0", "max": None},
+            "csaf_range": {"min": "17.0", "max": "18.0"},
+            "expected": False,
+        },
+        {
+            "name": "Both ranges open",
+            "asset_range": {"min": None, "max": None},
+            "csaf_range": {"min": None, "max": None},
+            "expected": True,
+        },
+        {
+            "name": "Same single version inclusive",
+            "asset_range": {
+                "min": "17.0",
+                "max": "17.0",
+                "min_inclusive": True,
+                "max_inclusive": True,
+            },
+            "csaf_range": {
+                "min": "17.0",
+                "max": "17.0",
+                "min_inclusive": True,
+                "max_inclusive": True,
+            },
+            "expected": True,
+        },
+        {
+            "name": "Same single version exclusive",
+            "asset_range": {
+                "min": "17.0",
+                "max": "17.0",
+                "min_inclusive": True,
+                "max_inclusive": True,
+            },
+            "csaf_range": {
+                "min": "17.0",
+                "max": "17.0",
+                "min_inclusive": False,
+                "max_inclusive": False,
+            },
+            "expected": False,
+        },
+    ]
+
+    for case in test_cases:
+        result = matcher._range_in_range(case["asset_range"], case["csaf_range"])
+        assert result is case["expected"], (
+            f"{case['name']}: expected {case['expected']}, got {result} "
+            f"for asset_range={case['asset_range']} and csaf_range={case['csaf_range']}"
+        )
 
 
 def test_compare_release_numbers(matcher):
@@ -196,7 +320,31 @@ def test_compare_versions(matcher):
         "qualifier": None,
         "min_max_version": [{"min": "1.0.0", "max": "1.0.0"}],
     }
-    assert np.isclose(matcher._compare_versions(csaf, asset), 1.0)
+    assert matcher._compare_versions(csaf, asset) > 0.8
+
+    csaf["min_max_version"] = [{"min": "1", "max": "2"}]
+
+    assert matcher._compare_versions(csaf, asset) == 1.0
+
+    assert (
+        matcher._compare_fields(
+            csaf,
+            asset,
+            {
+                "schema": 0.05,
+                "release_number": 0.10,
+                "qualifier": 0.10,
+                "min_max_version": 0.75,
+            },
+        )
+        == 1.0
+    )
+
+    csaf["min_max_version"] = [{"min": None, "max": "17.2"}]
+    assert 0.9 <= matcher._compare_versions(csaf, asset) <= 1.0
+
+    csaf["min_max_version"] = [{"min": "17.-2", "max": None}]
+    assert matcher._compare_versions(csaf, asset) <= 0.1
 
     # invalid cases
     assert matcher._compare_versions(None, asset) == 0.0

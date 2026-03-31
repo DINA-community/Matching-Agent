@@ -1,8 +1,5 @@
 import json
 import re
-
-# from pathlib import Path
-# import tomllib
 import numpy as np
 from rapidfuzz.distance import Levenshtein
 import polars as pl
@@ -425,19 +422,20 @@ class Matching:
         Missing inclusive flags default to True.
         """
 
-        def _to_int(value: str):
+        def _remove_letters(value: str):
+            if value is None:
+                return None
             try:
-                value = value.replace(".", "")
-                value = re.sub(r"[A-Za-z]", "", value)
-                return int(value)
-            except (TypeError, ValueError):
+                cleaned = re.sub(r"[^0-9.]", "", str(value))
+                return Version(cleaned) if cleaned else None
+            except (TypeError, InvalidVersion):
                 return None
 
         # --- Extract numbers ---
-        a_min = _to_int(str(asset_range.get("min")))
-        a_max = _to_int(str(asset_range.get("max")))
-        c_min = _to_int(str(csaf_range.get("min")))
-        c_max = _to_int(str(csaf_range.get("max")))
+        a_min = _remove_letters(asset_range.get("min"))
+        a_max = _remove_letters(asset_range.get("max"))
+        c_min = _remove_letters(csaf_range.get("min"))
+        c_max = _remove_letters(csaf_range.get("max"))
 
         # --- Inclusivity flags (default True) ---
         a_min_inc = self._bool_or_default(asset_range.get("min_inclusive"))
@@ -445,36 +443,32 @@ class Matching:
         c_min_inc = self._bool_or_default(csaf_range.get("min_inclusive"))
         c_max_inc = self._bool_or_default(csaf_range.get("max_inclusive"))
 
-        # --- Case 1: both ranges empty
+        # Both ranges are completely open -> the asset matches the CSAF range
         if all(v is None for v in (a_min, a_max, c_min, c_max)):
             return True
 
-        # --- Case 2: CSAF has no bounds, cannot compare
-        if c_min is None and c_max is None:
-            return False
-
-        # --- Case 3: Asset has no bounds, not within CSAF
+        # Asset range is completely open -> handle conservatively from a matching perspective
+        # If "unknown asset range = not reliably affected" is desired:
         if a_min is None and a_max is None:
             return False
 
-        # --- Replace None with ±∞ ---
-        a_min = a_min if a_min is not None else float("-inf")
-        a_max = a_max if a_max is not None else float("inf")
-        c_min = c_min if c_min is not None else float("-inf")
-        c_max = c_max if c_max is not None else float("inf")
+        # CSAF range is completely open -> every concrete asset range is affected
+        if c_min is None and c_max is None:
+            return True
 
-        # --- Check if they overlap ---
-        # Overlap exists if left edge of one is <= right edge of the other, and vice versa
-        if a_max < c_min:
-            return False
-        if a_min > c_max:
-            return False
+        # Asset range lies entirely to the left of the CSAF range
+        if a_max is not None and c_min is not None:
+            if a_max < c_min:
+                return False
+            if a_max == c_min and (not a_max_inc or not c_min_inc):
+                return False
 
-        # Handle exclusive bounds equality
-        if a_max == c_min and (not a_max_inc or not c_min_inc):
-            return False
-        if a_min == c_max and (not a_min_inc or not c_max_inc):
-            return False
+        # Asset range lies entirely to the right of the CSAF range
+        if a_min is not None and c_max is not None:
+            if a_min > c_max:
+                return False
+            if a_min == c_max and (not a_min_inc or not c_max_inc):
+                return False
 
         return True
 
@@ -912,102 +906,3 @@ class Matching:
             )
 
         return df
-
-
-# def main():
-#     config_path = Path("./assets/plugin_configs/default/matching_config.toml")
-
-#     if not config_path.exists():
-#         raise FileNotFoundError(f"Config file not found: {config_path}")
-
-#     with open(config_path, "rb") as f:
-#         mc = tomllib.load(f)
-
-#     matcher = Matching(mc)
-
-#     # print(matcher._safe_version("1.2.3") == Version("1.2.3"))
-#     # print(matcher._safe_version("") is None)
-#     # print(matcher._safe_version("not_a_version") is None)
-
-#     # test_cases = [
-#     #     ({"min": "0.8", "max": "0.9", "min_inclusive": False}, {"min": "0.9", "max": "1.3"}, True),
-#     #     ({"min": "1.0", "max": "1.2"}, {"min": "1.0", "max": "1.2"}, True),
-#     # ]
-
-#     # for asset_range, csaf_range, expected in test_cases:
-#     #     result = matcher._range_in_range(asset_range, csaf_range)
-#     #     if result == expected:
-#     #         print(f"Passed for asset_range={asset_range} csaf_range={csaf_range}")
-#     #     else:
-#     #         print(f"Failed for asset_range={asset_range} csaf_range={csaf_range} got {result}, expected {expected}")
-
-#     # print(matcher._compare_freetext("nginx", "nginx") == 1.0)
-#     # print(matcher._compare_freetext("nginx", "apache") < 1.0)
-#     # print(matcher._compare_freetext("", "") is None)
-#     # print(matcher._compare_freetext("foo", "") == 0.0)
-
-#     # tokens1 = ["nginx", "server"]
-#     # tokens2 = ["nginx", "proxy"]
-
-#     # score = matcher._weighted_ngram_similarity(tokens1, tokens2, ignore_order=True)
-#     # print(0.0 <= score <= 1.0)
-
-#     # asset_field = {'schema': 'pep-440', 'raw': '21.0.0.0', 'package': None, 'release_prefix': None, 'release_number': '21.0.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': '21.0.0.0', 'max': '21.0.0.0'}]}
-#     # csaf_field = {'schema': 'pep-440', 'raw': '21.0.0.0', 'package': None, 'release_prefix': None, 'release_number': '21.0.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': None, 'max': '21.0.0.0'}]}
-#     # csaf_field = {
-#     #     "schema": "semantic-versioning",
-#     #     "release_number": None,
-#     #     "qualifier": None,
-#     #     "min_max_version": [{"min": "1.0.0", "max": "1.0.0"}]
-#     # }
-
-#     # asset_field = {
-#     #     "schema": "semantic-versioning",
-#     #     "release_number": None,
-#     #     "qualifier": "alpha",
-#     #     "min_max_version": [{"min": "1.0.0", "max": "1.0.0"}]
-#     # }
-#     # print(matcher._extract_field(csaf_field, "min_max_version"))
-#     # print(matcher._compare_versions(csaf_field, asset_field))
-#     # print(matcher._compare_fields(
-#     #     csaf_field,
-#     #     asset_field,
-#     #     {
-#     #         "raw": 0.01,
-#     #         "part": 0.05,
-#     #         "vendor": 0.15,
-#     #         "product": 0.35,
-#     #         "version": 0.30,
-#     #         "update": 0.05,
-#     #         "edition": 0.02,
-#     #         "language": 0.00,
-#     #         "sw_edition": 0.02,
-#     #         "target_sw": 0.02,
-#     #         "target_hw": 0.02,
-#     #         "other": 0.01,
-#     #     }
-#     #     ))
-
-#     # csaf_sbom_urls = ["https://www.freecodecamp.org/news/python-switch-statement-switch-case-example/", "https://www.test.org"]
-#     # asset_sbom_urls = ["https://www.freecodecamp.org/news/python-switch-statement-switch-case-example/"]
-#     # print(matcher._compare_fields(csaf_sbom_urls, asset_sbom_urls))
-
-#     # csaf_product_type = "Device"
-#     # asset_product_type = "Undefined"
-#     # print(matcher._compare_fields(csaf_product_type, asset_product_type))
-
-#     # csaf_version = {'schema': 'pep-440', 'raw': '1.15.0.0', 'package': None, 'release_prefix': None, 'release_number': '1.15.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': '1.15.0.0', 'max': '1.15.0.0'}]}
-#     # asset_version1 = {'schema': 'pep-440', 'raw': '1.15.0.0', 'package': None, 'release_prefix': None, 'release_number': '1.15.0.0', 'release_branch': None, 'qualifier': [None, None], 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': '1.15.0.0', 'max': '1.15.0.0'}]}
-#     # asset_version2 = {'schema': 'rpm-package-naming', 'raw': 'rubygem-activemodel-0:5.2.0-1.el7rhgs.src', 'package': 'rubygem-activemodel', 'release_prefix': None, 'release_number': None, 'release_branch': None, 'qualifier': None, 'build_number': '1.el7rhgs', 'architecture': 'src', 'date': None, 'epoch': '0', 'min_max_version': [{'min': '5.2.0', 'max': '5.2.0'}]}
-#     # print(matcher._compare_versions(csaf_version, asset_version1))
-
-#     # a = {'schema': 'windows-sap-schema', 'raw': 'v17 upd1', 'package': None, 'release_prefix': 'v', 'release_number': 17, 'release_branch': 0, 'qualifier': [None, None], 'build_number': 'upd1', 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': '17.0.0.1', 'max': '17.0.0.1'}]}
-#     # c = {'schema': 'csaf-constraint-vls', 'raw': '<v5.7', 'package': None, 'release_prefix': None, 'release_number': None, 'release_branch': None, 'qualifier': None, 'build_number': None, 'architecture': None, 'date': None, 'epoch': None, 'min_max_version': [{'min': None, 'max': '5.7'}]}
-#     # print(matcher._compare_versions(c, a))
-
-#     # textc = "21.0.0.0".lower()
-#     # texta = "21.0.0.0".lower()
-#     # print(matcher._compare_freetext(textc, texta))
-
-# if __name__ == "__main__":
-#     main()
