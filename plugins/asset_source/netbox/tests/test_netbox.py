@@ -66,6 +66,7 @@ def test_find_cachedb_type():
     from dina.plugins.datasource.netbox.netbox import find_cachedb_type, ProductType
 
     assert find_cachedb_type("dcim.device") == ProductType.Device
+    assert find_cachedb_type("dcim.module") == ProductType.Module
     assert find_cachedb_type("d3c.software") == ProductType.Software
     assert find_cachedb_type("unknown") == ProductType.Undefined
 
@@ -74,6 +75,7 @@ def test_find_cachedb_type():
     "origin_info,expected",
     [
         ({"device_id": 42}, "/api/dcim/devices/42/"),
+        ({"module_id": 77}, "/api/dcim/modules/77/"),
         ({"software_id": 99}, "/api/plugins/d3c/software/99/"),
         ({"relation_id": 123}, "/api/plugins/d3c/productrelationship-list/123/"),
         ({}, ""),
@@ -134,6 +136,14 @@ async def test_fetch_products(monkeypatch, mock_config):
         AsyncMock(return_value=DummyListResult([DummyDeviceType])),
     )
     monkeypatch.setattr(
+        "dina.plugins.datasource.netbox.netbox.dcim_modules_list.asyncio",
+        AsyncMock(return_value=DummyListResult([])),
+    )
+    monkeypatch.setattr(
+        "dina.plugins.datasource.netbox.netbox.dcim_module_types_list.asyncio",
+        AsyncMock(return_value=DummyListResult([])),
+    )
+    monkeypatch.setattr(
         "dina.plugins.datasource.netbox.netbox.dcim_manufacturers_list.asyncio",
         AsyncMock(return_value=DummyListResult([DummyManufacturer])),
     )
@@ -173,6 +183,10 @@ async def test_cleanup_products_returns_delete(monkeypatch, mock_config):
     )
     monkeypatch.setattr(
         "dina.plugins.datasource.netbox.netbox.plugins_d3c_software_list_list.asyncio",
+        AsyncMock(return_value=DummyListResult([])),
+    )
+    monkeypatch.setattr(
+        "dina.plugins.datasource.netbox.netbox.dcim_modules_list.asyncio",
         AsyncMock(return_value=DummyListResult([])),
     )
 
@@ -289,7 +303,7 @@ async def test_map_relationships_basic(monkeypatch, mock_config):
         MagicMock(id=300, origin_info={"software_id": 10}),
         MagicMock(id=400, origin_info={"software_id": 20}),
     ]
-    fetcher_view.get_existing = AsyncMock(side_effect=[fake_devices, fake_software])
+    fetcher_view.get_existing = AsyncMock(side_effect=[fake_devices, [], fake_software])
 
     relations = [
         Relationship(

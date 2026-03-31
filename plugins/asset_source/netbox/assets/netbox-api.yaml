@@ -139318,6 +139318,9 @@ components:
         software:
           type: integer
           nullable: true
+        module:
+          type: integer
+          nullable: true
         csaf_document:
           type: integer
         score:

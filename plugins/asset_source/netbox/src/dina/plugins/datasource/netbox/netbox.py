@@ -37,6 +37,8 @@ from dina.plugins.datasource.netbox.generated.api_client.api.dcim import (
     dcim_device_types_list,
     dcim_devices_list,
     dcim_manufacturers_list,
+    dcim_module_types_list,
+    dcim_modules_list,
 )
 from dina.plugins.datasource.netbox.generated.api_client.api.plugins import (
     plugins_d3c_productrelationship_list_list,
@@ -46,6 +48,7 @@ from dina.plugins.datasource.netbox.generated.api_client.api.plugins import (
 from dina.plugins.datasource.netbox.generated.api_client.errors import UnexpectedStatus
 from dina.plugins.datasource.netbox.generated.api_client.models import (
     DeviceTypeCustomFields,
+    ModuleTypeCustomFields,
     CsafMatchRequest,
 )
 from dina.plugins.datasource.netbox.generated.api_client.types import UNSET
@@ -117,42 +120,33 @@ class NetboxDataSource(DataSourcePlugin):
         self,
         fetcher_view: FetcherView,
     ) -> FetchProductsResult:
-        """
-        Fetch devices and software products that have been updated since the last run.
-
-        Retrieves devices, device types, manufacturers, and software from NetBox, performing
-        incremental synchronization based on last_updated timestamps. Handles cascading updates
-        where changes to manufacturers or device types require fetching related devices.
-
-        Args:
-            fetcher_view: Database view for accessing existing assets and metadata
-
-        Returns:
-            FetchProductsResult containing list of Asset objects for devices and software
-
-        Caveats:
-            - May perform multiple API calls to resolve relationships
-            - Returns empty results for software if D3C plugin is not installed
-            - 403 errors will raise RuntimeError with authentication guidance
-        """
+        """Fetch device, module, and software products updated since the last run."""
         last_run = (await fetcher_view.last_run()).astimezone(tz=timezone.utc)
         current_time = time.time()
 
-        # We want to fetch all devices and device_types and manufacturers.
-        # We then need to check if there were updates to only parts of an asset.
+        # We fetch products and their type/manufacturer records and then include products
+        # whose related records changed (e.g., manufacturer/type updates).
         (
             devices_result,
+            modules_result,
             software_results,
             device_types_result,
+            module_types_result,
             manufacturers_result,
         ) = await asyncio.gather(
             dcim_devices_list.asyncio(
+                client=self.client, last_updated_gt=[last_run], ordering="-id"
+            ),
+            dcim_modules_list.asyncio(
                 client=self.client, last_updated_gt=[last_run], ordering="-id"
             ),
             plugins_d3c_software_list_list.asyncio(
                 client=self.client, last_updated_gt=[last_run], ordering="-id"
             ),
             dcim_device_types_list.asyncio(
+                client=self.client, last_updated_gt=[last_run], ordering="-id"
+            ),
+            dcim_module_types_list.asyncio(
                 client=self.client, last_updated_gt=[last_run], ordering="-id"
             ),
             dcim_manufacturers_list.asyncio(
@@ -173,6 +167,13 @@ class NetboxDataSource(DataSourcePlugin):
                     "Probably invalid access token. "
                     "Please make sure to correctly configure your access token in the plugin configuration."
                 ) from e
+
+        try:
+            modules_result = validate_response(modules_result)
+            modules = {module.id: module for module in modules_result.results}
+        except UnexpectedStatus as e:
+            logger.error(f"Failed to fetch modules: {e.status_code}")
+            modules = {}
 
         try:
             software_results = validate_response(software_results)
@@ -196,6 +197,16 @@ class NetboxDataSource(DataSourcePlugin):
             device_types = {}
 
         try:
+            module_types_result = validate_response(module_types_result)
+            module_types = {
+                module_type.id: module_type
+                for module_type in module_types_result.results
+            }
+        except UnexpectedStatus as e:
+            logger.error(f"Failed to fetch module_types: {e.status_code}")
+            module_types = {}
+
+        try:
             manufacturers_result = validate_response(manufacturers_result)
             manufacturers = {
                 manufacturer.id: manufacturer
@@ -217,6 +228,16 @@ class NetboxDataSource(DataSourcePlugin):
                 for device in devices_result.results:
                     if device.id not in devices:
                         devices[device.id] = device
+
+            if modules_result := await dcim_modules_list.asyncio(
+                client=self.client,
+                manufacturer_id=list(manufacturers.keys()),
+                id_n=list(modules.keys()),
+                ordering="-id",
+            ):
+                for module in modules_result.results:
+                    if module.id not in modules:
+                        modules[module.id] = module
 
             try:
                 software_results = await plugins_d3c_software_list_list.asyncio(
@@ -247,6 +268,18 @@ class NetboxDataSource(DataSourcePlugin):
                     if device.id not in devices:
                         devices[device.id] = device
 
+        # Extend modules with updates that only changed module_type.
+        if module_types:
+            if modules_result := await dcim_modules_list.asyncio(
+                client=self.client,
+                module_type_id=list(module_types.keys()),
+                id_n=list(modules.keys()),
+                ordering="-id",
+            ):
+                for module in modules_result.results:
+                    if module.id not in modules:
+                        modules[module.id] = module
+
         # Fetch the missing device types and manufacturers.
         if devices:
             missing_device_type_ids = {
@@ -269,6 +302,42 @@ class NetboxDataSource(DataSourcePlugin):
                 device.device_type.manufacturer.id
                 for device in devices.values()
                 if device.device_type.manufacturer.id not in manufacturers
+            }
+            if missing_manufacturer_ids:
+                if manufacturers_result := await dcim_manufacturers_list.asyncio(
+                    client=self.client,
+                    id=list(missing_manufacturer_ids),
+                    ordering="-id",
+                ):
+                    manufacturers.update(
+                        {
+                            manufacturer.id: manufacturer
+                            for manufacturer in manufacturers_result.results
+                        }
+                    )
+
+        # Fetch missing module types and manufacturers.
+        if modules:
+            missing_module_type_ids = {
+                module.module_type.id
+                for module in modules.values()
+                if module.module_type.id not in module_types
+            }
+            if missing_module_type_ids:
+                if module_types_result := await dcim_module_types_list.asyncio(
+                    client=self.client, id=list(missing_module_type_ids), ordering="-id"
+                ):
+                    module_types.update(
+                        {
+                            module_type.id: module_type
+                            for module_type in module_types_result.results
+                        }
+                    )
+
+            missing_manufacturer_ids = {
+                module.module_type.manufacturer.id
+                for module in modules.values()
+                if module.module_type.manufacturer.id not in manufacturers
             }
             if missing_manufacturer_ids:
                 if manufacturers_result := await dcim_manufacturers_list.asyncio(
@@ -309,6 +378,16 @@ class NetboxDataSource(DataSourcePlugin):
                 Asset.origin_info["device_id"]
                 .astext.cast(Integer)
                 .in_(list(devices.keys())),
+            )
+        }
+
+        existing_module_assets = {
+            module.origin_info["module_id"]: module
+            for module in await fetcher_view.get_existing(
+                Asset,
+                Asset.origin_info["module_id"]
+                .astext.cast(Integer)
+                .in_(list(modules.keys())),
             )
         }
 
@@ -358,6 +437,54 @@ class NetboxDataSource(DataSourcePlugin):
                 product.part_numbers = [device_type.part_number]
             if isinstance(device_type.custom_fields, DeviceTypeCustomFields):
                 props = device_type.custom_fields.additional_properties
+
+                model_num = props.get("model_number")
+                product.model_numbers = [model_num] if model_num is not None else []
+                product.hardware_name = props.get("hardware_name")
+
+                versions = props.get("hardware_version")
+                product.version = versions if versions is not None else []
+                product.device_family = props.get("device_family")
+                product.cpe = props.get("cpe")
+
+            product.manufacturer_name = manufacturer.name
+            assets.append(asset)
+
+        for module in modules.values():
+            logger.debug(f"Adding asset for module: {module.display}")
+            module_type = module_types[module.module_type.id]
+            manufacturer = manufacturers[module_type.manufacturer.id]
+            origin_info = {
+                "module_id": module.id,
+                "module_type_id": module_type.id,
+                "manufacturer_id": manufacturer.id,
+            }
+
+            if asset := existing_module_assets.get(module.id, None):
+                asset.last_update = current_time
+                asset.origin_info = origin_info
+                asset.uri = self.build_resource_uri(origin_info)
+            else:
+                asset = Asset(
+                    product=Product(),
+                    last_update=current_time,
+                    origin_uri=str(self.origin_uri),
+                    origin_info=origin_info,
+                    uri=self.build_resource_uri(origin_info),
+                )
+
+            asset.product.product_type = ProductType.Module
+            if isinstance(module.display, str):
+                asset.product.name = module.display
+            if isinstance(module.serial, str):
+                asset.product.serial_numbers = [module.serial]
+
+            asset.product.model = module_type.model
+            product = asset.product
+            if isinstance(module_type.part_number, str):
+                product.part_numbers = [module_type.part_number]
+            if isinstance(module_type.custom_fields, ModuleTypeCustomFields):
+                props = module_type.custom_fields.additional_properties
 
                 model_num = props.get("model_number")
                 product.model_numbers = [model_num] if model_num is not None else []
@@ -462,7 +589,7 @@ class NetboxDataSource(DataSourcePlugin):
         """
         Map NetBox relationships to internal database asset IDs.
 
-        Translates NetBox product IDs (device_id, software_id) to internal Asset table
+        Translates NetBox product IDs (device_id, module_id, software_id) to internal Asset table
         primary keys, filtering out relationships where either endpoint is not found.
         Deduplicates relationships by (parent, child) pair.
 
@@ -474,14 +601,17 @@ class NetboxDataSource(DataSourcePlugin):
             List of MappedRelationship objects with internal database IDs
 
         Raises:
-            RuntimeError: If a product type is neither Device nor Software
+            RuntimeError: If a product type is neither Device, Module, nor Software
         """
         device_ids = set()
+        module_ids = set()
         software_ids = set()
         for relation in relations:
             match relation.parent.product_type:
                 case ProductType.Device:
                     device_ids.add(relation.parent.id)
+                case ProductType.Module:
+                    module_ids.add(relation.parent.id)
                 case ProductType.Software:
                     software_ids.add(relation.parent.id)
                 case _:
@@ -489,6 +619,8 @@ class NetboxDataSource(DataSourcePlugin):
             match relation.child.product_type:
                 case ProductType.Device:
                     device_ids.add(relation.child.id)
+                case ProductType.Module:
+                    module_ids.add(relation.child.id)
                 case ProductType.Software:
                     software_ids.add(relation.child.id)
                 case _:
@@ -501,6 +633,15 @@ class NetboxDataSource(DataSourcePlugin):
                 Asset.origin_info["device_id"]
                 .astext.cast(Integer)
                 .in_(list(device_ids)),
+            )
+        }
+        modules = {
+            module.origin_info["module_id"]: module.id
+            for module in await fetcher_view.get_existing(
+                Asset,
+                Asset.origin_info["module_id"]
+                .astext.cast(Integer)
+                .in_(list(module_ids)),
             )
         }
         software = {
@@ -519,6 +660,8 @@ class NetboxDataSource(DataSourcePlugin):
             match relation.parent.product_type:
                 case ProductType.Device:
                     parent_id = devices[relation.parent.id]
+                case ProductType.Module:
+                    parent_id = modules[relation.parent.id]
                 case ProductType.Software:
                     parent_id = software[relation.parent.id]
                 case _:
@@ -528,6 +671,8 @@ class NetboxDataSource(DataSourcePlugin):
             match relation.child.product_type:
                 case ProductType.Device:
                     child_id = devices[relation.child.id]
+                case ProductType.Module:
+                    child_id = modules[relation.child.id]
                 case ProductType.Software:
                     child_id = software[relation.child.id]
                 case _:
@@ -553,7 +698,7 @@ class NetboxDataSource(DataSourcePlugin):
         """
         Verify which assets still exist in NetBox and mark stale assets for deletion.
 
-        Queries NetBox to check if devices and software still exist. Assets that are
+        Queries NetBox to check if devices, modules, and software still exist. Assets that are
         no longer present in NetBox are marked for deletion from the local database.
 
         Args:
@@ -574,15 +719,23 @@ class NetboxDataSource(DataSourcePlugin):
             for d in data_to_check
             if d.product.product_type == ProductType.Device
         }
+        modules = {
+            int(d.origin_info["module_id"]): d
+            for d in data_to_check
+            if d.product.product_type == ProductType.Module
+        }
         software_set = {
             int(d.origin_info["software_id"]): d
             for d in data_to_check
             if d.product.product_type == ProductType.Software
         }
 
-        devices_result, software_result = await asyncio.gather(
+        devices_result, modules_result, software_result = await asyncio.gather(
             dcim_devices_list.asyncio(
                 client=self.client, id=list(devices.keys()), ordering="-id"
+            ),
+            dcim_modules_list.asyncio(
+                client=self.client, id=list(modules.keys()), ordering="-id"
             ),
             plugins_d3c_software_list_list.asyncio(
                 client=self.client, id=list(software_set.keys()), ordering="-id"
@@ -604,6 +757,16 @@ class NetboxDataSource(DataSourcePlugin):
             logger.error(f"Failed to fetch devices: {e.status_code}")
 
         try:
+            modules_result = validate_response(modules_result)
+            for module in modules_result.results:
+                kept_module = modules.pop(module.id)
+                decisions.append(
+                    CleanUpDecision(can_delete=False, id=kept_module.id, ty=Asset)
+                )
+        except UnexpectedStatus as e:
+            logger.error(f"Failed to fetch modules: {e.status_code}")
+
+        try:
             software_result = validate_response(software_result)
             for software in software_result.results:
                 kept_software = software_set.pop(software.id)
@@ -618,6 +781,12 @@ class NetboxDataSource(DataSourcePlugin):
             map(
                 lambda x: CleanUpDecision(can_delete=True, id=x.id, ty=Asset),
                 devices.values(),
+            )
+        )
+        decisions.extend(
+            map(
+                lambda x: CleanUpDecision(can_delete=True, id=x.id, ty=Asset),
+                modules.values(),
             )
         )
         decisions.extend(
@@ -715,34 +884,31 @@ class NetboxDataSource(DataSourcePlugin):
 
         plugins_csaf_csafmatch_list_create._parse_response = parse_response_monkey
 
+        def to_csaf_match_request(match: Match) -> CsafMatchRequest:
+            request = CsafMatchRequest(
+                csaf_document=match.csaf_product.uri,
+                device=(match.asset.origin_info or {}).get("device_id", UNSET),
+                software=(match.asset.origin_info or {}).get("software_id", UNSET),
+                module=(match.asset.origin_info or {}).get("module_id", UNSET),
+                product_name_id=(match.csaf_product.origin_info or {}).get(
+                    "product_name_id", UNSET
+                ),
+                score=match.score,
+                description=match.status,
+                time=datetime.fromtimestamp(match.timestamp or time.time()),
+            )
+            module_id = (match.asset.origin_info or {}).get("module_id", UNSET)
+            if module_id is not UNSET:
+                request["module"] = module_id
+            return request
+
         batch_size = 100
         for i in range(0, len(new_matches), batch_size):
             batch = new_matches[i : i + batch_size]
             try:
                 await plugins_csaf_csafmatch_list_create.asyncio(
                     client=self.client,
-                    body=BulkBody(
-                        [
-                            CsafMatchRequest(
-                                csaf_document=match.csaf_product.uri,
-                                device=(match.asset.origin_info or {}).get(
-                                    "device_id", UNSET
-                                ),
-                                software=(match.asset.origin_info or {}).get(
-                                    "software_id", UNSET
-                                ),
-                                product_name_id=(
-                                    match.csaf_product.origin_info or {}
-                                ).get("product_name_id", UNSET),
-                                score=match.score,
-                                description=match.status,
-                                time=datetime.fromtimestamp(
-                                    match.timestamp or time.time()
-                                ),
-                            )
-                            for match in batch
-                        ]
-                    ),  # type: ignore
+                    body=BulkBody([to_csaf_match_request(match) for match in batch]),  # type: ignore
                 )
             except (httpx.HTTPError, UnexpectedStatus) as e:
                 logger.error(f"Failed to notify new matches: {e}")
@@ -771,7 +937,7 @@ class NetboxDataSource(DataSourcePlugin):
         Construct the API path for a specific resource in NetBox.
 
         Generates the appropriate NetBox API endpoint path based on the resource type
-        (device, software, or relationship) encoded in the origin_info dictionary.
+        (device, module, software, or relationship) encoded in the origin_info dictionary.
 
         Args:
             origin_info: Dictionary containing resource type and ID information
@@ -782,6 +948,8 @@ class NetboxDataSource(DataSourcePlugin):
         try:
             if "device_id" in origin_info:
                 return f"/api/dcim/devices/{int(origin_info['device_id'])}/"
+            if "module_id" in origin_info:
+                return f"/api/dcim/modules/{int(origin_info['module_id'])}/"
             if "software_id" in origin_info:
                 return f"/api/plugins/d3c/software/{int(origin_info['software_id'])}/"
             if "relation_id" in origin_info:
@@ -797,15 +965,18 @@ def find_cachedb_type(netbox_type) -> ProductType:
     Map NetBox content type strings to ProductType enumeration values.
 
     Args:
-        netbox_type: NetBox content type string (e.g., "dcim.device", "d3c.software")
+        netbox_type: NetBox content type string (e.g., "dcim.device", "dcim.module", "d3c.software")
 
     Returns:
         ProductType.Device for "dcim.device"
+        ProductType.Module for "dcim.module"
         ProductType.Software for "d3c.software"
         ProductType.Undefined for unknown types
     """
     if netbox_type == "dcim.device":
         return ProductType.Device
+    elif netbox_type == "dcim.module":
+        return ProductType.Module
     elif netbox_type == "d3c.software":
         return ProductType.Software
     else:
