@@ -785,7 +785,12 @@ class NetboxDataSource(DataSourcePlugin):
             devices_result = validate_response(devices_result)
             for device in devices_result.results:
                 # The device still exists. Remove it from the set and mark it as kept
-                kept_device = devices.pop(device.id)
+                kept_device = devices.pop(device.id, None)
+                if kept_device is None:
+                    logger.debug(
+                        "Skipping unexpected device id %s during cleanup", device.id
+                    )
+                    continue
                 decisions.append(
                     CleanUpDecision(can_delete=False, id=kept_device.id, ty=Asset)
                 )
@@ -795,7 +800,12 @@ class NetboxDataSource(DataSourcePlugin):
         try:
             modules_result = validate_response(modules_result)
             for module in modules_result.results:
-                kept_module = modules.pop(module.id)
+                kept_module = modules.pop(module.id, None)
+                if kept_module is None:
+                    logger.debug(
+                        "Skipping unexpected module id %s during cleanup", module.id
+                    )
+                    continue
                 decisions.append(
                     CleanUpDecision(can_delete=False, id=kept_module.id, ty=Asset)
                 )
@@ -805,7 +815,13 @@ class NetboxDataSource(DataSourcePlugin):
         try:
             software_result = validate_response(software_result)
             for software in software_result.results:
-                kept_software = software_set.pop(software.id)
+                kept_software = software_set.pop(software.id, None)
+                if kept_software is None:
+                    logger.debug(
+                        "Skipping unexpected software id %s during cleanup",
+                        software.id,
+                    )
+                    continue
                 decisions.append(
                     CleanUpDecision(can_delete=False, id=kept_software.id, ty=Asset)
                 )
@@ -866,7 +882,13 @@ class NetboxDataSource(DataSourcePlugin):
             )
             response = validate_response(response)
             for relation in response.results:
-                kept_relation = existing_relations.pop(relation.id)
+                kept_relation = existing_relations.pop(relation.id, None)
+                if kept_relation is None:
+                    logger.debug(
+                        "Skipping unexpected relationship id %s during cleanup",
+                        relation.id,
+                    )
+                    continue
                 kept_relation.can_delete = False
                 result.append(kept_relation)
 
