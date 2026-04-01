@@ -1,9 +1,11 @@
 import logging as lg
 import multiprocessing
 import os
+from contextlib import contextmanager
+from contextvars import ContextVar, Token
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Optional
+from typing import Iterator, Optional
 
 import colorlog
 from pydantic import BaseModel, Field
@@ -17,6 +19,9 @@ INFO = lg.INFO  # type: ignore
 DEBUG = lg.DEBUG  # type: ignore
 NOTSET = lg.NOTSET  # type: ignore
 
+_MATCH_UUID_CONTEXT: ContextVar[str] = ContextVar("match_uuid", default="-")
+_LOG_RECORD_FACTORY_ENRICHED_ATTR = "_dina_enriched_with_match_uuid"
+
 
 class LoggingConfig(BaseModel):
     level: str = Field("INFO", description="Log level for file logging.")
@@ -25,6 +30,80 @@ class LoggingConfig(BaseModel):
         10_000_000, description="Maximum size of a log file before rotation."
     )
     backup_count: int = Field(5, description="Number of rotated log files to keep.")
+
+
+class _ConditionalMatchUuidFormatter(lg.Formatter):
+    """
+    Formatter that appends match UUID only for non-main-process records.
+    """
+
+    def format(self, record: lg.LogRecord) -> str:
+        match_uuid = getattr(record, "match_uuid", "-")
+        process_name = getattr(record, "processName", "")
+        include_match_uuid = (
+            process_name != "MainProcess" and bool(match_uuid) and match_uuid != "-"
+        )
+        record.match_uuid_segment = (
+            f"[match_uuid={match_uuid}] - " if include_match_uuid else ""
+        )
+        return super().format(record)
+
+
+class _ConditionalMatchUuidColoredFormatter(colorlog.ColoredFormatter):
+    """
+    Colored formatter variant that appends match UUID only for worker records.
+    """
+
+    def format(self, record: lg.LogRecord) -> str:
+        match_uuid = getattr(record, "match_uuid", "-")
+        process_name = getattr(record, "processName", "")
+        include_match_uuid = (
+            process_name != "MainProcess" and bool(match_uuid) and match_uuid != "-"
+        )
+        record.match_uuid_segment = (
+            f"[match_uuid={match_uuid}] - " if include_match_uuid else ""
+        )
+        return super().format(record)
+
+
+@contextmanager
+def match_uuid_context(match_uuid: str) -> Iterator[None]:
+    """
+    Bind a match UUID to all log records emitted in the current context.
+
+    Args:
+        match_uuid: Match trace UUID to inject into log records.
+    """
+    token: Token[str] = _MATCH_UUID_CONTEXT.set(match_uuid)
+    try:
+        yield
+    finally:
+        _MATCH_UUID_CONTEXT.reset(token)
+
+
+def clear_match_uuid_context() -> None:
+    """
+    Reset the match UUID logging context to the default placeholder.
+    """
+    _MATCH_UUID_CONTEXT.set("-")
+
+
+def _install_match_uuid_log_record_factory() -> None:
+    """
+    Ensure every log record carries a ``match_uuid`` field for formatting.
+    """
+    current_factory = lg.getLogRecordFactory()
+    if getattr(current_factory, _LOG_RECORD_FACTORY_ENRICHED_ATTR, False):
+        return
+
+    def record_factory(*args, **kwargs):
+        record = current_factory(*args, **kwargs)
+        if not hasattr(record, "match_uuid"):
+            record.match_uuid = _MATCH_UUID_CONTEXT.get()
+        return record
+
+    setattr(record_factory, _LOG_RECORD_FACTORY_ENRICHED_ATTR, True)
+    lg.setLogRecordFactory(record_factory)
 
 
 def configure_logging(
@@ -58,6 +137,7 @@ def configure_logging(
     # Resolve console level from environment (default INFO)
     console_level_name = os.getenv("LOG_LEVEL", "INFO").upper()
     console_level = getattr(lg, console_level_name, lg.INFO)
+    _install_match_uuid_log_record_factory()
 
     # Configure root logger
     lg.root.handlers.clear()
@@ -67,8 +147,8 @@ def configure_logging(
         console_handler = colorlog.StreamHandler()
         console_handler.setLevel(console_level)
         console_handler.setFormatter(
-            colorlog.ColoredFormatter(
-                "%(log_color)s%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            _ConditionalMatchUuidColoredFormatter(
+                "%(log_color)s%(asctime)s - %(name)s - %(levelname)s - %(match_uuid_segment)s%(message)s",
                 log_colors={
                     "DEBUG": "cyan",
                     "INFO": "green",
@@ -101,8 +181,8 @@ def configure_logging(
                 path, maxBytes=config.max_bytes, backupCount=config.backup_count
             )
             file_handler.setLevel(file_level)
-            file_formatter = lg.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            file_formatter = _ConditionalMatchUuidFormatter(
+                "%(asctime)s - %(name)s - %(levelname)s - %(match_uuid_segment)s%(message)s"
             )
             file_handler.setFormatter(file_formatter)
             lg.root.addHandler(file_handler)

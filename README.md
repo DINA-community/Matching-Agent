@@ -318,16 +318,58 @@ uv run csafsync
 
 ### Running Tests
 
-Tests can be executed using uv as well. All test targets are defined in the pyproject.toml, so you can run them with:
+Run all unit and integration tests:
 
 ```shell
 uv run pytest -v -s
 ```
 
-To run a single test file:
+Run a single test file:
 
 ```shell
-uv run pytest -v  -s tests/matcher/test_matching.py
+uv run pytest -v -s tests/matcher/test_matching.py
+```
+
+### API Performance Tests
+
+Run API performance tests with Locust:
+
+```shell
+uv run locust -f tests_api_performance --assetsync-host http://localhost:8992 --csafsync-host http://localhost:8991 --matcher-host http://localhost:8998
+```
+
+### `match_pairs` Benchmark Tests
+
+Run the benchmark script for `match_pairs`:
+
+```shell
+uv run python tests_benchmarks/test_match_pairs_benchmark.py --limits 10 20 30 --rounds 5 --threshold 50 --output-dir ./tests_benchmarks/reports_match_pairs_benchmark
+```
+
+### Matcher Resource and Performance Tests
+
+Scenario A: increasing assets, constant CSAFs
+
+```shell
+uv run python tests_benchmarks/test_measure_matcher_resources.py --pairs 5:30 10:30 15:30 20:30 25:30 30:30 --threshold 20 --output-dir ./tests_benchmarks/reports_measure_matcher_resources/plots_A
+```
+
+Scenario B: increasing CSAFs, constant assets
+
+```shell
+uv run python tests_benchmarks/test_measure_matcher_resources.py --pairs 30:5 30:10 30:15 30:20 30:25 30:30 --threshold 20 --output-dir ./tests_benchmarks/reports_measure_matcher_resources/plots_B
+```
+
+Scenario C: symmetric scaling
+
+```shell
+uv run python tests_benchmarks/test_measure_matcher_resources.py --pairs 5:5 10:10 15:15 20:20 25:25 30:30 --threshold 20 --output-dir ./tests_benchmarks/reports_measure_matcher_resources/plots_C
+```
+
+Scenario D: asymmetric scaling
+
+```shell
+uv run python tests_benchmarks/test_measure_matcher_resources.py --pairs 5:30 10:30 15:30 30:5 30:10 30:15 --threshold 20 --output-dir ./tests_benchmarks/reports_measure_matcher_resources/plots_D
 ```
 
 ## Production Docker Setup

@@ -516,6 +516,22 @@ class CsafProduct(Base, MetaInfo):
             result["id"] = self.id
         return result
 
+    def document_url(self) -> str:
+        """
+        Generate the URL for the CSAF document associated with this product.
+
+        :return: URL string for the CSAF document.
+        """
+        return str(self.origin_uri) + f"{self.origin_info['path']}".lstrip("/")
+
+    def product_id(self) -> str:
+        """
+        Retrieve the product ID associated with this CSAF document.
+
+        :return: Product ID as an integer.
+        """
+        return self.origin_info["product_name_id"]
+
 
 product_relationship = Table(
     "product_relationship",
@@ -620,6 +636,7 @@ class Match(Base):
     :ivar csaf_product_id: Foreign key to the CSAF product.
     :ivar asset_id: Foreign key to the asset.
     :ivar matcher_run_id: Foreign key to the run that created this match (nullable).
+    :ivar trace_uuid: Stable UUID assigned before scoring for traceability.
     :ivar matching_config_hash: Hash of the matching configuration used.
     :ivar csaf_product: Relationship to the CsafProduct.
     :ivar asset: Relationship to the Asset.
@@ -631,6 +648,7 @@ class Match(Base):
         Index("ix_match_csaf_product_id", "csaf_product_id"),
         Index("ix_match_asset_id", "asset_id"),
         Index("ix_match_matcher_run_id", "matcher_run_id"),
+        Index("ix_match_trace_uuid", "trace_uuid"),
         Index("ix_match_csaf_product_asset", "csaf_product_id", "asset_id"),
     )
 
@@ -648,6 +666,7 @@ class Match(Base):
     matcher_run_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("cacheDB.matcher_run.id", ondelete="SET NULL"), nullable=True
     )
+    trace_uuid: Mapped[str] = mapped_column(Text, nullable=False)
     matching_config_hash: Mapped[str] = mapped_column(Text, nullable=False)
 
     csaf_product: Mapped["CsafProduct"] = relationship(back_populates="matches")
@@ -667,6 +686,7 @@ class Match(Base):
             "csaf_product_id": self.csaf_product_id,
             "asset_id": self.asset_id,
             "matcher_run_id": self.matcher_run_id,
+            "trace_uuid": self.trace_uuid,
             "matching_config_hash": self.matching_config_hash,
         }
         if self.id is not None:

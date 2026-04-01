@@ -859,6 +859,8 @@ class NetboxDataSource(DataSourcePlugin):
             - Processes in batches of 100 to avoid overwhelming the API
         """
 
+        logger.debug("Notifying NetBox of %i new matches", len(new_matches))
+
         class BulkBody:
             def __init__(self, items: List[Any]):
                 self.items = items
@@ -886,13 +888,11 @@ class NetboxDataSource(DataSourcePlugin):
 
         def to_csaf_match_request(match: Match) -> CsafMatchRequest:
             request = CsafMatchRequest(
-                csaf_document=match.csaf_product.uri,
+                csaf_document=match.csaf_product.document_url(),
                 device=(match.asset.origin_info or {}).get("device_id", UNSET),
                 software=(match.asset.origin_info or {}).get("software_id", UNSET),
                 module=(match.asset.origin_info or {}).get("module_id", UNSET),
-                product_name_id=(match.csaf_product.origin_info or {}).get(
-                    "product_name_id", UNSET
-                ),
+                product_name_id=match.csaf_product.product_id(),
                 score=match.score,
                 description=match.status,
                 time=datetime.fromtimestamp(match.timestamp or time.time()),

@@ -4,7 +4,7 @@ import argparse
 
 from dina.cachedb.database import CacheDB
 from dina.common.config import Config
-from dina.common.log import configure_logging, get_logger
+from dina.common.log import get_logger
 from dina.synchronizer.base import BaseSynchronizer
 import sys
 
@@ -25,6 +25,7 @@ class CSAFSynchronizer(BaseSynchronizer):
         """
         Initialize the CSAF Manager.
         """
+        print(f"Initializing CSAF Synchronizer with config: {config_path}")
         config = Config.load(config_path)
         cache_db = CacheDB(config.Cachedb)
         super().__init__(
@@ -32,8 +33,6 @@ class CSAFSynchronizer(BaseSynchronizer):
             config.Csafsync,
             root_path="/csafsync",
         )
-        # Configure logging
-        configure_logging(self.config.Logging)
 
 
 async def run_csaf_manager(config_path: Path = Path("./assets/config.toml")):
@@ -57,7 +56,10 @@ async def run_csaf_manager(config_path: Path = Path("./assets/config.toml")):
 def main():
     """Entry point for the CSAF Manager."""
     try:
-        parser = argparse.ArgumentParser(description="Run the CSAF Synchronizer")
+        parser = argparse.ArgumentParser(
+            description="Run the CSAF Synchronizer",
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        )
         parser.add_argument(
             "--config",
             type=Path,
