@@ -571,6 +571,7 @@ class BaseSynchronizer(ABC):
             app=api,
             host=self.config.Api.host,
             port=self.config.Api.port,
+            log_level="warning",
         )
         server = uvicorn.Server(config)
         await server.serve()
