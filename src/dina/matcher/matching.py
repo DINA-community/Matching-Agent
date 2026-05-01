@@ -174,7 +174,7 @@ class Matching:
         return round(weighted_sum / total_weight, 4)
 
 
-    def normalize_text_by_api(self, s1) ->str:
+    def normalize_text_by_api(self, s1) -> str:
         normalized_s = None
         if self.normalizer is not None:
             response = self.normalizer.request(s1)

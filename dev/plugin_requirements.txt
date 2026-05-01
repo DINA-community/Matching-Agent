@@ -1,2 +1,2 @@
-git+https://github.com/DINA-community/DDDC-Netbox-plugin.git
+git+https://github.com/DINA-community/DDDC-Netbox-plugin.git@4f83a5636042c17bb27b8a8767cba267371c8f5b
 git+https://github.com/DINA-community/CSAF-Netbox-Plugin.git
