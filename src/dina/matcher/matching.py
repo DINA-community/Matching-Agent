@@ -4,6 +4,7 @@ import numpy as np
 from rapidfuzz.distance import Levenshtein
 import polars as pl
 from packaging.version import Version, InvalidVersion
+from dina.common.normalizer_client import GoetterdaemmerungAPIClient
 
 
 class Matching:
@@ -31,6 +32,17 @@ class Matching:
 
         levenshtein = matching_config.get("levenshtein", {})
         self.levenshtein_max_distance = levenshtein.get("max_distance", 0)
+
+        self.normalizer = None
+        normalizer = matching_config.get("normalizer", None)
+        if normalizer is not None:
+            activated = normalizer.get("activated", 0)
+            if activated == 1:
+                api_key = normalizer.get("api_key", "1234567890abcdef")
+                url = normalizer.get("url", "http://localhost:5000/api/match_all_with_fallbacks")
+                self.normalizer = GoetterdaemmerungAPIClient(api_key=api_key, url=url)
+
+
 
     # ============================================================
     # PUBLIC METHODS
@@ -161,6 +173,23 @@ class Matching:
 
         return round(weighted_sum / total_weight, 4)
 
+
+    def normalize_text_by_api(self, s1) ->str:
+        normalized_s = None
+        if self.normalizer is not None:
+            response = self.normalizer.request(s1)
+            if isinstance(response, dict) and "matches" in response and isinstance(response["matches"], list) and len(
+                    response["matches"]) > 0:
+                if isinstance(response["matches"], list):
+                    text = response["matches"][0]["normalized"]
+                    if isinstance(text, list):
+                        text = " ".join(text)
+                    normalized_s = text
+        if normalized_s is None:
+            normalized_s = self._normalize_text(s1)
+        return normalized_s
+
+
     # ============================================================
     # FREETEXT COMPARISON
     # ============================================================
@@ -173,7 +202,11 @@ class Matching:
         Returns 1.0 for exact matches.
         """
         # --- Normalize ---
-        s1 = self._normalize_text(s1)
+        s1 = self.normalize_text_by_api(s1)
+
+        # csaf text
+        #s2 = self._normalize_text_by_api(s2)
+
         s2 = self._normalize_text(s2)
 
         # --- Early exits ---

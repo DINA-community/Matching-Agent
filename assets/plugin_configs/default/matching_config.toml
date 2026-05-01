@@ -84,3 +84,8 @@ product_family = 50
 product_name = 80
 keyword = 50
 version = 50
+
+[normalizer]
+activated = 1
+api_key = "1234567890abcdef"
+url = "http://localhost:5002/api/match_all_with_fallbacks"
