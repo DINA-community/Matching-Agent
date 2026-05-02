@@ -1,5 +1,6 @@
 import json
 import re
+import threading
 import numpy as np
 from rapidfuzz.distance import Levenshtein
 import polars as pl
@@ -8,7 +9,12 @@ from dina.common.normalizer_client import GoetterdaemmerungAPIClient
 
 
 class Matching:
-    def __init__(self, matching_config: dict):
+    def __init__(
+        self,
+        matching_config: dict,
+        normalizer_cache=None,
+        normalizer_cache_lock=None,
+    ):
         db = matching_config.get("database", {})
         self.freetext_fields_separator = db.get("freetext_fields_separator", ":")
         self.freetext_fields = db.get("freetext_fields", {})
@@ -35,12 +41,19 @@ class Matching:
 
         self.normalizer = None
         normalizer = matching_config.get("normalizer", None)
+        self.normalizer_cache = normalizer_cache if normalizer_cache is not None else {}
+        self.normalizer_cache_lock = (
+            normalizer_cache_lock
+            if normalizer_cache_lock is not None
+            else threading.RLock()
+        )
         if normalizer is not None:
             activated = normalizer.get("activated", 0)
             if activated == 1:
                 api_key = normalizer.get("api_key", "1234567890abcdef")
+                match_strategies = normalizer.get("match_strategies", [])
                 url = normalizer.get("url", "http://localhost:5000/api/match_all_with_fallbacks")
-                self.normalizer = GoetterdaemmerungAPIClient(api_key=api_key, url=url)
+                self.normalizer = GoetterdaemmerungAPIClient(api_key=api_key, url=url, match_strategies=match_strategies)
 
 
 
@@ -175,6 +188,11 @@ class Matching:
 
 
     def normalize_text_by_api(self, s1) -> str:
+        s1 = re.sub(r'[:\s]+', ' ', s1)
+        s1 = s1.strip()
+
+        if s1 == "":
+            return None
         normalized_s = None
         if self.normalizer is not None:
             response = self.normalizer.request(s1)
@@ -190,37 +208,55 @@ class Matching:
         return normalized_s
 
 
+
+
+
     # ============================================================
     # FREETEXT COMPARISON
     # ============================================================
 
     def _compare_freetext(
-        self, s1: str | None, s2: str | None, ignore_order: bool = True
+        self, s_csaf: str | None, s_asset: str | None, ignore_order: bool = True
     ) -> float | None:
         """
         Compare two freetext strings using token, n-gram, and overlap similarity.
         Returns 1.0 for exact matches.
         """
         # --- Normalize ---
-        s1 = self.normalize_text_by_api(s1)
+        if s_asset is not None and isinstance(s_asset, str) and s_asset.strip() != "":
+            s_asset_key = s_asset.strip()
+            found = True
+            with self.normalizer_cache_lock:
+                if s_asset_key not in self.normalizer_cache:
+                        found = False
 
-        # csaf text
-        #s2 = self._normalize_text_by_api(s2)
+            if not found:
+                s_asset = self.normalize_text_by_api(s_asset_key)
+                if s_asset is None:
+                    s_asset = s_asset_key
+                s_asset = re.sub(r'[\s]+', ':', s_asset.strip())
+                s_asset = self._normalize_text(s_asset)
 
-        s2 = self._normalize_text(s2)
+                with self.normalizer_cache_lock:
+                    self.normalizer_cache[s_asset_key] = s_asset
+            else:
+                with self.normalizer_cache_lock:
+                    s_asset = self.normalizer_cache[s_asset_key]
+
+        s_csaf = self._normalize_text(s_csaf)
 
         # --- Early exits ---
-        if (not s1 and not s2) or (s1 is None and s2 is None):
+        if (not s_csaf and not s_asset) or (s_csaf is None and s_asset is None):
             return None
-        if (not s1 or not s2) or (s1 is None or s2 is None):
+        if (not s_csaf or not s_asset) or (s_csaf is None or s_asset is None):
             return None
 
         # --- Exact match shortcut ---
-        if s1 == s2:
+        if s_csaf == s_asset:
             return 1.0
 
         # --- Tokenize ---
-        tokens1, tokens2 = self._tokenize_freetext(s1, s2, ignore_order)
+        tokens1, tokens2 = self._tokenize_freetext(s_csaf, s_asset, ignore_order)
 
         # --- Token-level similarity ---
         token_similarity = self._token_similarity(tokens1, tokens2)

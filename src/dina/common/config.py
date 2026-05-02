@@ -352,6 +352,10 @@ class NormalizerConfig(BaseModel):
     )
     api_key: str = Field(..., description="API key for the normalizer service.")
     url: str = Field(..., description="Normalizer API endpoint URL.")
+    match_strategies: list[str] = Field(
+        default_factory=list,
+        description="Match strategies sent to the external normalizer service.",
+    )
 
 
 class MatchingConfig(BaseModel):
