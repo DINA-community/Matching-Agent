@@ -95,6 +95,7 @@ Quick start
 
         ./dev/start-local-env.sh                       # start services in background
         ./dev/start-local-env.sh --recreate            # recreate containers
+        ./dev/start-local-env.sh --stop                # stop
         ./dev/start-local-env.sh --down                # stop and remove services
         ./dev/start-local-env.sh --down --volumes      # stop and remove services AND named volumes
         ./dev/start-local-env.sh --recreate --volumes  # full reset: down -v, then up

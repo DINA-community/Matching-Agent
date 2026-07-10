@@ -8,8 +8,7 @@ It includes two concrete implementations:
 2. **CSAF Synchronizer (`csafsync`)**: Fetches and processes CSAF (Common Security Advisory Framework) data.
 
 Furthermore, it includes the matcher implementation that uses the data from the synchronizers to match assets.
-The matches can be retrieved via a REST API, and alternatively, a hook can be set up to be notified of new matches (
-WIP).
+The matches can be retrieved via a REST API, and alternatively, a hook can be set up to be notified of new matches (WIP).
 
 ## Feature Matrix
 
@@ -18,7 +17,7 @@ WIP).
 | Asset Synchronization  | ✅ Done | Basic asset data syncing implemented                                         |
 | CSAF Synchronization   | ✅ Done | CSAF advisory data syncing implemented                                       |
 | Asset-CSAF Matching    | ✅ Done | A simple Matcher that matches everything with maximum score.                 |
-| Sophisticated Matching | 🚧 WIP | A sophisticated matching algorithm that properly assigns match probabilities. |
+| Useable Matching | 🚧 WIP | A reliable matching algorithm that properly assigns match probabilities. |
 | REST API               | 🚧 WIP | Groundwork has been done. Need to specify API                                 |
 | Webhook Notifications  | 🚧 WIP | Notification system being developed                                           |
 | Plugin System          | ✅ Done | Extensible plugin architecture ready                                         |
@@ -63,36 +62,27 @@ You can either build the docs with `make docs` and follow the instructions there
 To set up a development environment, follow the steps below.
 
 - Use either of the following methods to set up the runtime environment:
-  - [Fully local setup](#fully-local-setup)
+  - [Fully local setup](#fully-local-setup-for-netbox-plugin)
   - [Setup with external asset sources](#setup-with-external-asset-sources)
 - And then configure according to the [Configuration](#configuration) documentation
   - [Plugins](#configure-plugins)
   - [API](#configure-apis)
 - For production use refer to the [Production Docker setup](#production-docker-setup)
 
-### Fully Local Setup
+### Fully Local Setup for Netbox-Plugin
 
-You can start, stop, and recreate the full local development stack (PostgreSQL, NetBox, ISDuBA, etc.) using the helper script in the `dev/` directory.
-In order for the script to work, you need to set the correct environment variables in the `.env` file.
-To configure the environment variables, copy the `.env.example` file to `.env` and modify the values as needed.
-If `dev/configuration/plugins.py` is missing, copy it from `dev/configuration/plugins.py.example`.
-The dev script will also copy available `*.env.example` and `plugins.py.example` files automatically on first run.
+Using the helper script `./dev/start-local-env.sh`, a full local development stack with the asset source plugins `isduba` and `netbox` can e set up using the provided sample files.
 
-```bash
-./dev/start-local-env.sh                       # start services in background
-./dev/start-local-env.sh --recreate            # recreate containers
-./dev/start-local-env.sh --stop                # stop 
-./dev/start-local-env.sh --down                # stop and remove services
-./dev/start-local-env.sh --down --volumes      # stop and remove services AND named volumes
-./dev/start-local-env.sh --recreate --volumes  # full reset: down -v, then up (fresh volumes)
-./dev/start-local-env.sh --clean               # remove local images + local env/toml/plugins.py
-```
-
-After startup, the API token is printed. This information is needed for the [configuration of the NetBox plugin](#configure-plugins). You can retrieve the NetBox API token any time from the setup container logs:
+To configure the environment variables, modify the values as needed in the `.env.example` file. After startup, the API token is printed. This information is needed for the [configuration of the NetBox plugin](#configure-plugins). You can retrieve the NetBox API token any time from the setup container logs:
 
 ```bash
 docker compose -f dev/docker-compose.yml logs netbox-setup
 ```
+
+Proceed with:
+
+- [Authenticate with the API](#authenticate-with-the-api)
+- [Running Applications](#running-applications)
 
 ### Setup with External Asset Sources
 
@@ -229,9 +219,11 @@ port = 8991
 Both the Matcher and Synchronizers support two mutually exclusive scheduling modes:
 
 **Interval-based scheduling** (default):
+
 - `sync_interval`: Time in seconds between runs. For example, `86400` runs every 24 hours after the previous run completes.
 
 **Fixed time of day scheduling**:
+
 - `fixed_time_of_day`: Run once per day at a specific time in 24-hour format (e.g., `"02:30"` for 2:30 AM).
 
 **Important**: For the Matcher, you must specify at most one of these options. If you omit both,

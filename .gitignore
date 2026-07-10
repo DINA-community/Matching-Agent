@@ -140,6 +140,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+!dev/configuration/.env*.example
 
 # Spyder project settings
 .spyderproject
@@ -205,10 +206,18 @@ __marimo__/
 src/.DS_Store
 .DS_Store
 
+# Submodules
 
+/dev/isduba
+/dev/netbox
+
+# Custom
 logs/
 local/
 Troubleshoot.md
 .vscode/
 /tests/data*
 dev/configuration/plugins.py
+assetsync.pid
+csafsync.pid
+matcher.pid
