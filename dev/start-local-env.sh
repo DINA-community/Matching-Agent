@@ -66,8 +66,6 @@ need_cmd() {
 
 need_dep() {
 	## INSTALL DEPENDENCIES
-	# Check if DEP has been already executed
-	info "--[DEP] Check if DEP-check has been already executed."
 	KEY=$(grep -E '^DEP=' "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2- || true)
 	if [ -z "$KEY" ]; then
 		warning "Your $ENV_FILE is missing the DEP entry. Compare $ENV_SAMPLE."
