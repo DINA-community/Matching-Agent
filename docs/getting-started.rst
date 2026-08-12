@@ -133,13 +133,13 @@ Quick start
    - NetBox fetcher (asset source):
 
      - Copy: ``assets/plugin_configs/data_source/asset/sample/netbox.toml``
-       to a new file in ``assets/plugin_configs/data_source/asset/`` (e.g. ``netbox_local.toml``)
+       to a new file in ``assets/plugin_configs/data_source/asset/`` (e.g. ``netbox-local.toml``)
      - Set ``url`` (e.g. http://netbox.localhost/) and ``api_token`` (see token from setup logs)
 
    - ISDuBA fetcher (CSAF source):
 
      - Copy: ``assets/plugin_configs/data_source/csaf/sample/isduba.toml``
-       to a new file in ``assets/plugin_configs/data_source/csaf/`` (e.g. ``isduba_local.toml``)
+       to a new file in ``assets/plugin_configs/data_source/csaf/`` (e.g. ``isduba-local.toml``)
      - Set ``url`` (e.g. http://isduba.localhost/), ``username``/``password`` (default user/user), and
        ``keycloak_url`` (e.g. http://keycloak.localhost/)
 
