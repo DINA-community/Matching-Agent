@@ -254,7 +254,7 @@ services:
       - netbox-postgres-data:/var/lib/postgresql/data
 
   traefik:
-    image: traefik:latest
+    image: traefik:v3
     command:
       - --api=true
       - --api.insecure=true
