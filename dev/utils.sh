@@ -63,3 +63,29 @@ open_terminal() {
   echo "No terminal found (set \$TERMINAL, or install xdg-terminal-exec/xdg-terminal and configure a default terminal)." >&2
   exit 1
 }
+
+set_terminal() {
+  # Choose from x-terminal-emulator list. Otherwise xdg-terminal-exec will be used (if installed)
+  mapfile -t terminals < <(update-alternatives --list x-terminal-emulator)
+
+  if ((${#terminals[@]} == 0)); then
+      echo "No terminal emulators found." >&2
+      exit 1
+  fi
+
+  terminals+=("None / Cancel")
+
+  echo "Choose the default terminal emulator:"
+  select terminal in "${terminals[@]}"; do
+      if [[ "$terminal" == "None / Cancel" ]]; then
+          echo "No terminal emulator selected."
+          exit 0
+      elif [[ -n "$terminal" ]]; then
+          echo "Default terminal set to: $terminal" >&2         
+          export TERMINAL="$terminal"
+          break
+      else
+          echo "Invalid selection. Please try again."
+      fi
+  done
+}

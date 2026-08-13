@@ -39,7 +39,8 @@ exe_local() {
 		info "--[API] Unsupported OS: $OS"
 		exit 1
 	fi
-
+	# Select terminal
+	set_terminal
 	open_terminal "csafsync" "uv run csafsync"
 	open_terminal "assetsync" "uv run assetsync"
 	open_terminal "matcher" "uv run csaf_matcher"
