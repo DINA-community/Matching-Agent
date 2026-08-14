@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-# shellcheck source=../utils.sh
-source "$SCRIPT_DIR/../utils.sh"
+# shellcheck source=dev/scripts-install/utils.sh
+source "$SCRIPT_DIR/utils.sh"
 
 main() {
 	syt=$1
