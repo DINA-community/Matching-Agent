@@ -267,7 +267,7 @@ The synchronizer components (Asset/CSAF) and the Matcher expose a small FastAPI 
 
 Quick start:
 
-1) Make sure the component is running (e.g., Matcher default at <http://localhost:8998/>; configurable in `assets/matcher.toml`) after executing the setup and configuration.
+1) Make sure the component is running (e.g., Matcher default at <http://localhost:8998/>; configurable in `assets/config.toml`) after executing the setup and configuration.
 2) Create or update a user in the CacheDB using the CLI:
 
 ```bash
