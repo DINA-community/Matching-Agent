@@ -274,6 +274,8 @@ Quick start:
 uv run csaf_matcher_cli user create -u admin
 ```
 
+Set the password to `admin`.
+
 **Note**: For interactive use, do not pass passwords via `-p/--password`. The CLI will securely prompt
 for the password. Reserve `-p` only for non-interactive environments (e.g., CI) and source secrets
 from a secure provider.
