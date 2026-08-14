@@ -79,6 +79,8 @@ To configure the environment variables, modify the values as needed in the `.env
 docker compose -f dev/docker-compose.yml logs netbox-setup
 ```
 
+Set the retrieved value in `assets/plugin_configs/data_source/asset/netbox-local.toml` for the parameter `api_token`.
+
 Proceed with:
 
 - [Authenticate with the API](#authenticate-with-the-api)
@@ -100,18 +102,18 @@ Before starting the services, make sure to configure the plugins and the APIs ac
 
 ### Configure Plugins
 
-To configure the Netbox fetcher plugin, copy the file [`assets/plugin_configs/data_source/asset/sample/netbox.toml`](assets/plugin_configs/data_source/asset/sample/netbox.toml) to `assets/plugin_configs/data_source/asset/netbox_local.toml` and adjust the values to your environment.
+To configure the Netbox fetcher plugin, copy the file [`assets/plugin_configs/data_source/asset/sample/netbox.toml`](assets/plugin_configs/data_source/asset/sample/netbox.toml) to `assets/plugin_configs/data_source/asset/netbox-local.toml` and adjust the values to your environment.
 The file can be named any way you like, but it must be a toml file.
 
 ```shell
-cp assets/plugin_configs/data_source/asset/sample/netbox.toml assets/plugin_configs/data_source/asset/netbox_local.toml
+cp assets/plugin_configs/data_source/asset/sample/netbox.toml assets/plugin_configs/data_source/asset/netbox-local.toml
 ```
 
-To configure the ISDuBA fetcher plugin, copy the file [`assets/plugin_configs/data_source/csaf/sample/isduba.toml`](assets/plugin_configs/data_source/csaf/sample/isduba.toml) to `assets/plugin_configs/data_source/csaf/isduba_local.toml` and adjust the values to your environment.
+To configure the ISDuBA fetcher plugin, copy the file [`assets/plugin_configs/data_source/csaf/sample/isduba.toml`](assets/plugin_configs/data_source/csaf/sample/isduba.toml) to `assets/plugin_configs/data_source/csaf/isduba-local.toml` and adjust the values to your environment.
 The file can be named any way you like, but it must be a toml file.
 
 ```shell
-cp assets/plugin_configs/data_source/csaf/sample/isduba.toml assets/plugin_configs/data_source/csaf/isduba_local.toml
+cp assets/plugin_configs/data_source/csaf/sample/isduba.toml assets/plugin_configs/data_source/csaf/isduba-local.toml
 ```
 
 Before starting the synchronizers, make sure to create some assets and CSAF documents in the NetBox and ISDuBA instances.
