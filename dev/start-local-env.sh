@@ -512,24 +512,65 @@ execute() {
 
 }
 
+
+stop_process() {
+	# Helper function of stop_apis
+    local pid="$1"
+    local label="$2"
+    
+    # Don't kill invalid or PID 1
+    if [[ -z "$pid" ]] || [[ "$pid" == "1" ]]; then
+        info "Skipping PID $pid (invalid or PID 1)"
+        return
+    fi
+    
+    # Check if process exists
+    if ! kill -0 "$pid" 2>/dev/null; then
+        info "Process $pid is not running"
+        # Try to find child processes by name
+        local name="${label%%.*}"
+        if pgrep -f "$name" > /dev/null 2>&1; then
+            local child_pids
+            child_pids=$(pgrep -f "$name")
+            if [[ -n "$child_pids" ]]; then
+                echo "$child_pids" | xargs kill -SIGTERM 2>/dev/null
+                info "Killed $name with SIGTERM (by name)"
+            fi
+        fi
+        return
+    fi
+    
+    # Graceful shutdown with timeout
+    kill -SIGTERM "$pid"
+    info "Killed $label with SIGTERM ($pid)"
+    
+    local timeout=5
+    while kill -0 "$pid" 2>/dev/null && [[ $timeout -gt 0 ]]; do
+        sleep 1
+        ((timeout--))
+    done
+    
+    # Force kill if still running
+    if kill -0 "$pid" 2>/dev/null; then
+        kill -SIGKILL "$pid" 2>/dev/null
+        info "Force killed $label with SIGKILL ($pid)"
+    fi
+}
+
 stop_apis() {
-	#touch matcher.pid
-	#touch csafsync.pid
-	#touch assetsync.pid
-	info "--[EXE] Stopping APIs"
-	for pidfile in "${API_PID[@]}"; do
-		if [[ -f "$pidfile" ]]; then
-			pid="$(<"$pidfile")"
-			if ! kill -0 "$pid" 2>/dev/null; then
-				info "Process $pid is not running"
-			else
-				kill -SIGTERM "$pid"
-				info "Killing ${pidfile%%.*} $pid"
-			fi
-		fi
-		rm -f -- "$pidfile"
-	done
-	info "--[EXE] Stopping APIs finished"
+	# Since PID of the xdg-terminal-exec process, not necessarily the PID of the terminal window or bash process it launches. 
+	# So using that PID later to monitor/kill the terminal may not work reliably.
+	# As a result, the stop function checks for the title name also if PID is outdated.
+    info "--[EXE] Stopping APIs"
+    for pidfile in "${API_PID[@]}"; do
+        if [[ -f "$pidfile" ]]; then
+            pid="$(<"$pidfile")"
+            local name="${pidfile%%.*}"
+            stop_process "$pid" "$name"
+            rm -f -- "$pidfile"
+        fi
+    done
+    info "--[EXE] Stopping APIs finished"
 }
 
 post_processing() {

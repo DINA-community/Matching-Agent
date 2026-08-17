@@ -8,7 +8,6 @@ main() {
 	syt=$1
 	log=$2
 	info() { echo "[INFO] $*" >&2; }
-
 	info "# Starting APIs"
 	if [[ $syt == "remote" ]]; then
 		exe_remote
@@ -39,8 +38,10 @@ exe_local() {
 		info "--[API] Unsupported OS: $OS"
 		exit 1
 	fi
-	# Select terminal
-	set_terminal
+	# Select terminal if not set
+	if ! command -v "$TERMINAL" >/dev/null 2>&1; then
+		set_terminal
+	fi
 	open_terminal "csafsync" "uv run csafsync"
 	open_terminal "assetsync" "uv run assetsync"
 	open_terminal "matcher" "uv run csaf_matcher"

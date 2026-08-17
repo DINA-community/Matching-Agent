@@ -47,12 +47,18 @@ open_terminal() {
 
   # 2) generic way to launch the standard terminal
   if command -v xdg-terminal-exec >/dev/null 2>&1; then
-    xdg-terminal-exec --title="$title" bash -c "$full_cmd" &
+    #xdg-terminal-exec --title="$title" bash -c "$full_cmd" &
+    xdg-terminal-exec bash -c '
+        printf "\033]0;%s\007" "$1"
+        eval "$2"
+        exec bash
+    ' bash "$title" "$cmd" &
+
     echo "$!" >"$title.pid"
     return
   fi
 
-  # 3) the slighly older variant to launch the standard terminal, only
+  # 3) the slightly older variant to launch the standard terminal, only
   #    accepts a single command string (run via the shell), not argv.
   if command -v xdg-terminal >/dev/null 2>&1; then
     xdg-terminal "$full_cmd" &
@@ -66,10 +72,16 @@ open_terminal() {
 
 set_terminal() {
   # Choose from x-terminal-emulator list. Otherwise xdg-terminal-exec will be used (if installed)
-  mapfile -t terminals < <(update-alternatives --list x-terminal-emulator)
+  
+  if command -v update-alternatives >/dev/null 2>&1; then
+    mapfile -t terminals < <(update-alternatives --list x-terminal-emulator)
+  else
+    echo "No terminal found (set \$TERMINAL, or install xdg-terminal-exec/xdg-terminal and configure a default terminal)." >&2
+    exit 1
+  fi
 
   if ((${#terminals[@]} == 0)); then
-      echo "No terminal emulators found." >&2
+      echo "No terminal emulators found. set \$TERMINAL, or install xdg-terminal-exec/xdg-terminal and configure a default terminal." >&2
       exit 1
   fi
 
@@ -79,10 +91,12 @@ set_terminal() {
   select terminal in "${terminals[@]}"; do
       if [[ "$terminal" == "None / Cancel" ]]; then
           echo "No terminal emulator selected."
-          exit 0
+          break
       elif [[ -n "$terminal" ]]; then
-          echo "Default terminal set to: $terminal" >&2         
-          export TERMINAL="$terminal"
+          echo "Default terminal set to: $terminal" >&2
+          terminal_name="$(basename -- "$terminal")"
+          terminal_name="${terminal_name%.*}"
+          export TERMINAL="$terminal_name"
           break
       else
           echo "Invalid selection. Please try again."
