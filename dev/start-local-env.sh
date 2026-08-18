@@ -72,7 +72,7 @@ need_dep() {
 		exit 1
 	fi
 	if [ "$KEY" == "false" ]; then
-		if check_response "Do you want to check for missing dependencies and install them? [Y/n] " Y; then
+		if check_response "Do you want to check for missing dependencies and install them? [Y/n] " "Y"; then
 			wdir=$(pwd)
 			idir="$wdir/dev/scripts-install/"
 			cd "$idir" || {

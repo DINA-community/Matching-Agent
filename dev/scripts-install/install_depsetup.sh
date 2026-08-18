@@ -17,6 +17,12 @@ sudo install -m 0755 -d /etc/apt/keyrings
 dep "Installing OpenJDK21"
 sudo apt-get -qq install openjdk-21-jre openjdk-21-jdk -y
 
+# Install xdg-terminal-exec (optional)
+if check_response "Do you want to install xdg-terminal-exec? [y/N] " "N"; then
+	dep "Install xdg-terminal-exec"
+	sudo apt-get -qq install xdg-terminal-exec -y
+fi
+
 # Check for uv
 dep "Checking for uv.."
 if ! command -v uv >/dev/null 2>&1; then
