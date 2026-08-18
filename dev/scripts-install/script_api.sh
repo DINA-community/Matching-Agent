@@ -1,15 +1,15 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 # shellcheck source=dev/scripts-install/utils.sh
-source "$SCRIPT_DIR/utils.sh"
+source "${SCRIPT_DIR}/utils.sh"
 
 main() {
-	syt=$1
-	log=$2
+	syt="$1"
+	log="$2"
 	info() { echo "[INFO] $*" >&2; }
 	info "# Starting APIs"
-	if [[ $syt == "remote" ]]; then
+	if [[ "$syt" == "remote" ]]; then
 		exe_remote
 	else
 		exe_local

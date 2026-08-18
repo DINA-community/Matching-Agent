@@ -13,9 +13,7 @@
 # Prefers the user's configured terminal ($TERMINAL), then the newer
 # xdg-terminal-exec, then the older xdg-terminal.
 #
-# This only works with commands that do not use double quotes
-#
-#   open_terminal "<title>" "<command>"
+
 open_terminal() {
   local title="$1"
   local cmd="$2"

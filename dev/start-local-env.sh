@@ -28,7 +28,7 @@ NETBOX_FILE="assets/plugin_configs/data_source/asset/netbox-local.toml"
 ISDUBA_FILE="assets/plugin_configs/data_source/csaf/isduba-local.toml"
 PLUGINS_FILE="dev/configuration/plugins.py"
 PLUGINS_SAMPLE="dev/configuration/plugins.py.example"
-API_START=dev/scripts-install/script_api.sh
+API_START="dev/scripts-install/script_api.sh"
 LOCAL_SETTING="FULLY_LOCAL"
 JWT="JWT_KEY"
 
@@ -79,7 +79,7 @@ need_dep() {
 				warning "$idir missing?! You just executed me there!"
 				exit 1
 			}
-			#bash ./install_depsetup.sh
+			bash ./install_depsetup.sh
 			cd ../../
 			sed -i "s|^\(DEP=\).*|\1true|" "$ENV_FILE"
 			info "--DEP set true in $ENV_FILE"
@@ -121,7 +121,7 @@ need_env() {
 
 set_local_toml() {
 	info "--[ENV] Set local toml files"
-	declare -A REPLACEMENTS=(
+	local -A REPLACEMENTS=(
 		["url = "]="ISDUBA_CLIENT_HOSTNAME_URL"
 		["keycloak_url = "]="ISDUBA_CLIENT_KEYCLOAK_URL"
 		["keycloak_realm = "]="ISDUBA_CLIENT_KEYCLOAK_REALM"
@@ -168,7 +168,10 @@ check_response() {
 	local default_reply="${2:-None}" # Assign default reply if provided
 	local reply
 	while true; do
-		read -rp "[INPUT] $text" reply </dev/tty
+        read -rp "[INPUT] $text" reply </dev/tty || {
+            error "Failed to read response from TTY"
+            exit 1
+		}
 		if [ -z "$reply" ]; then
 			reply="$default_reply"
 		fi
@@ -285,8 +288,7 @@ prune_project_images() {
 		if echo "$command_output" | grep -iq "variable is not set"; then
 			info "--[EXE] There is no project image"
 		else
-
-			$COMPOSE_CMD -f "$compose_file" down --rmi local --remove-orphans #|| true
+			$COMPOSE_CMD -f "$compose_file" down --rmi local --remove-orphans || true
 		fi
 	fi
 }
@@ -529,11 +531,11 @@ stop_process() {
         info "Process $pid is not running"
         # Try to find child processes by name
         local name="${label%%.*}"
-        if pgrep -f "$name" > /dev/null 2>&1; then
+        if pgrep -f "$name" >/dev/null 2>&1; then
             local child_pids
             child_pids=$(pgrep -f "$name")
             if [[ -n "$child_pids" ]]; then
-                echo "$child_pids" | xargs kill -SIGTERM 2>/dev/null
+                echo "$child_pids" | xargs kill -SIGTERM 2>/dev/null || true
                 info "Killed $name with SIGTERM (by name)"
             fi
         fi
@@ -552,7 +554,7 @@ stop_process() {
     
     # Force kill if still running
     if kill -0 "$pid" 2>/dev/null; then
-        kill -SIGKILL "$pid" 2>/dev/null
+        kill -SIGKILL "$pid" 2>/dev/null || true
         info "Force killed $label with SIGKILL ($pid)"
     fi
 }
@@ -579,12 +581,12 @@ post_processing() {
 	#   "API Token created: <TOKEN>" or "API Token already exists: <TOKEN>"
 	# We'll wait up to 120 seconds for this to appear.
 	info "# Start post_processing"
-	SERVICE="netbox-setup"
-	TIMEOUT=${TOKEN_TIMEOUT:-120}
+	local SERVICE="netbox-setup"
+	local TIMEOUT=${TOKEN_TIMEOUT:-120}
 	info "--[PoP] Waiting up to ${TIMEOUT}s for NetBox API token from '$SERVICE'..."
 
-	end_time=$(($(date +%s) + TIMEOUT))
-	token=""
+	local end_time=$(($(date +%s) + TIMEOUT))
+	local token=""
 	while [ "$(date +%s)" -lt $end_time ]; do
 		# Fetch logs; ignore errors if service not ready yet
 		LOGS=$($COMPOSE_CMD -f "$COMPOSE_FILE" logs "$SERVICE" 2>/dev/null || true)
@@ -605,14 +607,14 @@ cleanup() {
 		info "--[CLE] NetBox API token detected:"
 		echo "$token"
 		## set it in env
-		LOCAL_SETTING=$(grep -E "^$LOCAL_SETTING=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2-)
-		if [ "$LOCAL_SETTING" == "true" ]; then
+		local LOCAL_SETTING_VAL=$(grep -E "^$LOCAL_SETTING=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2-)
+		if [ "$LOCAL_SETTING_VAL" == "true" ]; then
 			# Sets token always new in case it changes.
 			sed -i "s|^\(api_token = \).*|\1\"$token\"|" "$NETBOX_FILE"
 		fi
 		# set JWT secret key
-		KEY=$(grep -E "^$JWT=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2-)
-		if [ "$KEY" == "false" ]; then
+		local JWT_KEY=$(grep -E "^$JWT=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2-)
+		if [ "$JWT_KEY" == "false" ]; then
 			openssl rand -hex 32 | xargs -I{} printf "export JWT_SECRET_KEY={}\n" | tee -a .env dev/.env >/dev/null
 			sed -i "s|^\($JWT=\).*|\1true|" "$ENV_FILE"
 			info "--[CLE] JWT was created successfully"
@@ -621,11 +623,11 @@ cleanup() {
 		local excess
 		if check_response "Do you want to start the apis right away? [y/N]" "N"; then
 			if check_response "Do you execute the script on a remote PC (using ssh)? [Y/n]" "Y"; then
-				excess="remote"
+				local excess="remote"
 			else
-				excess="local"
+				local excess="local"
 			fi
-			bash $API_START $excess
+			bash "$API_START" "$excess"
 		fi
 
 	else
