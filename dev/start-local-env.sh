@@ -519,7 +519,11 @@ stop_process() {
 	# Helper function of stop_apis
     local pid="$1"
     local label="$2"
-    
+	local base="${label%%.*}"
+    local name="uv run $base"
+	if [[ ${label%%.*} == "matcher" ]]; then
+		name="uv run csaf_matcher"
+	fi
     # Don't kill invalid or PID 1
     if [[ -z "$pid" ]] || [[ "$pid" == "1" ]]; then
         info "Skipping PID $pid (invalid or PID 1)"
@@ -530,7 +534,6 @@ stop_process() {
     if ! kill -0 "$pid" 2>/dev/null; then
         info "Process $pid is not running"
         # Try to find child processes by name
-        local name="${label%%.*}"
         if pgrep -f "$name" >/dev/null 2>&1; then
             local child_pids
             child_pids=$(pgrep -f "$name")
