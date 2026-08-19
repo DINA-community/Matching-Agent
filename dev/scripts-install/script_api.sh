@@ -9,15 +9,15 @@ main() {
 	log="$2"
 	info() { echo "[INFO] $*" >&2; }
 	info "# Starting APIs"
-	if [[ "$syt" == "remote" ]]; then
-		exe_remote
+	if [[ "$syt" == "terminal" ]]; then
+		exe_single
 	else
-		exe_local
+		exe_separate
 	fi
 	info "--[API] finished."
 }
 
-exe_remote() {
+exe_single() {
 	# Start the APIs. Stdout in one window
 	info "The APIs will be called in this interface"
 	uv run assetsync &
@@ -31,8 +31,8 @@ exe_remote() {
 	sleep 5
 }
 
-exe_local() {
-
+exe_separate() {
+	# Start the APIs in separate windows
 	OS="$(uname -s)"
 	if [[ "$OS" != "Linux" ]]; then
 		info "--[API] Unsupported OS: $OS"

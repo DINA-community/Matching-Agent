@@ -72,17 +72,18 @@ need_dep() {
 		exit 1
 	fi
 	if [ "$KEY" == "false" ]; then
+		local SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+		source "${SCRIPT_DIR}/scripts-install/install_depsetup.sh"
+		advise
 		if check_response "Do you want to check for missing dependencies and install them? [Y/n] " "Y"; then
-			wdir=$(pwd)
-			idir="$wdir/dev/scripts-install/"
-			cd "$idir" || {
-				warning "$idir missing?! You just executed me there!"
-				exit 1
-			}
-			bash ./install_depsetup.sh
-			cd ../../
+			install_dep
 			sed -i "s|^\(DEP=\).*|\1true|" "$ENV_FILE"
 			info "--DEP set true in $ENV_FILE"
+		else
+			if ! check_response "Asking again? [y/N] " "N"; then
+				sed -i "s|^\(DEP=\).*|\1true|" "$ENV_FILE"
+				info "--DEP set true in $ENV_FILE"
+			fi
 		fi
 	else
 		info "--[DEP] DEP is set as executed in $ENV_FILE. Skip check."
@@ -423,6 +424,7 @@ main() {
 
 checks() {
 	info "#Checks started"
+	need_dep
 	info "## Check Argument"
 	info "--Action: $ACTION and Volume: $WITH_VOLUMES"
 	if [[ "$ACTION" == "up" && "$WITH_VOLUMES" == true ]]; then
@@ -440,7 +442,6 @@ checks() {
 	else # Skipping unnecessary checks for cleaning
 		## INSTALL DEPENDENCIES
 		need_env
-		need_dep
 		need_cmd docker
 		COMPOSE_CMD=$(ensure_compose)
 		need_cmd git
@@ -621,10 +622,10 @@ cleanup() {
 		# Start API
 		local excess
 		if check_response "Do you want to start the apis right away? [y/N]" "N"; then
-			if check_response "Do you execute the script on a remote PC (using ssh)? [Y/n]" "Y"; then
-				excess="remote"
+			if check_response "Do you execute the APIs in separate windows each (Y) or all in this terminal (N) [y/N]" "N"; then
+				excess="separate"
 			else
-				excess="local"
+				excess="terminal"
 			fi
 			bash "$API_START" "$excess"
 		fi

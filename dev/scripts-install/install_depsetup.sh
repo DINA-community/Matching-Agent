@@ -1,5 +1,6 @@
 #!/bin/bash
 
+install_dep() {
 #who is the user behind sudo (add to docker group)?
 suser=$(sudo sh -c 'echo $SUDO_USER')
 
@@ -14,7 +15,7 @@ dep "Installing certificate-keyring..."
 sudo install -m 0755 -d /etc/apt/keyrings
 
 # Install JDK21
-dep "Installing OpenJDK21"
+dep "Installing OpenJDK21..."
 sudo apt-get -qq install openjdk-21-jre openjdk-21-jdk -y
 
 # Install xdg-terminal-exec (optional)
@@ -24,7 +25,7 @@ if check_response "Do you want to install xdg-terminal-exec? [y/N] " "N"; then
 fi
 
 # Check for uv
-dep "Checking for uv.."
+dep "Checking for uv..."
 if ! command -v uv >/dev/null 2>&1; then
     dep "Installing uv via pipx..."
     pipx install uv
@@ -45,3 +46,11 @@ else
 fi
 
 dep "All Dependencies installed"
+}
+
+advise() {
+	cat >&2 <<USAGE
+	This script will install necessary dependencies which are listed in the README.
+	However, it is recommended to do this manually.
+USAGE
+}
