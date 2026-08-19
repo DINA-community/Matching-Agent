@@ -133,7 +133,6 @@ set_local_toml() {
 	cp -p "$ISDUBA_SAMPLE" "$ISDUBA_FILE"
 	value=$(grep -E "^${NETBOX_URL}=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2-)
 	sed -i "s|^\(api_url = \).*|\1\"$value\"|" "$NETBOX_FILE"
-
 	## Adjust the isduba setting with environment file
 	for pattern in "${!REPLACEMENTS[@]}"; do
 		value=$(grep -E "^${REPLACEMENTS[$pattern]}=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2-)
@@ -586,7 +585,7 @@ post_processing() {
 	info "--[PoP] Waiting up to ${TIMEOUT}s for NetBox API token from '$SERVICE'..."
 
 	local end_time=$(($(date +%s) + TIMEOUT))
-	local token=""
+	token=""
 	while [ "$(date +%s)" -lt $end_time ]; do
 		# Fetch logs; ignore errors if service not ready yet
 		LOGS=$($COMPOSE_CMD -f "$COMPOSE_FILE" logs "$SERVICE" 2>/dev/null || true)
@@ -623,9 +622,9 @@ cleanup() {
 		local excess
 		if check_response "Do you want to start the apis right away? [y/N]" "N"; then
 			if check_response "Do you execute the script on a remote PC (using ssh)? [Y/n]" "Y"; then
-				local excess="remote"
+				excess="remote"
 			else
-				local excess="local"
+				excess="local"
 			fi
 			bash "$API_START" "$excess"
 		fi
