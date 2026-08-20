@@ -159,6 +159,8 @@ services:
       - redis-cache
     env_file: netbox/env/netbox.env
     user: "unit:root"
+    entrypoint: ["/usr/bin/tini", "--", "/opt/netbox/docker-entrypoint-plugins.sh", "/opt/netbox/docker-entrypoint.sh"]
+    command: ["/opt/netbox/launch-netbox.sh"]
     healthcheck:
       test: curl -f http://localhost:8800/login/ || exit 1
       start_period: 180s
@@ -173,6 +175,8 @@ services:
       - netbox-media-files:/opt/netbox/netbox/media:rw
       - netbox-reports-files:/opt/netbox/netbox/reports:rw
       - netbox-scripts-files:/opt/netbox/netbox/scripts:rw
+      - ./plugins/d3c:/opt/netbox-plugins/d3c:z
+      - ./plugins/csaf:/opt/netbox-plugins/csaf:z
     extra_hosts:
       - "host.local:host-gateway"
     labels:
@@ -228,7 +232,7 @@ services:
     depends_on:
       netbox:
         condition: service_healthy
-    entrypoint: ["bash", "/opt/netbox/init-scripts/netbox-token.sh"]
+    entrypoint: ["/opt/netbox/docker-entrypoint-plugins.sh", "bash", "/opt/netbox/init-scripts/netbox-token.sh"]
     environment:
       DJANGO_SUPERUSER_PASSWORD: ${NETBOX_SUPERUSER_PASSWORD}
       NETBOX_SUPERUSER_NAME: ${NETBOX_SUPERUSER_NAME}

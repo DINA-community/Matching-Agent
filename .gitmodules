@@ -4,3 +4,9 @@
 [submodule "dev/netbox"]
 	path = dev/netbox
 	url = https://github.com/netbox-community/netbox-docker.git
+[submodule "dev/plugins/csaf"]
+	path = dev/plugins/csaf
+	url = https://github.com/DINA-community/CSAF-Netbox-Plugin.git
+[submodule "dev/plugins/d3c"]
+	path = dev/plugins/d3c
+	url = https://github.com/DINA-community/DDDC-Netbox-plugin.git
