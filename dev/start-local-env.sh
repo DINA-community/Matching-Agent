@@ -491,6 +491,7 @@ execute() {
 		;;
 	recreate)
 		ensure_local_configs
+		stop_apis
 		sleep 2
 		if [[ "$WITH_VOLUMES" == true ]]; then
 			info "-- [EXE] Recreating dev environment with volume reset (down -v; up)..."
