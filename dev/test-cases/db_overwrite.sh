@@ -1,6 +1,63 @@
 #!/bin/bash
 
-# Check if an argument was provided
+cat >&2 <<USAGE
+This script will install a small netbox db for testing the matching agent and the CSAF Handler.
+Also relevant csaf documents will be downloaded.
+###############################################
+#### The current database will be deleted! ####
+###############################################
+USAGE
+
+CSAF_FILES=(
+    "https://cert-portal.siemens.com/productcert/csaf/ssa-674753.json"
+    "https://raw.githubusercontent.com/cisagov/CSAF/develop/csaf_files/OT/white/2024/icsa-24-338-04.json"
+    "https://raw.githubusercontent.com/cisagov/CSAF/develop/csaf_files/OT/white/2024/icsa-24-352-04.json"
+    "https://raw.githubusercontent.com/cisagov/CSAF/develop/csaf_files/OT/white/2025/icsa-25-007-01.json"
+    "https://raw.githubusercontent.com/cisagov/CSAF/develop/csaf_files/OT/white/2025/icsa-25-345-03.json"
+	"https://raw.githubusercontent.com/cisagov/CSAF/develop/csaf_files/OT/white/2026/icsa-26-008-01.json"
+	"https://raw.githubusercontent.com/cisagov/CSAF/develop/csaf_files/OT/white/2025/icsma-25-364-01.json"
+    )
+
+
+get_csaf() {
+	OUTPUT_DIR="./csaf_files"
+	mkdir -p "$OUTPUT_DIR"
+
+	# Download each file
+	errors=0
+	for url in "${CSAF_FILES[@]}"; do
+		filename=$(basename "$url")
+		filepath="$OUTPUT_DIR/$filename"
+
+		if [ -f "$filepath" ]; then
+			continue
+		fi
+		echo "Downloading: $filename"
+		sleep 1
+		if wget -q "$url"; then
+			mv $filename $filepath
+			echo "  ✓ Success"
+		else
+			if [ -f $filename ] && ["$(wc -c < "$file")" -eq 0 ]; then
+  		  		rm $filename
+			fi
+			echo "  ✗ Failed to download"
+			((errors++))
+		fi
+	done
+	echo ""
+	echo "Download complete!"
+	echo "Files saved to: $OUTPUT_DIR/"
+
+	if [ $errors -gt 0 ]; then
+		echo "Warning: $errors file(s) failed to download."
+		exit 1
+	else
+		echo "All files downloaded successfully."
+	fi
+}
+
+
 if [[ -z "$1" ]]; then
 	echo "Please provide ad database. Usage: $0 <new db>"
 	exit 1
@@ -19,16 +76,8 @@ else
 fi
 
 echo "You provided file: $1"
-read -r -p "The current database will be deleted. Do you want to proceed? [y/n]: " confirm
 
-case "${confirm,,}" in
-[yY] | [yY][eE][sS]) echo "Let's replace some data..." ;;
-"" | [nN] | [nN][oO])
-	echo "Abort"
-	exit 1
-	;;
-*) echo "Please answer y or n." ;;
-esac
+get_csaf
 
 full_container=$(docker ps -a --format "{{.Names}}" | grep -i postgres-1 | head -n1)
 
@@ -47,6 +96,7 @@ if [[ $prefix != "dev" ]]; then
 	exit 1
 fi
 
+docker stop "${prefix}-postgres-1"
 docker start "${prefix}-postgres-1"
 sleep 3
 docker exec "${prefix}-postgres-1" dropdb -U netbox netbox

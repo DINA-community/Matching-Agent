@@ -143,6 +143,9 @@ Quick start
      - Set ``url`` (e.g. http://isduba.localhost/), ``username``/``password`` (default user/user), and
        ``keycloak_url`` (e.g. http://keycloak.localhost/)
 
+
+.. _running-services:
+
 Running the services
 --------------------
 This project provides three long-running components. Each reads its TOML config from ``assets/`` and

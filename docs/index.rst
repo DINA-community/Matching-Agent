@@ -20,6 +20,7 @@ Contents
    matching-agent
    production-setup
    troubleshooting
+   tutorial
 
 
 Indices and tables

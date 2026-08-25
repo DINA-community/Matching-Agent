@@ -5,8 +5,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source "${SCRIPT_DIR}/utils.sh"
 
 main() {
-	syt="$1"
-	log="$2"
+	local syt="${1:-terminal}"
 	info() { echo "[INFO] $*" >&2; }
 	info "# Starting APIs"
 	if [[ "$syt" == "terminal" ]]; then

@@ -108,7 +108,7 @@ sync_interval = 86400
 # If set, matching will gracefully stop after this duration, preserving all matches found.
 # max_duration = 3600  # Stop matching after 1 hour
 # Threshold for showing matches
-match_threshold = 0
+match_threshold = 70
 # Path to asset data source plugin configs used for the assetsync
 asset_plugins_path = "./assets/plugin_configs/data_source/asset"
 # Path to CSAF data source plugin configs used for the csafsync
