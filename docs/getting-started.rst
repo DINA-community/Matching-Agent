@@ -52,15 +52,23 @@ This section provides an overview of the project’s directory and package struc
 
 - ``tests/``: Tests (pytest), fixtures, and test data
 
+Git Branches
+------------
+
+- ``main`` contains the latest stable release.
+- ``chore/pre-release`` is the active development branch: branch from it for new work and target it with pull requests, unless told otherwise.
+
 Quick start
 -----------
-1) Clone the repository:
+1) Clone the repository and switch to the development branch:
 
    .. code-block:: bash
 
       git clone --recurse-submodules https://github.com/DINA-community/Matching-Agent.git
 
       cd Matching-Agent
+
+      git checkout chore/pre-release
 
 2) Create the Python environment and install dependencies
     - Base package only:
