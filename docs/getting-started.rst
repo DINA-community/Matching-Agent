@@ -62,6 +62,14 @@ Quick start
 
       cd Matching-Agent
 
+   .. note::
+      If you already have an existing clone, fetch newly added submodules (e.g. the
+      NetBox plugin sources under ``dev/plugins/``) with:
+
+      .. code-block:: bash
+
+         git submodule update --init --recursive
+
 2) Create the Python environment and install dependencies
     - Base package only:
 
@@ -121,6 +129,25 @@ Quick start
       .. code-block:: bash
 
         docker compose -f dev/docker-compose.yml logs netbox-setup
+
+   .. note::
+      The NetBox plugins ``csaf`` and ``d3c`` are included as git submodules at ``dev/plugins/csaf`` and ``dev/plugins/d3c``.
+      The directories are bind-mounted into the containers ``netbox``, ``netbox-worker``, and ``netbox-housekeeping`` and installed in editable mode.
+      After making changes to the backend code of netbox modules, either restart the affected containers:
+
+      .. code-block:: bash
+
+         docker compose -f dev/docker-compose.yml restart netbox netbox-worker netbox-housekeeping
+
+      Of, for faster feedback, you can reload only the NetBox application:
+
+      .. code-block:: bash
+
+         ./dev/netbox-reload-plugins.sh
+
+      However, this only covers the ``netbox`` service itself, not ``netbox-worker`` and ``netbox-housekeeping``.
+
+      Changes to frontend code (HTML, JS, CSSS) don't need a restart and only a reload in the browser.
 
 4) Configure plugins
 
