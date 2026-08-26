@@ -28,7 +28,7 @@ NETBOX_FILE="assets/plugin_configs/data_source/asset/netbox-local.toml"
 ISDUBA_FILE="assets/plugin_configs/data_source/csaf/isduba-local.toml"
 PLUGINS_FILE="dev/configuration/plugins.py"
 PLUGINS_SAMPLE="dev/configuration/plugins.py.example"
-API_START=dev/scripts-install/script_api.sh
+API_START="dev/scripts-install/script_api.sh"
 LOCAL_SETTING="FULLY_LOCAL"
 JWT="JWT_KEY"
 
@@ -72,17 +72,18 @@ need_dep() {
 		exit 1
 	fi
 	if [ "$KEY" == "false" ]; then
-		if check_response "Do you want to check for missing dependencies and install them? [Y/n] " Y; then
-			wdir=$(pwd)
-			idir="$wdir/dev/scripts-install/"
-			cd "$idir" || {
-				warning "$idir missing?! You just executed me there!"
-				exit 1
-			}
-			#bash ./install_depsetup.sh
-			cd ../../
+		local SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+		source "${SCRIPT_DIR}/scripts-install/install_depsetup.sh"
+		advise
+		if check_response "Do you want to check for missing dependencies and install them? [Y/n] " "Y"; then
+			install_dep
 			sed -i "s|^\(DEP=\).*|\1true|" "$ENV_FILE"
 			info "--DEP set true in $ENV_FILE"
+		else
+			if ! check_response "Asking again? [y/N] " "N"; then
+				sed -i "s|^\(DEP=\).*|\1true|" "$ENV_FILE"
+				info "--DEP set true in $ENV_FILE"
+			fi
 		fi
 	else
 		info "--[DEP] DEP is set as executed in $ENV_FILE. Skip check."
@@ -121,7 +122,7 @@ need_env() {
 
 set_local_toml() {
 	info "--[ENV] Set local toml files"
-	declare -A REPLACEMENTS=(
+	local -A REPLACEMENTS=(
 		["url = "]="ISDUBA_CLIENT_HOSTNAME_URL"
 		["keycloak_url = "]="ISDUBA_CLIENT_KEYCLOAK_URL"
 		["keycloak_realm = "]="ISDUBA_CLIENT_KEYCLOAK_REALM"
@@ -133,7 +134,6 @@ set_local_toml() {
 	cp -p "$ISDUBA_SAMPLE" "$ISDUBA_FILE"
 	value=$(grep -E "^${NETBOX_URL}=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2-)
 	sed -i "s|^\(api_url = \).*|\1\"$value\"|" "$NETBOX_FILE"
-
 	## Adjust the isduba setting with environment file
 	for pattern in "${!REPLACEMENTS[@]}"; do
 		value=$(grep -E "^${REPLACEMENTS[$pattern]}=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2-)
@@ -168,7 +168,10 @@ check_response() {
 	local default_reply="${2:-None}" # Assign default reply if provided
 	local reply
 	while true; do
-		read -rp "[INPUT] $text" reply </dev/tty
+        read -rp "[INPUT] $text" reply </dev/tty || {
+            error "Failed to read response from TTY"
+            exit 1
+		}
 		if [ -z "$reply" ]; then
 			reply="$default_reply"
 		fi
@@ -285,8 +288,7 @@ prune_project_images() {
 		if echo "$command_output" | grep -iq "variable is not set"; then
 			info "--[EXE] There is no project image"
 		else
-
-			$COMPOSE_CMD -f "$compose_file" down --rmi local --remove-orphans #|| true
+			$COMPOSE_CMD -f "$compose_file" down --rmi local --remove-orphans || true
 		fi
 	fi
 }
@@ -422,6 +424,7 @@ main() {
 
 checks() {
 	info "#Checks started"
+	need_dep
 	info "## Check Argument"
 	info "--Action: $ACTION and Volume: $WITH_VOLUMES"
 	if [[ "$ACTION" == "up" && "$WITH_VOLUMES" == true ]]; then
@@ -439,7 +442,6 @@ checks() {
 	else # Skipping unnecessary checks for cleaning
 		## INSTALL DEPENDENCIES
 		need_env
-		need_dep
 		need_cmd docker
 		COMPOSE_CMD=$(ensure_compose)
 		need_cmd git
@@ -512,24 +514,68 @@ execute() {
 
 }
 
+
+stop_process() {
+	# Helper function of stop_apis
+    local pid="$1"
+    local label="$2"
+	local base="${label%%.*}"
+    local name="uv run $base"
+	if [[ ${label%%.*} == "matcher" ]]; then
+		name="uv run csaf_matcher"
+	fi
+    # Don't kill invalid or PID 1
+    if [[ -z "$pid" ]] || [[ "$pid" == "1" ]]; then
+        info "Skipping PID $pid (invalid or PID 1)"
+        return
+    fi
+    
+    # Check if process exists
+    if ! kill -0 "$pid" 2>/dev/null; then
+        info "Process $pid is not running"
+        # Try to find child processes by name
+        if pgrep -f "$name" >/dev/null 2>&1; then
+            local child_pids
+            child_pids=$(pgrep -f "$name")
+            if [[ -n "$child_pids" ]]; then
+                echo "$child_pids" | xargs kill -SIGTERM 2>/dev/null || true
+                info "Killed $name with SIGTERM (by name)"
+            fi
+        fi
+        return
+    fi
+    
+    # Graceful shutdown with timeout
+    kill -SIGTERM "$pid"
+    info "Killed $label with SIGTERM ($pid)"
+    
+    local timeout=5
+    while kill -0 "$pid" 2>/dev/null && [[ $timeout -gt 0 ]]; do
+        sleep 1
+        ((timeout--))
+    done
+    
+    # Force kill if still running
+    if kill -0 "$pid" 2>/dev/null; then
+        kill -SIGKILL "$pid" 2>/dev/null || true
+        info "Force killed $label with SIGKILL ($pid)"
+    fi
+}
+
 stop_apis() {
-	#touch matcher.pid
-	#touch csafsync.pid
-	#touch assetsync.pid
-	info "--[EXE] Stopping APIs"
-	for pidfile in "${API_PID[@]}"; do
-		if [[ -f "$pidfile" ]]; then
-			pid="$(<"$pidfile")"
-			if ! kill -0 "$pid" 2>/dev/null; then
-				info "Process $pid is not running"
-			else
-				kill -SIGTERM "$pid"
-				info "Killing ${pidfile%%.*} $pid"
-			fi
-		fi
-		rm -f -- "$pidfile"
-	done
-	info "--[EXE] Stopping APIs finished"
+	# Since PID of the xdg-terminal-exec process, not necessarily the PID of the terminal window or bash process it launches. 
+	# So using that PID later to monitor/kill the terminal may not work reliably.
+	# As a result, the stop function checks for the title name also if PID is outdated.
+    info "--[EXE] Stopping APIs"
+    for pidfile in "${API_PID[@]}"; do
+        if [[ -f "$pidfile" ]]; then
+            pid="$(<"$pidfile")"
+            local name="${pidfile%%.*}"
+            stop_process "$pid" "$name"
+            rm -f -- "$pidfile"
+        fi
+    done
+    info "--[EXE] Stopping APIs finished"
 }
 
 post_processing() {
@@ -538,11 +584,11 @@ post_processing() {
 	#   "API Token created: <TOKEN>" or "API Token already exists: <TOKEN>"
 	# We'll wait up to 120 seconds for this to appear.
 	info "# Start post_processing"
-	SERVICE="netbox-setup"
-	TIMEOUT=${TOKEN_TIMEOUT:-120}
+	local SERVICE="netbox-setup"
+	local TIMEOUT=${TOKEN_TIMEOUT:-120}
 	info "--[PoP] Waiting up to ${TIMEOUT}s for NetBox API token from '$SERVICE'..."
 
-	end_time=$(($(date +%s) + TIMEOUT))
+	local end_time=$(($(date +%s) + TIMEOUT))
 	token=""
 	while [ "$(date +%s)" -lt $end_time ]; do
 		# Fetch logs; ignore errors if service not ready yet
@@ -564,14 +610,14 @@ cleanup() {
 		info "--[CLE] NetBox API token detected:"
 		echo "$token"
 		## set it in env
-		LOCAL_SETTING=$(grep -E "^$LOCAL_SETTING=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2-)
-		if [ "$LOCAL_SETTING" == "true" ]; then
+		local LOCAL_SETTING_VAL=$(grep -E "^$LOCAL_SETTING=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2-)
+		if [ "$LOCAL_SETTING_VAL" == "true" ]; then
 			# Sets token always new in case it changes.
 			sed -i "s|^\(api_token = \).*|\1\"$token\"|" "$NETBOX_FILE"
 		fi
 		# set JWT secret key
-		KEY=$(grep -E "^$JWT=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2-)
-		if [ "$KEY" == "false" ]; then
+		local JWT_KEY=$(grep -E "^$JWT=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2-)
+		if [ "$JWT_KEY" == "false" ]; then
 			openssl rand -hex 32 | xargs -I{} printf "export JWT_SECRET_KEY={}\n" | tee -a .env dev/.env >/dev/null
 			sed -i "s|^\($JWT=\).*|\1true|" "$ENV_FILE"
 			info "--[CLE] JWT was created successfully"
@@ -579,12 +625,12 @@ cleanup() {
 		# Start API
 		local excess
 		if check_response "Do you want to start the apis right away? [y/N]" "N"; then
-			if check_response "Do you execute the script on a remote PC (using ssh)? [Y/n]" "Y"; then
-				excess="remote"
+			if check_response "Do you execute the APIs in separate windows each (Y) or all in this terminal (N) [y/N]" "N"; then
+				excess="separate"
 			else
-				excess="local"
+				excess="terminal"
 			fi
-			bash $API_START $excess
+			bash "$API_START" "$excess"
 		fi
 
 	else
