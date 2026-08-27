@@ -1,4 +1,4 @@
-FROM netboxcommunity/netbox:v4.3.1
+FROM netboxcommunity/netbox:v4.4
 
 COPY nginx-unit.json /etc/unit/
 COPY ./docker-entrypoint-plugins.sh /opt/netbox/docker-entrypoint-plugins.sh
