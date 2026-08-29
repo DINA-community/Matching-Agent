@@ -84,3 +84,9 @@ product_family = 50
 product_name = 80
 keyword = 50
 version = 50
+
+[normalizer]
+activated = 1
+api_key = "1234567890abcdef"
+url = "http://localhost:5002/api/match_all_with_strategies"
+strategies = ["exact_match_strategy", "fuzzy_match_strategy", "vector_match_strategy"]

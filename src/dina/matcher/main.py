@@ -234,6 +234,9 @@ class Matcher:
         configure_logging(self.__config.Matcher.Logging)
 
         self.__manager = multiprocessing.Manager()
+        self.normalizer_cache = self.__manager.dict()
+        self.normalizer_cache_lock = self.__manager.RLock()
+
         self.__matches: Queue[tuple[int, list[tuple[int, int]], list[Match]]] = (
             self.__manager.Queue()
         )
@@ -617,6 +620,8 @@ class Matcher:
                         task_state.matching_config,
                         task_state.task.matching_config_hash
                         or hash_matching_config(task_state.matching_config),
+                        self.normalizer_cache,
+                        self.normalizer_cache_lock
                     )
 
                     def _done_callback(_fut, done_task_id: int = task_id):
@@ -1382,6 +1387,8 @@ def match_pairs(
     threshold: float,
     matching_config: dict[str, Any],
     matching_config_hash: str,
+    normalizer_cache,
+    normalizer_cache_lock,
 ):
     """
     Process a batch of asset-CSAF pairs and compute matches in a worker process.
@@ -1418,7 +1425,11 @@ def match_pairs(
 
             df = pl.DataFrame([{**csaf_dict, **asset_dict}], strict=False)
 
-            matching = Matching(matching_config)
+            matching = Matching(
+                matching_config,
+                normalizer_cache,
+                normalizer_cache_lock,
+            )
             df_matches = matching.df_matching(df)
 
             score = Score(matching_config)
