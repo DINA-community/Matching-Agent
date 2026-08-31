@@ -462,7 +462,7 @@ checks() {
 }
 
 execute() {
-	info "# Execute action $ACTION"
+	info "## Execute Action $ACTION"
 	case "$ACTION" in
 	stop)
 		info "--[EXE] Stopping dev environment..."

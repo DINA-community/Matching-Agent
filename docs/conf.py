@@ -20,11 +20,6 @@ sys.path.insert(0, str(SRC))
 # -- Project information -----------------------------------------------------
 project = "dina.matcher"
 
-# Try to determine version from pyproject.toml, falling back to package/distribution metadata.
-# We keep this resilient to allow local docs builds without installing the package.
-release = "0.1.0"
-version = release
-
 try:
     import tomllib  # Python 3.11+
 except Exception:  # pragma: no cover
@@ -38,7 +33,7 @@ if tomllib and pyproject_toml.exists():
         rel = project_table.get("version")
         if isinstance(rel, str):
             release = rel
-            version = rel
+            version = ".".join(release.split(".")[:2])
         name = project_table.get("name")
         if isinstance(name, str):
             project = name
@@ -48,9 +43,8 @@ else:
     # Last resort: try importlib.metadata if the package is installed
     try:
         from importlib.metadata import version as _dist_version
-
         release = _dist_version(project)
-        version = release
+        version = ".".join(release.split(".")[:2])
     except Exception:
         pass
 
