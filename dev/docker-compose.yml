@@ -152,17 +152,17 @@ services:
       args:
         BUILD_VERSION: ${BUILD_VERSION}
     ports:
-      - "8800:8800"
+      - "8800:8080"
     depends_on:
       - postgres
       - redis
       - redis-cache
     env_file: netbox/env/netbox.env
-    user: "unit:root"
+    user: "netbox:root"
     entrypoint: ["/usr/bin/tini", "--", "/opt/netbox/docker-entrypoint-plugins.sh", "/opt/netbox/docker-entrypoint.sh"]
     command: ["/opt/netbox/launch-netbox.sh"]
     healthcheck:
-      test: curl -f http://localhost:8800/login/ || exit 1
+      test: curl -f http://localhost:8080/login/ || exit 1
       start_period: 180s
       timeout: 5s
       interval: 15s
@@ -182,7 +182,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.netbox.rule=Host(`netbox.localhost`)"
-      - "traefik.http.services.netbox.loadbalancer.server.port=8800"
+      - "traefik.http.services.netbox.loadbalancer.server.port=8080"
 
   netbox-worker:
     <<: *netbox
