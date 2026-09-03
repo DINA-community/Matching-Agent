@@ -52,6 +52,9 @@ This section provides an overview of the project’s directory and package struc
 
 - ``tests/``: Tests (pytest), fixtures, and test data
 
+
+.. _quick-start:
+
 Quick start
 -----------
 1) Clone the repository:
