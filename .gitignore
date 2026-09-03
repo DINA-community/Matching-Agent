@@ -28,7 +28,6 @@ share/python-wheels/
 MANIFEST
 **/_build/
 **/_autosummary/
-uv.lock
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

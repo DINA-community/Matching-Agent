@@ -155,17 +155,21 @@ If you need the details, the compare function can be used to show further inform
 
    Compare match with asset and csaf information
 
-One upcoming feature is that the  user feedback of a match is looped back to the matching agent. This 
-make the matching process more reliable with time and the user gets matches as `exact matches` more often.
-
+One upcoming feature is that the user feedback of a match is fed back to the matching agent. 
+This improves the reliability of the matching process over time, as the algorithms become better 
+at distinguishing between `exact matches` and `partial matches`.
 
 Test Data Set
 ------------------------
 
-In the present tutorial.sql matches should be seen for the following devices, modules and software.
+In the present `dev/test-cases/tutorial-1.sql` matches should be seen for the following devices, modules and software.
+In order to use this data set, use the `dev/test-cases/db_overwrite.sh` after shut down running API of the matching-agent. 
+Be aware, that this will delete your current netbox entries.
 
 Matches
 ~~~~~~~~~~~~~~~~~~~~~~~~
+
+Running the Matcher should lead to the following matches. 
 
 +-----------------+-------+-----------+----------+---------------------------------------------------------+----------------------+
 | CSAF            | ID    | Netbox-ID | Asset    | Type                                                    | Match                |
@@ -194,7 +198,7 @@ Matches
 +-----------------+-------+-----------+----------+---------------------------------------------------------+----------------------+
 | icsa-24-338-04  | 8     | 4         | Software | GENESIS64 10.97.3 (ME Iconics Digital Solutions)        | affected version     |
 +-----------------+-------+-----------+----------+---------------------------------------------------------+----------------------+
-| icsa-24-338-04  | 9     | 4         | Software | GENESIS64 10.97.3 (ME Iconics Digital Solutions)        | version schema unkown|
+| icsa-24-338-04  | 9     | 4         | Software | GENESIS64 x + 10.97.3 (ME Iconics Digital Solutions)    | version schema unkown|
 +-----------------+-------+-----------+----------+---------------------------------------------------------+----------------------+
 | icsa-25-007-01  | 6     | 1,3,6     | Software | ASPECT Enterprise 3.08.00 (ABB)                         | affected version     |
 +-----------------+-------+-----------+----------+---------------------------------------------------------+----------------------+
@@ -202,8 +206,10 @@ Matches
 False Positive Matches
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
+The Matcher probably will also provide the following matches as False Positives. The reason for this is given briefly in the column "Reject MAtch".
+
 +-----------------+-------+-----------+----------+---------------------------------------------------------+-----------------------------------+
-| CSAF            | ID    | Netbox-ID | Asset    | Type                                                    | Match                             |
+| CSAF            | ID    | Netbox-ID | Asset    | Type                                                    | Reject Match                      |
 +=================+=======+===========+==========+=========================================================+===================================+
 | icsa-24-352-04  | 1     | 5         | Device   | Schneider Electric Modicon Controllers LMC058 5.0.4.19  | wrong model                       |
 +-----------------+-------+-----------+----------+---------------------------------------------------------+-----------------------------------+
@@ -238,4 +244,5 @@ False Positive Matches
 | icsa-24-338-04  | 8     | 3         | Software | Mitsubishi Electric GENESIS64: 10.97.3                  | wrong vendor                      |
 +-----------------+-------+-----------+----------+---------------------------------------------------------+-----------------------------------+
 
-All products of the provided CSAF documents can be found under `dev/test-cases/tutorial-1_csaf-products.csv`.
+All products of the provided CSAF documents can be found under `dev/test-cases/tutorial-1_csaf-products.csv` in case the user wants to generate
+own test cases based on the given CSAF documents available in this test setup.
