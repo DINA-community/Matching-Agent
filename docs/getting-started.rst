@@ -135,12 +135,12 @@ Quick start
 
    .. note::
       The NetBox plugins ``csaf`` and ``d3c`` are included as git submodules at ``dev/plugins/csaf`` and ``dev/plugins/d3c``.
-      The directories are bind-mounted into the containers ``netbox``, ``netbox-worker``, and ``netbox-housekeeping`` and installed in editable mode.
+      The directories are bind-mounted into the containers ``netbox`` and ``netbox-worker`` and installed in editable mode.
       After making changes to the backend code of netbox modules, either restart the affected containers:
 
       .. code-block:: bash
 
-         docker compose -f dev/docker-compose.yml restart netbox netbox-worker netbox-housekeeping
+         docker compose -f dev/docker-compose.yml restart netbox netbox-worker
 
       Of, for faster feedback, you can reload only the NetBox application:
 
@@ -148,7 +148,7 @@ Quick start
 
          ./dev/netbox-reload-plugins.sh
 
-      However, this only covers the ``netbox`` service itself, not ``netbox-worker`` and ``netbox-housekeeping``.
+      However, this only covers the ``netbox`` service itself, not ``netbox-worker``.
 
       Changes to frontend code (HTML, JS, CSSS) don't need a restart and only a reload in the browser.
 
