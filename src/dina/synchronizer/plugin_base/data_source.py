@@ -24,7 +24,7 @@ from dina.cachedb.model import Asset, CsafProduct, ProductType, Match
 class DataSourceConfig(BaseModel):
     """Configuration for a data source plugin.
 
-    Attributes:
+    Args:
         plugin_name: Unique identifier for the plugin instance.
         publish_matches: Whether to send match notifications back to the data source.
         Plugin: Plugin class reference (for dynamic loading).
@@ -39,7 +39,7 @@ class DataSourceConfig(BaseModel):
 class CleanUpDecision:
     """Decision about whether a product can be deleted during cleanup.
 
-    Attributes:
+    Args:
         can_delete: Whether the product should be removed from the cache.
         id: Database ID of the product to potentially delete.
         ty: Type of the product (Asset or CsafProduct class).
@@ -57,7 +57,7 @@ class ProductId:
     This represents a product ID as known to the external data source, before
     mapping to the internal database ID.
 
-    Attributes:
+    Args:
         id: Plugin-specific identifier (can be string, int, or other type).
         product_type: Category of the product (Software, Device, etc.).
     """
@@ -75,7 +75,7 @@ class Relationship:
     csaf products. It encapsulates the IDs of the parent and child entities, the type of
     the relationship, and metadata for tracking the relationship's origin.
 
-    Attributes:
+    Args:
         parent: The ProductId of the parent entity in plugin-native format.
         child: The ProductId of the child entity in plugin-native format.
         ty: The type of relationship (Asset or CsafProduct class).
@@ -95,7 +95,7 @@ class MappedRelationship:
     This represents a relationship after the plugin-native IDs have been mapped
     to the internal cache database IDs.
 
-    Attributes:
+    Args:
         parent: Database ID of the parent entity.
         child: Database ID of the child entity.
         ty: Type of relationship (Asset or CsafProduct class).
@@ -116,7 +116,7 @@ class MappedRelationship:
 class FetchRelationshipsResult:
     """Result from fetching relationships from the data source.
 
-    Attributes:
+    Args:
         again: Whether the plugin has more relationships to fetch (pagination).
         data: List of relationships retrieved in this batch.
     """
@@ -129,7 +129,7 @@ class FetchRelationshipsResult:
 class FetchProductsResult:
     """Result from fetching products from the data source.
 
-    Attributes:
+    Args:
         again: Whether the plugin has more products to fetch (pagination).
         data: List of Asset or CsafProduct objects retrieved in this batch.
     """
@@ -162,7 +162,7 @@ class DataSourcePlugin(ABC):
     class Config(BaseModel):
         """Configuration model for the plugin.
 
-        Attributes:
+        Args:
             DataSource: Data source specific configuration.
         """
 

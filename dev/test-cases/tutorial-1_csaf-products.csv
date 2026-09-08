@@ -1,0 +1,71 @@
+source,vendor,product_family,product_name,product_version_range,full_product_name_branch,product_id
+icsa-26-008-01.json,Hitachi Energy,,Asset Suite,vers:Asset_Suite/<=9.7,Asset Suite versions 9.7 and prior,CSAFPID-0001
+icsa-25-345-03.json,AzeoTech,,DAQFactory,<=20.7_Build_2555,AzeoTech DAQFactory: <=20.7_Build_2555,CSAFPID-0001
+icsa-24-338-04.json,Mitsubishi Electric,,GENESIS64,<=10.97.3,Mitsubishi Electric GENESIS64: <= 10.97.3,CSAFPID-0001
+icsa-24-338-04.json,Mitsubishi Electric,,GENESIS64,10.97.2|10.97.2_CFR1|10.97.2_CFR2|10.97.3,Mitsubishi Electric GENESIS64: 10.97.2|10.97.2 CFR1|10.97.2 CFR2|10.97.3,CSAFPID-0002
+icsa-24-338-04.json,Mitsubishi Electric,,ICONICS Suite,<=10.97.3,Mitsubishi Electric ICONICS Suite: <=10.97.3,CSAFPID-0003
+icsa-24-338-04.json,Mitsubishi Electric,,ICONICS Suite,10.97.2|10.97.2_CFR1|10.97.2_CFR2|10.97.3,Mitsubishi Electric ICONICS Suite: 10.97.2|10.97.2 CFR1|10.97.2 CFR2|10.97.3,CSAFPID-0004
+icsa-24-338-04.json,Mitsubishi Electric,,MC Works64,vers:all/*,Mitsubishi Electric MC Works64: vers:all/*,CSAFPID-0005
+icsa-24-338-04.json,Mitsubishi Electric,,GENESIS32,vers:all/*,Mitsubishi Electric GENESIS32: vers:all/*,CSAFPID-0006
+icsa-24-338-04.json,Mitsubishi Electric,,Hyper Historian,<=10.97.3,Mitsubishi Electric Hyper Historian: <=10.97.3,CSAFPID-0007
+icsa-24-338-04.json,Mitsubishi Electric Iconics Digital Solutions,,GENESIS64,<=10.97.3,Mitsubishi Electric Iconics Digital Solutions GENESIS64: <=10.97.3,CSAFPID-0008
+icsa-24-338-04.json,Mitsubishi Electric Iconics Digital Solutions,,GENESIS64,10.97.2|10.97.2_CFR1|10.97.2_CFR2|10.97.3,Mitsubishi Electric Iconics Digital Solutions GENESIS64: 10.97.2|10.97.2 CFR1|10.97.2 CFR2|10.97.3,CSAFPID-0009
+icsa-24-338-04.json,Mitsubishi Electric Iconics Digital Solutions,,ICONICS Suite,<=10.97.3,Mitsubishi Electric Iconics Digital Solutions ICONICS Suite: <=10.97.3,CSAFPID-0010
+icsa-24-338-04.json,Mitsubishi Electric Iconics Digital Solutions,,ICONICS Suite,10.97.2|10.97.2_CFR1|10.97.2_CFR2|10.97.3,Mitsubishi Electric Iconics Digital Solutions ICONICS Suite: 10.97.2|10.97.2 CFR1|10.97.2 CFR2|10.97.3,CSAFPID-0011
+icsa-24-338-04.json,Mitsubishi Electric Iconics Digital Solutions,,GENESIS32,vers:all/*,Mitsubishi Electric Iconics Digital Solutions GENESIS32: vers:all/*,CSAFPID-0012
+icsa-24-338-04.json,Mitsubishi Electric Iconics Digital Solutions,,Hyper Historian,<=10.97.3,Mitsubishi Electric Iconics Digital Solutions Hyper Historian: <=10.97.3,CSAFPID-0013
+icsa-24-352-04.json,Schneider Electric,,Modicon Controllers M241,<5.2.11.29,Schneider Electric Modicon Controllers M241 Versions prior to 5.2.11.29,CSAFPID-0001
+icsa-24-352-04.json,Schneider Electric,,Modicon Controllers M251,<5.2.11.29,Schneider Electric Modicon Controllers M251 Versions prior to 5.2.11.29,CSAFPID-0002
+icsa-24-352-04.json,Schneider Electric,,Modicon Controllers M258,<5.0.4.19,Modicon Controllers M258 Versions prior to v5.0.4.19,CSAFPID-0003
+icsa-24-352-04.json,Schneider Electric,,Modicon Controllers M258,,Modicon Controllers M258 Version v5.0.4.19,CSAFPID-0004
+icsa-24-352-04.json,Schneider Electric,,Modicon Controllers LMC058,<5.0.4.19,Modicon Controllers LMC058 Versions prior to v5.0.4.19,CSAFPID-0005
+icsa-24-352-04.json,Schneider Electric,,Modicon Controllers LMC058,,Modicon Controllers LMC058 Version v5.0.4.19,CSAFPID-0006
+icsa-24-352-04.json,Schneider Electric,,Modicon Controllers M241,,Schneider Electric Modicon Controllers M241 Version 5.2.11.29,CSAFPID-0007
+icsa-24-352-04.json,Schneider Electric,,Modicon Controllers M251,,Schneider Electric Modicon Controllers M251 Version 5.2.11.29,CSAFPID-0008
+icsa-24-352-04.json,Schneider Electric,,Modicon Controllers M241,,Modicon Controllers M241,CSAFPID-0009
+icsa-24-352-04.json,Schneider Electric,,Modicon Controllers M251,,Modicon Controllers M251,CSAFPID-0010
+icsa-24-352-04.json,Schneider Electric,,Modicon Controllers M258,,Modicon Controllers M258,CSAFPID-0011
+icsa-24-352-04.json,Schneider Electric,,Modicon Controllers LMC058,,Modicon Controllers LMC058,CSAFPID-0012
+icsma-25-364-01.json,WHILL Inc.,,Model C2 Electric WheelChair,<HMI_v3.00,WHILL Inc. Model C2 Electric WheelChair: <HMI_v3.00,CSAFPID-0001
+icsma-25-364-01.json,WHILL Inc.,,Model F Power Chair,<HMI_v3.01,WHILL Inc. Model F Power Chair: <HMI_v3.01,CSAFPID-0002
+icsa-25-007-01.json,ABB,ASPECT®-Enterprise,ASP-ENT-x,<=3.08.02,ASP-ENT-x <=3.08.02,CSAFPID-0001
+icsa-25-007-01.json,ABB,ASPECT®-Enterprise,ASP-ENT-x,,ASP-ENT-x 3.08.03,CSAFPID-0002
+icsa-25-007-01.json,ABB,ASPECT®-Enterprise,ASP-ENT-x,<=3.08.01,ASP-ENT-x <=3.08.01,CSAFPID-0003
+icsa-25-007-01.json,ABB,ASPECT®-Enterprise,ASP-ENT-x,>=3.08.02,ASP-ENT-x 3.08.02 and above,CSAFPID-0004
+icsa-25-007-01.json,ABB,ASPECT®-Enterprise,ASP-ENT-x,<=3.07.02,ASP-ENT-x <=3.07.02,CSAFPID-0005
+icsa-25-007-01.json,ABB,ASPECT®-Enterprise,ASP-ENT-x,,ASP-ENT-x 3.08.00,CSAFPID-0006
+icsa-25-007-01.json,ABB,NEXUS Series,NEX-2x,<=3.08.02,NEX-2x <=3.08.02,CSAFPID-0007
+icsa-25-007-01.json,ABB,NEXUS Series,NEX-2x,,NEX-2x 3.08.03,CSAFPID-0008
+icsa-25-007-01.json,ABB,NEXUS Series,NEX-2x,<=3.08.01,NEX-2x <=3.08.01,CSAFPID-0009
+icsa-25-007-01.json,ABB,NEXUS Series,NEX-2x,>=3.08.02,NEX-2x 3.08.02 and above,CSAFPID-0010
+icsa-25-007-01.json,ABB,NEXUS Series,NEX-2x,<=3.07.02,NEX-2x <=3.07.02,CSAFPID-0011
+icsa-25-007-01.json,ABB,NEXUS Series,NEX-2x,,NEX-2x 3.08.00,CSAFPID-0012
+icsa-25-007-01.json,ABB,NEXUS Series,NEXUS-3-x,<=3.08.02,NEXUS-3-x <=3.08.02,CSAFPID-0013
+icsa-25-007-01.json,ABB,NEXUS Series,NEXUS-3-x,,NEXUS-3-x 3.08.03,CSAFPID-0014
+icsa-25-007-01.json,ABB,NEXUS Series,NEXUS-3-x,<=3.08.01,NEXUS-3-x <=3.08.01,CSAFPID-0015
+icsa-25-007-01.json,ABB,NEXUS Series,NEXUS-3-x,>=3.08.02,NEXUS-3-x 3.08.02 and above,CSAFPID-0016
+icsa-25-007-01.json,ABB,NEXUS Series,NEXUS-3-x,<=3.07.02,NEXUS-3-x <=3.07.02,CSAFPID-0017
+icsa-25-007-01.json,ABB,NEXUS Series,NEXUS-3-x,,NEXUS-3-x 3.08.00,CSAFPID-0018
+icsa-25-007-01.json,ABB,MATRIX Series,MAT-x,<=3.08.02,MAT-x <=3.08.02,CSAFPID-0019
+icsa-25-007-01.json,ABB,MATRIX Series,MAT-x,,MAT-x 3.08.03,CSAFPID-0020
+icsa-25-007-01.json,ABB,MATRIX Series,MAT-x,<=3.08.01,MAT-x <=3.08.01,CSAFPID-0021
+icsa-25-007-01.json,ABB,MATRIX Series,MAT-x,>=3.08.02,MAT-x 3.08.02 and above,CSAFPID-0022
+icsa-25-007-01.json,ABB,MATRIX Series,MAT-x,<=3.07.02,MAT-x <=3.07.02,CSAFPID-0023
+icsa-25-007-01.json,ABB,MATRIX Series,MAT-x,,MAT-x 3.08.00,CSAFPID-0024
+ssa-674753.json,Siemens,,SIMATIC ET 200AL IM 157-1 PN (6ES7157-1AB00-0AB0),vers:all/*,SIMATIC ET 200AL IM 157-1 PN (6ES7157-1AB00-0AB0),1
+ssa-674753.json,Siemens,,SIMATIC ET 200MP IM 155-5 PN HF (6ES7155-5AA00-0AC0),vers:intdot/>=4.2.0,SIMATIC ET 200MP IM 155-5 PN HF (6ES7155-5AA00-0AC0),2
+ssa-674753.json,Siemens,,SIMATIC ET 200SP IM 155-6 MF HF (6ES7155-6MU00-0CN0),vers:all/*,SIMATIC ET 200SP IM 155-6 MF HF (6ES7155-6MU00-0CN0),3
+ssa-674753.json,Siemens,,SIMATIC ET 200SP IM 155-6 PN HA (incl. SIPLUS variants),vers:intdot/<1.3,SIMATIC ET 200SP IM 155-6 PN HA (incl. SIPLUS variants),4
+ssa-674753.json,Siemens,,SIMATIC ET 200SP IM 155-6 PN R1 (6ES7155-6AU00-0HM0),vers:intdot/<6.0.1,SIMATIC ET 200SP IM 155-6 PN R1 (6ES7155-6AU00-0HM0),5
+ssa-674753.json,Siemens,,SIMATIC ET 200SP IM 155-6 PN/2 HF (6ES7155-6AU01-0CN0),vers:intdot/>=4.2.0|<4.2.5,SIMATIC ET 200SP IM 155-6 PN/2 HF (6ES7155-6AU01-0CN0),6
+ssa-674753.json,Siemens,,SIMATIC ET 200SP IM 155-6 PN/3 HF (6ES7155-6AU30-0CN0),vers:intdot/<4.2.2,SIMATIC ET 200SP IM 155-6 PN/3 HF (6ES7155-6AU30-0CN0),7
+ssa-674753.json,Siemens,,SIMATIC PN/MF Coupler (6ES7158-3MU10-0XA0),vers:all/*,SIMATIC PN/MF Coupler (6ES7158-3MU10-0XA0),8
+ssa-674753.json,Siemens,,SIMATIC PN/PN Coupler (6ES7158-3AD10-0XA0),vers:intdot/<6.0.0,SIMATIC PN/PN Coupler (6ES7158-3AD10-0XA0),9
+ssa-674753.json,Siemens,,SIPLUS ET 200MP IM 155-5 PN HF (6AG1155-5AA00-2AC0),vers:intdot/>=4.2.0,SIPLUS ET 200MP IM 155-5 PN HF (6AG1155-5AA00-2AC0),10
+ssa-674753.json,Siemens,,SIPLUS ET 200MP IM 155-5 PN HF (6AG1155-5AA00-7AC0),vers:intdot/>=4.2.0,SIPLUS ET 200MP IM 155-5 PN HF (6AG1155-5AA00-7AC0),11
+ssa-674753.json,Siemens,,SIPLUS ET 200MP IM 155-5 PN HF T1 RAIL (6AG2155-5AA00-1AC0),vers:intdot/>=4.2.0,SIPLUS ET 200MP IM 155-5 PN HF T1 RAIL (6AG2155-5AA00-1AC0),12
+ssa-674753.json,Siemens,,SIPLUS ET 200SP IM 155-6 PN HF (6AG1155-6AU01-2CN0),vers:intdot/>=4.2.0|<4.2.5,SIPLUS ET 200SP IM 155-6 PN HF (6AG1155-6AU01-2CN0),13
+ssa-674753.json,Siemens,,SIPLUS ET 200SP IM 155-6 PN HF (6AG1155-6AU01-7CN0),vers:intdot/>=4.2.0|<4.2.5,SIPLUS ET 200SP IM 155-6 PN HF (6AG1155-6AU01-7CN0),14
+ssa-674753.json,Siemens,,SIPLUS ET 200SP IM 155-6 PN HF T1 RAIL (6AG2155-6AU01-1CN0),vers:intdot/>=4.2.0|<4.2.5,SIPLUS ET 200SP IM 155-6 PN HF T1 RAIL (6AG2155-6AU01-1CN0),15
+ssa-674753.json,Siemens,,SIPLUS ET 200SP IM 155-6 PN HF TX RAIL (6AG2155-6AU01-4CN0),vers:intdot/>=4.2.0|<4.2.5,SIPLUS ET 200SP IM 155-6 PN HF TX RAIL (6AG2155-6AU01-4CN0),16
+ssa-674753.json,Siemens,,SIPLUS NET PN/PN Coupler (6AG2158-3AD10-4XA0),vers:intdot/<6.0.0,SIPLUS NET PN/PN Coupler (6AG2158-3AD10-4XA0),17

@@ -37,7 +37,7 @@ class Token(BaseModel):
     """
     OAuth2 token response model.
 
-    Attributes:
+    Args:
         access_token: The JWT access token string
         token_type: The type of token, typically "bearer"
     """
@@ -50,7 +50,7 @@ class SessionData(BaseModel):
     """
     User session information extracted from JWT tokens.
 
-    Attributes:
+    Args:
         username: The authenticated user's username
     """
 
@@ -93,12 +93,13 @@ class AccessChecker:
 
     Raises:
         HTTPException: Returns 401 UNAUTHORIZED if token is invalid, expired,
-                      or user is not active
+                       or user is not active
 
     Usage:
         access_checker = AccessChecker(db)
 
         @app.get("/protected")
+
         async def protected_route(session: SessionData = Depends(access_checker)):
             return {"user": session.username}
     """
