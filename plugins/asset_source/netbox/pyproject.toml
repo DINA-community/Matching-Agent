@@ -36,7 +36,8 @@ build-backend = "hatchling.build"
 [tool.hatch.build.hooks.custom]
 path = "build_hook.py"
 dependencies = [
-    "openapi-python-client",
+    #openapi-python-client version 0.29.1 fails with "Expected an expression" during `uv build` (see #133)
+    "openapi-python-client==0.29.0",
     "dina.matcher",
 ]
 
