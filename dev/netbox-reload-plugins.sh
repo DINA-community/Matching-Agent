@@ -2,7 +2,7 @@
 # Reloads the NetBox application, so a full container restart is not needed.
 # Edits under dev/plugins/csaf or dev/plugins/d3c directly effective.
 #
-# Services `netbox-worker` and `netbox-housekeeping` are unaffected.
+# Service `netbox-worker` is unaffected.
 #
 # Granian gracefully respawns its workers on SIGHUP
 # The `tini --` entrypoint forwards all signals to Granian
