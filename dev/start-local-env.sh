@@ -592,8 +592,8 @@ post_processing() {
 	#   "API Token created: <TOKEN>" or "API Token already exists: <TOKEN>"
 	# We'll wait up to 120 seconds for this to appear.
 	info "# Start post_processing"
-	local SERVICE="netbox-setup"
-	local TIMEOUT=${TOKEN_TIMEOUT:-120}
+	SERVICE="netbox-setup"
+	TIMEOUT=${TOKEN_TIMEOUT:-120}
 	info "--[PoP] Waiting up to ${TIMEOUT}s for NetBox API token from '$SERVICE'..."
 
 	local end_time=$(($(date +%s) + TIMEOUT))
