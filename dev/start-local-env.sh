@@ -457,6 +457,13 @@ checks() {
 			info "Some dev service directories seem missing. Installing"
 			git submodule update --init --recursive
 		fi
+
+		# The csaf/d3c plugins are mounted into the netbox container.
+		# Netbox then installs the plugins at container start in editable mode as unprivileged user.
+		# The setuptools installation (create metadata egg-info) requires write access to the submodule directories.
+		if [[ -d "dev/plugins/csaf" || -d "dev/plugins/d3c" ]]; then
+			chmod o+w dev/plugins/csaf dev/plugins/d3c 2>/dev/null || true
+		fi
 	fi
 	info "-[CHK] completed"
 }
