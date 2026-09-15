@@ -424,7 +424,6 @@ main() {
 
 checks() {
 	info "#Checks started"
-	need_dep
 	info "## Check Argument"
 	info "--Action: $ACTION and Volume: $WITH_VOLUMES"
 	if [[ "$ACTION" == "up" && "$WITH_VOLUMES" == true ]]; then
@@ -442,6 +441,7 @@ checks() {
 	else # Skipping unnecessary checks for cleaning
 		## INSTALL DEPENDENCIES
 		need_env
+		need_dep
 		need_cmd docker
 		COMPOSE_CMD=$(ensure_compose)
 		need_cmd git
