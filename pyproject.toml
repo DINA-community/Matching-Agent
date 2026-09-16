@@ -87,7 +87,8 @@ python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 markers = [
-    "asyncio: mark a test as using asyncio"
+    "asyncio: mark a test as using asyncio",
+    "integration: mark a test as requiring external services",
 ]
 addopts = [
     "--strict-markers",
@@ -129,6 +130,7 @@ exclude_also = [
 
 [dependency-groups]
 dev = [
+    "docker>=7.1.0",
     "furo>=2024.8.6",
     "line-profiler",
     "locust>=2.0.0",

@@ -10110,7 +10110,6 @@ COPY public.users_objectpermission_object_types (id, objectpermission_id, object
 --
 
 COPY public.users_token (id, created, expires, key, write_enabled, description, user_id, allowed_ips, last_used) FROM stdin;
-1	2026-08-24 10:22:35.45023+00	\N	53d349a3f09a9e29874a906ee0f320097c914826	t		1	\N	\N
 \.
 
 
@@ -22058,4 +22057,3 @@ ALTER TABLE ONLY public.wireless_wirelesslink
 --
 
 \unrestrict 1WJxZ4WqGAyV5W2yb4eXvdzUuekWanvJ9aDu8bL8WEOLCn2adWUEE4fdfjlOBTS
-
