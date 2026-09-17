@@ -158,6 +158,8 @@ services:
       - redis
       - redis-cache
     env_file: netbox/env/netbox.env
+    environment: &netbox-environment
+      API_TOKEN_PEPPER_1: ${API_TOKEN_PEPPER_1:-matching-agent-development-only-pepper-change-in-production}
     user: "netbox:root"
     entrypoint: ["/usr/bin/tini", "--", "/opt/netbox/docker-entrypoint-plugins.sh", "/opt/netbox/docker-entrypoint.sh"]
     command: ["/opt/netbox/launch-netbox.sh"]
@@ -215,6 +217,7 @@ services:
         condition: service_healthy
     entrypoint: ["/opt/netbox/docker-entrypoint-plugins.sh", "bash", "/opt/netbox/init-scripts/netbox-token.sh"]
     environment:
+      <<: *netbox-environment
       DJANGO_SUPERUSER_PASSWORD: ${NETBOX_SUPERUSER_PASSWORD}
       NETBOX_SUPERUSER_NAME: ${NETBOX_SUPERUSER_NAME}
       NETBOX_SUPERUSER_EMAIL: ${NETBOX_SUPERUSER_EMAIL}

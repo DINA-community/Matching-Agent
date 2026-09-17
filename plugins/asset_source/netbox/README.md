@@ -13,7 +13,7 @@ This plugin allows integration with Netbox to retrieve device and infrastructure
 
 TODO
 
-curl -o netbox-api-swagger.yaml http://<netbox-host>:8000/api/schema/ -H "api_token = <netbox-api-token>
+curl -o netbox-api-swagger.yaml http://<netbox-host>:8000/api/schema/ -H "Authorization: Bearer nbt_<key>.<secret>"
 
 
 in netbox-api-swagger.yaml delete the following:
