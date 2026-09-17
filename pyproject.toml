@@ -95,7 +95,8 @@ addopts = [
     "--strict-config",
     "--cov=src",
     "--cov-report=html",
-    "--cov-report=term-missing"
+    "--cov-report=term-missing",
+    "-m", "not integration",
 ]
 asyncio_mode = "auto"
 filterwarnings = [
@@ -130,7 +131,6 @@ exclude_also = [
 
 [dependency-groups]
 dev = [
-    "docker>=7.1.0",
     "furo>=2024.8.6",
     "line-profiler",
     "locust>=2.0.0",
