@@ -1,0 +1,75 @@
+services:
+  # redis
+  redis:
+    image: docker.io/valkey/valkey:9.1-alpine
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      start_period: 5s
+      timeout: 5s
+      interval: 5s
+      retries: 100
+    networks:
+      - netbox
+    tmpfs:
+      - /data
+
+  netbox:
+    build:
+      context: ../../../../dev
+      dockerfile: netbox.Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_NAME: netbox
+      DB_USER: netbox
+      DB_PASSWORD: test
+      REDIS_HOST: redis
+      REDIS_CACHE_HOST: redis
+      SECRET_KEY: isolated-integration-test-secret-key-at-least-fifty-characters
+      API_TOKEN_PEPPER_1: isolated-integration-test-pepper-at-least-fifty-characters
+      NETBOX_SUPERUSER_NAME: test-user
+      NETBOX_SUPERUSER_EMAIL: test@example.com
+      DJANGO_SUPERUSER_PASSWORD: test-password
+      ALLOWED_HOSTS: "*"
+      SKIP_SUPERUSER: "true"
+    user: "netbox:root"
+    entrypoint: ["/usr/bin/tini", "--", "/opt/netbox/docker-entrypoint-plugins.sh", "/opt/netbox/docker-entrypoint.sh"]
+    command: ["/opt/netbox/launch-netbox.sh"]
+    healthcheck:
+      test: curl -f http://localhost:8080/login/ || exit 1
+      start_period: 180s
+      timeout: 5s
+      interval: 15s
+      retries: 100
+    networks:
+      - netbox
+    volumes:
+      - ../../../../dev/configuration:/etc/netbox/config:ro
+      - ../../../../dev/init-scripts:/opt/netbox/init-scripts:ro
+      - ../../../../dev/plugins/d3c:/opt/netbox-plugins/d3c
+      - ../../../../dev/plugins/csaf:/opt/netbox-plugins/csaf
+
+  # postgres
+  postgres:
+    image: docker.io/postgres:18-alpine
+    healthcheck:
+      test: pg_isready -q -t 2 -d $$POSTGRES_DB -U $$POSTGRES_USER
+      start_period: 20s
+      timeout: 30s
+      interval: 10s
+      retries: 100
+    networks:
+      - netbox
+    environment:
+      POSTGRES_DB: netbox
+      POSTGRES_USER: netbox
+      POSTGRES_PASSWORD: test
+    tmpfs:
+      - /var/lib/postgresql
+
+networks:
+  netbox: {}
