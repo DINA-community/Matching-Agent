@@ -142,7 +142,7 @@ Quick start
 
          docker compose -f dev/docker-compose.yml restart netbox netbox-worker
 
-      Of, for faster feedback, you can reload only the NetBox application:
+      Or, for faster feedback, you can reload only the NetBox application:
 
       .. code-block:: bash
 
@@ -151,6 +151,22 @@ Quick start
       However, this only covers the ``netbox`` service itself, not ``netbox-worker``.
 
       Changes to frontend code (HTML, JS, CSSS) don't need a restart and only a reload in the browser.
+
+   .. note::
+      Some CSAF providers are automatically configured in ISDuBA upon startup, ensuring there is CSAF data available without manual setup.
+
+      The default providers are small vendor providers to keep the data modest in size.
+
+      The sources are defined in ``dev/configuration/isduba-sources.json``, which is created from the template ``dev/configuration/isduba-sources.example.json`` on first run.
+
+      Additionally, the CSAF documents in ``documents_dir`` are uploaded directly.
+
+      The setup runs as part of ``./dev/start-local-env.sh``. It can also be run on its own:
+
+      .. code-block:: bash
+
+        ./dev/isduba-set-sources.py
+
 
 4) Configure plugins
 

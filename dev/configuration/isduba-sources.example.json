@@ -1,0 +1,15 @@
+{
+  "_default_age_comment": "this is two years",
+  "default_age": "17520h",
+  "documents_dir": "dev/test-cases/csaf_files",
+  "sources": [
+    {
+      "name": "Open-Xchange GmbH",
+      "url": "https://www.open-xchange.com/.well-known/csaf/provider-metadata.json"
+    },
+    {
+      "name": "SICK PSIRT",
+      "url": "https://www.sick.com/.well-known/csaf/provider-metadata.json"
+    }
+  ]
+}
