@@ -29,6 +29,9 @@ ISDUBA_FILE="assets/plugin_configs/data_source/csaf/isduba-local.toml"
 PLUGINS_FILE="dev/configuration/plugins.py"
 PLUGINS_SAMPLE="dev/configuration/plugins.py.example"
 API_START="dev/scripts-install/script_api.sh"
+ISDUBA_SOURCES_SCRIPT="dev/isduba-set-sources.py"
+ISDUBA_SOURCES_FILE="dev/configuration/isduba-sources.json"
+ISDUBA_SOURCES_SAMPLE="dev/configuration/isduba-sources.example.json"
 LOCAL_SETTING="FULLY_LOCAL"
 JWT="JWT_KEY"
 
@@ -45,6 +48,7 @@ FILE_PAIRS=(
 	"docker/.env.example docker/.env"
 	"dev/configuration/.env.isduba.example dev/isduba/docker/.env"
 	"$PLUGINS_SAMPLE $PLUGINS_FILE"
+	"$ISDUBA_SOURCES_SAMPLE $ISDUBA_SOURCES_FILE"
 )
 
 API_PID=(
@@ -250,6 +254,11 @@ remove_local_configs() {
 		fi
 	fi
 
+	# Remove the local ISDuBA providers configuration
+	if [[ -f "$ISDUBA_SOURCES_FILE" ]]; then
+		remove_files "$ISDUBA_SOURCES_FILE"
+	fi
+
 }
 
 remove_plugins_config() {
@@ -309,7 +318,7 @@ To get the NetBox API token printed by the setup container:
 ./dev/start-local-env.sh -d -r, --down --volumes      # stop and remove services AND named volumes
 ./dev/start-local-env.sh -r -v, --recreate --volumes  # full reset: down -v, then up (fresh volumes)
 ./dev/start-local-env.sh -r, --recreate            # recreate containers
-./dev/start-local-env.sh -s, --stop                # stop 
+./dev/start-local-env.sh -s, --stop                # stop
 
 If you want to use a test database for netbox look at
   dev/test-cases
@@ -340,7 +349,7 @@ Usage: $0 [Options]
 
     Combination:
     --recreate --volumes   Full reset (down -v && up)
-    
+
     Requirements:
     Docker and Docker Compose (v2) required.
 
@@ -537,7 +546,7 @@ stop_process() {
         info "Skipping PID $pid (invalid or PID 1)"
         return
     fi
-    
+
     # Check if process exists
     if ! kill -0 "$pid" 2>/dev/null; then
         info "Process $pid is not running"
@@ -552,17 +561,17 @@ stop_process() {
         fi
         return
     fi
-    
+
     # Graceful shutdown with timeout
     kill -SIGTERM "$pid"
     info "Killed $label with SIGTERM ($pid)"
-    
+
     local timeout=5
     while kill -0 "$pid" 2>/dev/null && [[ $timeout -gt 0 ]]; do
         sleep 1
         ((timeout--))
     done
-    
+
     # Force kill if still running
     if kill -0 "$pid" 2>/dev/null; then
         kill -SIGKILL "$pid" 2>/dev/null || true
@@ -571,7 +580,7 @@ stop_process() {
 }
 
 stop_apis() {
-	# Since PID of the xdg-terminal-exec process, not necessarily the PID of the terminal window or bash process it launches. 
+	# Since PID of the xdg-terminal-exec process, not necessarily the PID of the terminal window or bash process it launches.
 	# So using that PID later to monitor/kill the terminal may not work reliably.
 	# As a result, the stop function checks for the title name also if PID is outdated.
     info "--[EXE] Stopping APIs"
@@ -609,6 +618,16 @@ post_processing() {
 		sleep 2
 	done
 
+	set_isduba_sources
+}
+
+# Configures providers in ISDuBA
+set_isduba_sources() {
+	info "--[PoP] Configuring default CSAF providers in ISDuBA..."
+	if ! "$ISDUBA_SOURCES_SCRIPT"; then
+		warning "--[PoP] Failed to configure ISDuBA providers."
+		warning "--[PoP] You can retry later with: $ISDUBA_SOURCES_SCRIPT"
+	fi
 }
 
 cleanup() {
