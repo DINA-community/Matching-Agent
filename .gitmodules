@@ -7,6 +7,8 @@
 [submodule "dev/plugins/csaf"]
 	path = dev/plugins/csaf
 	url = https://github.com/DINA-community/CSAF-Netbox-Plugin.git
+	# branch= chore/workflow
 [submodule "dev/plugins/d3c"]
 	path = dev/plugins/d3c
-	url = https://github.com/DINA-community/DDDC-Netbox-plugin.git
+	url = https://github.com/DINA-community/D3C-Netbox-plugin.git
+	# branch= chore/v1.0.0-beta.1
