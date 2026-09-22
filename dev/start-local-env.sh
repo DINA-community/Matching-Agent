@@ -503,10 +503,10 @@ execute() {
 		if [[ "$WITH_VOLUMES" == true ]]; then
 			info "-- [EXE] Recreating dev environment with volume reset (down -v; up)..."
 			$COMPOSE_CMD -f "$COMPOSE_FILE" down -v || true
-			$COMPOSE_CMD -f "$COMPOSE_FILE" up -d --force-recreate --remove-orphans
+			$COMPOSE_CMD -f "$COMPOSE_FILE" up -d --build --force-recreate --remove-orphans
 		else
 			info "-- [EXE] Starting dev environment (recreate containers)..."
-			$COMPOSE_CMD -f "$COMPOSE_FILE" up -d --force-recreate --remove-orphans
+			$COMPOSE_CMD -f "$COMPOSE_FILE" up -d --build --force-recreate --remove-orphans
 		fi
 		;;
 	up)
