@@ -56,7 +56,7 @@ After this, the source is not active yet. Here, the :ref:`checkbox <csaf-cisa-ac
 Provide NetBox Test Data
 ------------------------
 
-Load the sample assets through the NetBox API using the token printed by the ``netbox-setup`` container:
+Load the sample assets through the NetBox API using the token printed by the ``netbox-setup`` container (``docker logs netbox-setup``):
 
 .. code-block:: bash
 
