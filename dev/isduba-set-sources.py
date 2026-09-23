@@ -4,17 +4,19 @@
 # dependencies = ["httpx", "python-dotenv"]
 # ///
 """
-Configures default CSAF providers in ISDuBA via its REST API.
+Adds sources to the ISDuBA instances via its REST API.
 
+CSAF documents in `documents_dir` uploaded as single documents.
+
+Optionally also configures default CSAF providers in ISDuBA.
 Sources and the document age are read from dev/configuration/isduba-sources.json
-CSAF documents in ``documents_dir`` are uploaded as well.
-
 Existing sources with the same name are skipped, so the script is safe to re-run at any time.
 """
 
 import json
 import sys
 import time
+from argparse import ArgumentParser
 from functools import cache
 from pathlib import Path
 from typing import Any
@@ -100,7 +102,8 @@ def wait_for_isduba(client: httpx.Client, api: str):
 
 
 def feeds_from_pmd(pmd: dict[str, Any]) -> list[tuple[str, str]]:
-    """Return label and URL of the feeds advertised in the PMD. Mirrors what the ISDuBA UI does"""
+    """Return label and URL of the feeds advertised in the PMD. Mirrors what the ISDuBA UI does
+    https://github.com/ISDuBA/ISDuBA/blob/e5f0c58648ffaf74e83b3d5326943543e269e399/client/src/lib/Sources/source.ts#L256"""
     feeds = []
     for entry in pmd.get("distributions", []):
         for feed in (entry.get("rolie") or {}).get("feeds", []):
@@ -111,7 +114,11 @@ def feeds_from_pmd(pmd: dict[str, Any]) -> list[tuple[str, str]]:
             feeds.append((label, url))
         if directory_url := entry.get("directory_url"):
             parts = [p for p in directory_url.split("/") if p]
-            feeds.append((parts[-1] if parts else "directory", directory_url))
+            label = (parts[-1] if parts else "directory")
+            # If a feed label (last part of the URI) is not unique, append `#` until the label is unique
+            while label in {existing_label for existing_label, _ in feeds}:
+                label += '#'
+            feeds.append((label, directory_url))
     return feeds
 
 
@@ -211,6 +218,12 @@ def import_documents(client: httpx.Client, api: str, config: dict[str, Any]):
 
 
 def main() -> int:
+    parser = ArgumentParser('isduba-set-sources',
+                            description=__doc__)
+    parser.add_argument('--configure-sources', action='store_true',
+                        help='Also configure and activate CSAF providers as sources in ISDuBA')
+    args = parser.parse_args()
+
     if not ENV_FILE.is_file():
         error(f"{ENV_FILE.relative_to(REPO_ROOT)} not found. Run ./dev/start-local-env.sh first.")
         return 1
@@ -229,7 +242,8 @@ def main() -> int:
         client.headers["Authorization"] = f"Bearer {token}"
         wait_for_isduba(client, isduba_api)
 
-        create_sources(client, isduba_api, config)
+        if args.configure_sources:
+            create_sources(client, isduba_api, config)
         import_documents(client, isduba_api, config)
 
     info("--ISDuBA provider setup finished")
