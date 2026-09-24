@@ -32,6 +32,11 @@ The matches can be retrieved via a REST API, and alternatively, a hook can be se
 
 For more details about the synchronizer infrastructure, see the Synchronizer Infrastructure README. (TODO)
 
+## Documentation
+
+Read the [documentation](https://dina-community.github.io/Matching-Agent/) online, or build it locally with
+`make docs` and open `docs/_build/html/index.html`.
+
 ## Getting Started
 
 ### Requirements
@@ -55,7 +60,8 @@ cd Matching-Agent
 uv sync --extra isduba_fetcher # If you plan to use the ISDuBA CSAF source (default plugin name `isduba_fetcher`)
 ```
 
-You can either build the docs with `make docs` and follow the instructions there or proceed with the instructions below.
+You can follow the [Getting Started guide](https://dina-community.github.io/Matching-Agent/getting-started.html)
+or proceed with the instructions below.
 
 ## Installation
 
@@ -374,9 +380,9 @@ This repository ships a simple production‑ready Docker setup that runs the thr
 
 The core services themselves do not implement native TLS listeners. Without a reverse proxy, there is no TLS support for external traffic. This separation is intentional and follows common industry practice (TLS termination at the edge proxy, application services kept lean).
 
-For instructions on how to set up the environment, see the corresponding section in the docs.
+For instructions on how to set up the environment, see the
+[production setup guide](https://dina-community.github.io/Matching-Agent/production-setup.html).
 For professional deployments, use the SSL/TLS guidance in the production docs (trusted certificates, reverse proxy hardening, and NGINX example configuration).
-The docs are built with `make docs` and can be found in the `docs/_build/html/production-setup.html` directory.
 
 > Note Under development see [Issue #9](https://github.com/DINA-community/Matching-Agent/issues/9)
 
