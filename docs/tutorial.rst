@@ -53,12 +53,16 @@ After this, the source is not active yet. Here, the :ref:`checkbox <csaf-cisa-ac
    Activate source by setting the checkbox by "Active". Also the document age was set to 5 years (default 2 years).
 
 
-Provide NetBox Database
+Provide NetBox Test Data
 ------------------------
 
-In order to have a small test sample of assets, execute the ``db_overwrite.sh`` script in the ``dev/test-cases`` folder.
-The SQL file provides data for device types, module types, and software. Every asset is linked in some way to a device,
-which allows possible matches to be displayed there at the end.
+Load the sample assets through the NetBox API using the token printed by the ``netbox-setup`` container (``docker logs netbox-setup``):
+
+.. code-block:: bash
+
+   NETBOX_TOKEN='<token>' uv run dev/test-cases/load_tutorial_fixture.py --url http://netbox.localhost
+
+The loader reads ``dev/test-cases/tutorial-1.fixture.json`` and creates or updates the device types, devices, modules, and software used below.
 
 
 NetBox
@@ -162,9 +166,8 @@ at distinguishing between `exact matches` and `partial matches`.
 Test Data Set
 ------------------------
 
-In the present `dev/test-cases/tutorial-1.sql` matches should be seen for the following devices, modules and software.
-In order to use this data set, use the `dev/test-cases/db_overwrite.sh` after shut down running API of the matching-agent. 
-Be aware, that this will delete your current netbox entries.
+With ``dev/test-cases/tutorial-1.fixture.json`` loaded, matches should be seen for the following devices, modules, and software.
+The NetBox IDs in the tables below come from the old SQL dump and may differ after loading the fixture through the API. Identify assets by name and type.
 
 Matches
 ~~~~~~~~~~~~~~~~~~~~~~~~

@@ -34,7 +34,7 @@ def mock_config():
     """Creates a fake plugin configuration for tests."""
     plugin_data = NetboxDataSource.Config(
         api_url=HttpUrl("https://fake.netbox"),
-        api_token="fake-token",
+        api_token="nbt_0123456789ab.0123456789abcdef0123456789abcdef01234567",
     )
     ds_cfg = DataSourceConfig(
         plugin_name="netbox",
@@ -411,3 +411,32 @@ async def test_cleanup_relationships_keeps_and_deletes(monkeypatch, mock_config)
 
     deleted = next(r for r in result if r.origin_info["relation_id"] == 20)
     assert deleted.can_delete is True
+
+
+@pytest.mark.asyncio
+async def test_v2_authorization_on_requests(mock_config):
+    """Checks that requests use NetBox v2 token authentication."""
+    sent_requests: list[httpx.Request] = []
+
+    def handle_request(request: httpx.Request) -> httpx.Response:
+        sent_requests.append(request)
+        # cleanup_products uses paginated list endpoints whose generated response
+        # models require count and results.
+        return httpx.Response(200, json={"count": 0, "results": []})
+
+    mock_config.client._httpx_args["transport"] = httpx.MockTransport(handle_request)
+
+    asset = Asset(
+        id=1,
+        product=Product(product_type=ProductType.Device),
+        origin_info={"device_id": 1},
+    )
+
+    async with mock_config.client:
+        await mock_config.cleanup_products([asset])
+
+    assert sent_requests
+    assert all(
+        request.headers["Authorization"] == f"Bearer {mock_config.config.DataSource.Plugin.api_token}"
+        for request in sent_requests
+    )

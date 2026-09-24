@@ -106,7 +106,7 @@ class NetboxDataSource(DataSourcePlugin):
             netbox = self.config.DataSource.Plugin
             self.client = AuthenticatedClient(
                 base_url=str(netbox.api_url),
-                prefix="Token",
+                prefix="Bearer",
                 token=netbox.api_token,
                 raise_on_unexpected_status=True,
             )

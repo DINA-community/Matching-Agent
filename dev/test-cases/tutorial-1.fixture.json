@@ -1,0 +1,478 @@
+{
+  "sites": [
+    {
+      "name": "PoC",
+      "slug": "poc",
+      "status": "active",
+      "description": ""
+    }
+  ],
+  "device_roles": [
+    {
+      "name": "RTU-PLC",
+      "slug": "rtu-plc",
+      "description": "Network-external channel for controlling the system."
+    }
+  ],
+  "manufacturers": [
+    {
+      "name": "Unspecified",
+      "slug": "unspecified",
+      "description": ""
+    },
+    {
+      "name": "Mitsubishi Electric Iconics Digital Solutions",
+      "slug": "mitsubishi-electric-iconics-digital-solutions",
+      "description": "Spelling from icsa-24-338-04 CSAFID08-13"
+    },
+    {
+      "name": "Mitsubishi Electric",
+      "slug": "mitsubishi-electric",
+      "description": "Spelling from icsa-24-338-04 CSAFID01-07"
+    },
+    {
+      "name": "Hitachi Energy",
+      "slug": "hitachi-energy",
+      "description": "Spelling from icsa-26-008-01"
+    },
+    {
+      "name": "AzeoTech",
+      "slug": "azeotech",
+      "description": "Spelling from icsa-25-345-03"
+    },
+    {
+      "name": "Schneider Electric",
+      "slug": "schneider-electric",
+      "description": "Spelling from icsa-24-352-04"
+    },
+    {
+      "name": "ABB",
+      "slug": "abb",
+      "description": "Spelling from icsa-25-007-01"
+    },
+    {
+      "name": "Siemens",
+      "slug": "siemens",
+      "description": "Spelling from ssa-674753"
+    }
+  ],
+  "device_types": [
+    {
+      "manufacturer": "Unspecified",
+      "model": "unspecified  unspecified",
+      "slug": "unspecified  unspecified",
+      "part_number": "",
+      "description": "",
+      "comments": "",
+      "custom_fields": {
+        "model_number": "unspecified",
+        "device_family": "unspecified",
+        "hardware_name": "",
+        "hardware_version": "",
+        "device_description": ""
+      }
+    },
+    {
+      "manufacturer": "Siemens",
+      "model": "SCALANCE Hardware SC622-2C 6GK5622-2GS00-2AC2 1.2",
+      "slug": "SCALANCE Hardware SC622-2C 6GK5622-2GS00-2AC2 1.2",
+      "part_number": "6GK5622-2GS00-2AC2",
+      "description": "",
+      "comments": "",
+      "custom_fields": {
+        "model_number": "SC622-2C",
+        "device_family": "SCALANCE",
+        "hardware_name": "Hardware",
+        "hardware_version": "1.2",
+        "device_description": "A Siemens device type"
+      }
+    },
+    {
+      "manufacturer": "Siemens",
+      "model": "SIMATIC  ",
+      "slug": "SIMATIC  ",
+      "part_number": "",
+      "description": "",
+      "comments": "",
+      "custom_fields": {
+        "model_number": "",
+        "device_family": "SIMATIC",
+        "hardware_name": "",
+        "hardware_version": "",
+        "device_description": ""
+      }
+    },
+    {
+      "manufacturer": "ABB",
+      "model": "NEXUS Series NEX-2 3.08.01",
+      "slug": "NEXUS-Series-NEX-2-3-08-01",
+      "part_number": "",
+      "description": "NEXUS Series",
+      "comments": "Data for icsa-25-007-01 matching CSAFID 7, 9, 13",
+      "custom_fields": {
+        "cpe": "",
+        "model_number": "NEX-2",
+        "device_family": "NEXUS Series",
+        "hardware_name": "-",
+        "hardware_version": "3.08.01",
+        "device_description": ""
+      }
+    },
+    {
+      "manufacturer": "ABB",
+      "model": "NEXUS Series NEX-2 3.08.00",
+      "slug": "NEXUS-Series-NEX-2-3-08-00",
+      "part_number": "",
+      "description": "",
+      "comments": "Matchting icsa-25-007-01 CSAFID 7 , 9 ,11 12, 13",
+      "custom_fields": {
+        "cpe": "",
+        "model_number": "NEX-2",
+        "device_family": "NEXUS Series",
+        "hardware_name": "-",
+        "hardware_version": "3.08.00",
+        "device_description": ""
+      }
+    },
+    {
+      "manufacturer": "Siemens",
+      "model": "SIPLUS ET 200MP 6AG1155-5AA00-2AC0",
+      "slug": "SIPLUS-ET-200MP-6AG1155-5AA00-2AC0",
+      "part_number": "6AG1155-5AA00-2AC0",
+      "description": "",
+      "comments": "",
+      "custom_fields": {
+        "cpe": "",
+        "model_number": "ET",
+        "device_family": "SIPLUS",
+        "hardware_name": "200MP",
+        "hardware_version": "",
+        "device_description": ""
+      }
+    },
+    {
+      "manufacturer": "Siemens",
+      "model": "SIPLUS ET 200MP",
+      "slug": "SIPLUS-ET-200MP",
+      "part_number": "",
+      "description": "",
+      "comments": "",
+      "custom_fields": {
+        "cpe": "",
+        "model_number": "ET 200MP",
+        "device_family": "SIPLUS",
+        "hardware_name": "-",
+        "hardware_version": "",
+        "device_description": ""
+      }
+    },
+    {
+      "manufacturer": "Siemens",
+      "model": "SIPLUS ET 200SP",
+      "slug": "SIPLUS-ET-200SP",
+      "part_number": "",
+      "description": "",
+      "comments": "",
+      "custom_fields": {
+        "cpe": "",
+        "model_number": "ET",
+        "device_family": "SIPLUS",
+        "hardware_name": "200SP",
+        "hardware_version": "",
+        "device_description": ""
+      }
+    },
+    {
+      "manufacturer": "Schneider Electric",
+      "model": "Modicon Controllers M241 5.2.11.29",
+      "slug": "Modicon-Controllers-M241-5-2-11-29",
+      "part_number": "",
+      "description": "",
+      "comments": "",
+      "custom_fields": {
+        "cpe": "",
+        "model_number": "M241",
+        "device_family": "Modicon Controllers",
+        "hardware_name": "-",
+        "hardware_version": "5.2.11.29",
+        "device_description": ""
+      }
+    },
+    {
+      "manufacturer": "Schneider Electric",
+      "model": "Modicon Controllers M251 5.0.0.0",
+      "slug": "Modicon-Controllers-M251-5-0-0-0",
+      "part_number": "",
+      "description": "",
+      "comments": "",
+      "custom_fields": {
+        "cpe": "",
+        "model_number": "M251",
+        "device_family": "Modicon Controllers",
+        "hardware_name": "5.0.0.0",
+        "hardware_version": "",
+        "device_description": ""
+      }
+    },
+    {
+      "manufacturer": "Schneider Electric",
+      "model": "Modicon Controllers LMC058 5.0.4.19",
+      "slug": "Modicon-Controllers-LMC058-5-0-4-19",
+      "part_number": "",
+      "description": "",
+      "comments": "",
+      "custom_fields": {
+        "cpe": "",
+        "model_number": "LMC058",
+        "device_family": "Modicon Controllers",
+        "hardware_name": "-",
+        "hardware_version": "5.0.4.19",
+        "device_description": ""
+      }
+    }
+  ],
+  "devices": [
+    {
+      "name": "Siplus 1001 - Style 5",
+      "role": "RTU-PLC",
+      "device_type": "SIPLUS ET 200SP",
+      "device_type_manufacturer": "Siemens",
+      "site": "PoC",
+      "description": "Module base device for ssa-674753",
+      "custom_fields": {}
+    },
+    {
+      "name": "Siplus 1001 - Style 1",
+      "role": "RTU-PLC",
+      "device_type": "SIPLUS ET 200SP",
+      "device_type_manufacturer": "Siemens",
+      "site": "PoC",
+      "description": "",
+      "custom_fields": {
+        "safety": false,
+        "exposure": "unknown"
+      }
+    },
+    {
+      "name": "Nexus ultimate 2 Station A",
+      "role": "RTU-PLC",
+      "device_type": "NEXUS Series NEX-2 3.08.00",
+      "device_type_manufacturer": "ABB",
+      "site": "PoC",
+      "description": "Match for icsa-25-007-01 ID 07-09-12",
+      "custom_fields": {}
+    },
+    {
+      "name": "Nexus ultimate 2 Station B",
+      "role": "RTU-PLC",
+      "device_type": "NEXUS Series NEX-2 3.08.01",
+      "device_type_manufacturer": "ABB",
+      "site": "PoC",
+      "description": "Match for icsa-25-007-01 ID 07-09",
+      "custom_fields": {}
+    },
+    {
+      "name": "Modicon LMC",
+      "role": "RTU-PLC",
+      "device_type": "Modicon Controllers LMC058 5.0.4.19",
+      "device_type_manufacturer": "Schneider Electric",
+      "site": "PoC",
+      "description": "Match icsa-24-352-04 IP-06",
+      "custom_fields": {}
+    }
+  ],
+  "module_types": [
+    {
+      "manufacturer": "Siemens",
+      "model": "IM 155-6 PN HF 4.2.0 6AG1155-6AU01-2CN0",
+      "part_number": "",
+      "description": ""
+    },
+    {
+      "manufacturer": "Siemens",
+      "model": "IM 155-5 PN HF 4.2.0 (6AG1155-5AA00-7AC0)",
+      "part_number": "6AG1155-5AA00-7AC0",
+      "description": ""
+    },
+    {
+      "manufacturer": "Siemens",
+      "model": "IM 155-6 PN HF TX RAIL 4.2.2 (6AG2155-6AU01-4CN0)",
+      "part_number": "6AG2155-6AU01-4CN0",
+      "description": ""
+    }
+  ],
+  "module_bays": [
+    {
+      "device": "Siplus 1001 - Style 5",
+      "name": "Bay-02",
+      "label": "",
+      "position": "",
+      "description": ""
+    },
+    {
+      "device": "Siplus 1001 - Style 5",
+      "name": "Bay01-IM",
+      "label": "",
+      "position": "01",
+      "description": ""
+    },
+    {
+      "device": "Siplus 1001 - Style 5",
+      "name": "Bay-03",
+      "label": "",
+      "position": "",
+      "description": ""
+    },
+    {
+      "device": "Siplus 1001 - Style 1",
+      "name": "Bay-01",
+      "label": "",
+      "position": "",
+      "description": ""
+    },
+    {
+      "device": "Siplus 1001 - Style 1",
+      "name": "Bay-02",
+      "label": "",
+      "position": "",
+      "description": ""
+    },
+    {
+      "device": "Siplus 1001 - Style 1",
+      "name": "Bay-03",
+      "label": "",
+      "position": "",
+      "description": ""
+    }
+  ],
+  "modules": [
+    {
+      "device": "Siplus 1001 - Style 5",
+      "module_bay": "Bay01-IM",
+      "module_type": "IM 155-6 PN HF 4.2.0 6AG1155-6AU01-2CN0",
+      "module_type_manufacturer": "Siemens",
+      "description": "PN HF 6AG1155-6AU01-7CN0",
+      "status": "active"
+    },
+    {
+      "device": "Siplus 1001 - Style 5",
+      "module_bay": "Bay-02",
+      "module_type": "IM 155-5 PN HF 4.2.0 (6AG1155-5AA00-7AC0)",
+      "module_type_manufacturer": "Siemens",
+      "description": "",
+      "status": "active"
+    },
+    {
+      "device": "Siplus 1001 - Style 5",
+      "module_bay": "Bay-03",
+      "module_type": "IM 155-6 PN HF TX RAIL 4.2.2 (6AG2155-6AU01-4CN0)",
+      "module_type_manufacturer": "Siemens",
+      "description": "",
+      "status": "active"
+    }
+  ],
+  "software": [
+    {
+      "manufacturer": "Hitachi Energy",
+      "name": "Asset Suite",
+      "version": "9.7",
+      "is_firmware": false,
+      "cpe": "",
+      "purl": ""
+    },
+    {
+      "manufacturer": "AzeoTech",
+      "name": "DAQFactory",
+      "version": "20.7_Build_2555",
+      "is_firmware": null,
+      "cpe": "",
+      "purl": ""
+    },
+    {
+      "manufacturer": "Mitsubishi Electric",
+      "name": "GENESIS64",
+      "version": "10.97.3",
+      "is_firmware": null,
+      "cpe": "",
+      "purl": ""
+    },
+    {
+      "manufacturer": "Mitsubishi Electric Iconics Digital Solutions",
+      "name": "GENESIS64",
+      "version": "10.97.3",
+      "is_firmware": null,
+      "cpe": "",
+      "purl": ""
+    },
+    {
+      "manufacturer": "AzeoTech",
+      "name": "ICONICS Suite",
+      "version": "10.97.2_CFR2",
+      "is_firmware": null,
+      "cpe": "",
+      "purl": ""
+    },
+    {
+      "manufacturer": "ABB",
+      "name": "ASPECT Enterprise",
+      "version": "3.08.00",
+      "is_firmware": null,
+      "cpe": "",
+      "purl": ""
+    }
+  ],
+  "product_relationships": [
+    {
+      "source": {
+        "kind": "device",
+        "name": "Siplus 1001 - Style 1"
+      },
+      "category": "4",
+      "destination": {
+        "kind": "software",
+        "manufacturer": "Mitsubishi Electric",
+        "name": "GENESIS64",
+        "version": "10.97.3"
+      }
+    },
+    {
+      "source": {
+        "kind": "device",
+        "name": "Nexus ultimate 2 Station A"
+      },
+      "category": "4",
+      "destination": {
+        "kind": "software",
+        "manufacturer": "Mitsubishi Electric Iconics Digital Solutions",
+        "name": "GENESIS64",
+        "version": "10.97.3"
+      }
+    },
+    {
+      "source": {
+        "kind": "device",
+        "name": "Nexus ultimate 2 Station B"
+      },
+      "category": "4",
+      "destination": {
+        "kind": "software",
+        "manufacturer": "Mitsubishi Electric",
+        "name": "GENESIS64",
+        "version": "10.97.3"
+      }
+    },
+    {
+      "source": {
+        "kind": "software",
+        "manufacturer": "Hitachi Energy",
+        "name": "Asset Suite",
+        "version": "9.7"
+      },
+      "category": "3",
+      "destination": {
+        "kind": "device",
+        "name": "Siplus 1001 - Style 5"
+      }
+    }
+  ]
+}

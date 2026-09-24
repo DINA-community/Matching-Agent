@@ -10,5 +10,5 @@ publish_matches = true
 [DataSource.Plugin]
 # The api url from which the netbox fetcher plugin shall fetch the data
 api_url = "http://netbox.example.org/"
-# The api token the fetcher plugin will use to authenticate with the endpoint.
-api_token = "sample_token"
+# Full NetBox v2 credential (nbt_<key>.<secret>), without the Bearer prefix.
+api_token = "nbt_<key>.<secret>"
