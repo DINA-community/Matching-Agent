@@ -9,26 +9,31 @@ This plugin allows integration with Netbox to retrieve device and infrastructure
 - Running Netbox instance
 - Asset-CSAF matcher core application
 
-## Installation Netbox API
+## Updating `assets/netbox-api.yaml`
 
-TODO
+`assets/netbox-api.yaml` is the OpenAPI/Swagger specification of NetBox itself.
+The file is used by `build_hook.py`.
 
-curl -o netbox-api-swagger.yaml http://<netbox-host>:8000/api/schema/ -H "Authorization: Bearer nbt_<key>.<secret>"
+Steps for updating the file:
 
+1. Fetch the schema from a running NetBox instance:
 
-in netbox-api-swagger.yaml delete the following:
-devicetype_count: L132178, L147825
+   ```bash
+   curl -o netbox-api.yaml http://<netbox-host>:8000/api/schema/ -H "Authorization: Bearer nbt_<key>.<secret>"
+   ```
 
-device_count: L131369 L131425 L132365 L132757 L135291 L139171 L139442 L147593
-L162416 L166567 L169155 L169891
+   Or use your browser and fetch the URL.
 
-virtualmachine_count: L130937 L131373 L132368 L135296 L139174 L162418 L169158 L169895
+   Save the file at `assets/netbox-api.yaml`.
 
+2. Patch some known incompatibilities with `openapi-python-client` (see also [#133](https://github.com/DINA-community/Matching-Agent/issues/133)):
 
-python3 -m venv venv
-source /home/assetmgr/venv/bin/activate
-python3 -m openapi_python_client generate --path /home/netbox-api/netbox-api-swagger.yaml
+   ```bash
+   sed -i 's/m³/m^3/g' assets/netbox-api.yaml
+   ```
 
-in models/device_with_config_context.py comment 
-face, position, airflow: L663 L871 L663 ‚L875
+3. Verify the result builds fine by running:
 
+   ```bash
+   uv build
+   ```
