@@ -164,7 +164,7 @@ services:
     entrypoint: ["/usr/bin/tini", "--", "/opt/netbox/docker-entrypoint-plugins.sh", "/opt/netbox/docker-entrypoint.sh"]
     command: ["/opt/netbox/launch-netbox.sh"]
     healthcheck:
-      test: curl -f http://localhost:8080/login/ || exit 1
+      test: /opt/netbox/health.sh
       start_period: 180s
       timeout: 5s
       interval: 15s
