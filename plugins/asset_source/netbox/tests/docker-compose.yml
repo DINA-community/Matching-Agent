@@ -37,7 +37,7 @@ services:
       ALLOWED_HOSTS: "*"
       SKIP_SUPERUSER: "true"
     user: "netbox:root"
-    entrypoint: ["/usr/bin/tini", "--", "/opt/netbox/docker-entrypoint-plugins.sh", "/opt/netbox/docker-entrypoint.sh"]
+    entrypoint: ["/usr/bin/tini", "--", "bash", "/opt/netbox/test-entrypoint.sh"]
     command: ["/opt/netbox/launch-netbox.sh"]
     healthcheck:
       test: curl -f http://localhost:8080/login/ || exit 1
@@ -48,10 +48,14 @@ services:
     networks:
       - netbox
     volumes:
-      - ../../../../dev/configuration:/etc/netbox/config:ro
+      - ../../../../dev/configuration/configuration.py:/etc/netbox/config/configuration.py:ro
+      - ../../../../dev/configuration/plugins.py.example:/etc/netbox/config/plugins.py:ro
       - ../../../../dev/init-scripts:/opt/netbox/init-scripts:ro
-      - ../../../../dev/plugins/d3c:/opt/netbox-plugins/d3c
-      - ../../../../dev/plugins/csaf:/opt/netbox-plugins/csaf
+      - ./netbox-entrypoint.sh:/opt/netbox/test-entrypoint.sh:ro
+      - ../../../../dev/plugins/d3c:/test-plugins/d3c:ro
+      - ../../../../dev/plugins/csaf:/test-plugins/csaf:ro
+    tmpfs:
+      - /opt/netbox-plugins:mode=1777
 
   # postgres
   postgres:
