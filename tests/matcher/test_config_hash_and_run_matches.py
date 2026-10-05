@@ -6,13 +6,44 @@ from types import SimpleNamespace
 
 from dina.common.log import LoggingConfig
 from dina.matcher.config_hash import hash_matching_config
-from dina.matcher.main import match_pairs
+from dina.matcher.main import Matcher, match_pairs
 
 
 def test_hash_matching_config_is_order_independent():
     a = {"database": {"freetext_fields": {"name": 1.0, "manufacturer_name": 0.5}}}
     b = {"database": {"freetext_fields": {"manufacturer_name": 0.5, "name": 1.0}}}
     assert hash_matching_config(a) == hash_matching_config(b)
+
+
+def test_hash_matching_config_changes_when_config_changes() -> None:
+    base = {"threshold": {"vendor": 60}}
+    changed = {"threshold": {"vendor": 61}}
+
+    assert hash_matching_config(base) != hash_matching_config(changed)
+
+
+def test_merge_matching_config_recursively() -> None:
+    base = {
+        "threshold": {"vendor": 60, "version": 70},
+        "ngram": {"weights": {2: 0.5, 3: 0.5}},
+    }
+    overrides = {"threshold": {"vendor": 80, "keyword": 65}}
+
+    result = Matcher._merge_matching_config(base, overrides)
+
+    assert result == {
+        "threshold": {"vendor": 80, "version": 70, "keyword": 65},
+        "ngram": {"weights": {2: 0.5, 3: 0.5}},
+    }
+
+
+def test_merge_matching_config_does_not_modify_base() -> None:
+    base = {"threshold": {"vendor": 60, "version": 70}}
+
+    result = Matcher._merge_matching_config(base, {"threshold": {"vendor": 80}})
+
+    assert result["threshold"]["vendor"] == 80
+    assert base == {"threshold": {"vendor": 60, "version": 70}}
 
 
 def test_match_pairs_sets_run_and_config_hash():
