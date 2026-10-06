@@ -9,7 +9,7 @@ dep() { echo "--[DEP] $*" >&2; }
 if command -v apt-get >/dev/null 2>&1; then
 	package_manager=apt
 	basic_packages=(curl git ca-certificates pipx)
-	jdk_packages=(openjdk-21-jre openjdk-21-jdk)
+	jdk_packages=(default-jre default-jdk)
 	docker_packages=(docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin)
 elif command -v pacman >/dev/null 2>&1; then
 	package_manager=pacman
