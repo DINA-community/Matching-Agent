@@ -286,19 +286,34 @@
       "manufacturer": "Siemens",
       "model": "IM 155-6 PN HF 4.2.0 6AG1155-6AU01-2CN0",
       "part_number": "",
-      "description": ""
+      "description": "",
+      "custom_fields": {
+        "module_family": "IM",
+        "model_number": "-",
+        "hardware_name": "-"
+      }
     },
     {
       "manufacturer": "Siemens",
       "model": "IM 155-5 PN HF 4.2.0 (6AG1155-5AA00-7AC0)",
       "part_number": "6AG1155-5AA00-7AC0",
-      "description": ""
+      "description": "",
+      "custom_fields": {
+        "module_family": "IM",
+        "model_number": "-",
+        "hardware_name": "-"
+      }
     },
     {
       "manufacturer": "Siemens",
       "model": "IM 155-6 PN HF TX RAIL 4.2.2 (6AG2155-6AU01-4CN0)",
       "part_number": "6AG2155-6AU01-4CN0",
-      "description": ""
+      "description": "",
+      "custom_fields": {
+        "module_family": "IM",
+        "model_number": "-",
+        "hardware_name": "-"
+      }
     }
   ],
   "module_bays": [

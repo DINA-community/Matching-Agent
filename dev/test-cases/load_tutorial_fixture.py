@@ -172,7 +172,7 @@ def load_fixture(api: NetBoxApi, fixture: Record) -> None:
     }
     for item in fixture["module_types"]:
         key = manufacturer_ids[item["manufacturer"]], item["model"]
-        values = fields(item, ("model", "part_number", "description"))
+        values = fields(item, ("model", "part_number", "description", "custom_fields"))
         values["manufacturer"] = key[0]
         module_types[key] = upsert(api, endpoint, module_types.get(key), values)
     module_type_ids = {key: item["id"] for key, item in module_types.items()}
