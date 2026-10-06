@@ -31,6 +31,7 @@ class NetBoxApi:
             base_url=f"{url.rstrip('/')}/api/",
             headers={"Authorization": f"Bearer {token}"},
             timeout=30.0,
+            verify=False,
         )
 
     def close(self) -> None:

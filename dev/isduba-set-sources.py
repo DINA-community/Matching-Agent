@@ -79,14 +79,18 @@ def get_token(client: httpx.Client) -> str:
 
     deadline = time.monotonic() + KEYCLOAK_TIMEOUT
     while True:
+        last_exc = None
         try:
             response = client.post(url, data=login_data)
             if response.is_success and (token := response.json().get("access_token")):
                 return token
-        except httpx.HTTPError:
+        except httpx.HTTPError as exc:
+            last_exc = exc
             pass  # not up yet
         if time.monotonic() >= deadline:
-            error("Could not obtain an access token from Keycloak within the timeout")
+            error(f"Could not obtain an access token from Keycloak ({url}) within the timeout")
+            if last_exc:
+                warning(f"Exception: {last_exc!s}")
             sys.exit(1)
         time.sleep(2)
 
@@ -242,7 +246,7 @@ def main() -> int:
     isduba_url = get_env("ISDUBA_CLIENT_HOSTNAME_URL", service_for_url("isduba"))
     isduba_api = f"{isduba_url.rstrip('/')}/api"
 
-    with httpx.Client(timeout=TIMEOUT) as client:
+    with httpx.Client(timeout=TIMEOUT, verify=False) as client:
         token = get_token(client)
         client.headers["Authorization"] = f"Bearer {token}"
         wait_for_isduba(client, isduba_api)

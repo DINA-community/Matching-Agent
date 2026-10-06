@@ -53,6 +53,8 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.keycloak.rule=Host(`keycloak.${DEV_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.keycloak.entrypoints=web,websecure"
+      - "traefik.http.routers.keycloak.tls=true"
       - "traefik.http.services.keycloak.loadbalancer.server.port=8080"
 
   keycloak-setup:
@@ -111,6 +113,8 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.isduba.rule=Host(`isduba.${DEV_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.isduba.entrypoints=web,websecure"
+      - "traefik.http.routers.isduba.tls=true"
       - "traefik.http.services.isduba.loadbalancer.server.port=8081"
 
   # redis
@@ -184,6 +188,8 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.netbox.rule=Host(`netbox.${DEV_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.netbox.entrypoints=web,websecure"
+      - "traefik.http.routers.netbox.tls=true"
       - "traefik.http.services.netbox.loadbalancer.server.port=8080"
 
   netbox-worker:
@@ -254,6 +260,7 @@ services:
       - --entrypoints.websecure.address=:443
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
@@ -262,6 +269,8 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.traefik.rule=Host(`traefik.${DEV_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.traefik.entrypoints=web,websecure"
+      - "traefik.http.routers.traefik.tls=true"
       - "traefik.http.services.traefik.loadbalancer.server.port=8080"
 
 volumes:

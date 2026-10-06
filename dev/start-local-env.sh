@@ -147,6 +147,35 @@ get_domain() {
 	echo "${domain:-$DOMAIN_DEFAULT}"
 }
 
+get_scheme() {
+	# Custom domains require HTTPS, because of the ISDuBA login
+	if [ "$(get_domain)" == "$DOMAIN_DEFAULT" ]; then
+		echo "http"
+	else
+		echo "https"
+	fi
+}
+
+set_domain_urls() {
+	# Rewrites the service URLs in the env file to follow DEV_DOMAIN.
+	# Does nothing with the default domain
+	local domain
+	domain=$(get_domain)
+	if [ "$domain" == "$DOMAIN_DEFAULT" ]; then
+		info "--[ENV] DEV_DOMAIN is '$domain', keep default URLs"
+		return 0
+	fi
+	local scheme
+	scheme=$(get_scheme)
+	info "--[ENV] Applying DEV_DOMAIN='$domain' to URLs ($scheme)"
+	local entry key host
+	for entry in "${DOMAIN_URLS[@]}"; do
+		key=${entry%% *}
+		host=${entry##* }
+		sed -i "s|^\($key=\).*|\1$scheme://$host.$domain|" "$ENV_FILE"
+	done
+}
+
 set_local_toml() {
 	info "--[ENV] Set local toml files"
 	local -A REPLACEMENTS=(
