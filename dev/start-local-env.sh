@@ -34,6 +34,7 @@ ISDUBA_SOURCES_FILE="dev/configuration/isduba-sources.json"
 ISDUBA_SOURCES_SAMPLE="dev/configuration/isduba-sources.example.json"
 LOCAL_SETTING="FULLY_LOCAL"
 JWT="JWT_KEY"
+DOMAIN_DEFAULT="localhost"
 
 ENV_FILES=(
 	".env"
@@ -49,6 +50,14 @@ FILE_PAIRS=(
 	"dev/configuration/.env.isduba.example dev/isduba/docker/.env"
 	"$PLUGINS_SAMPLE $PLUGINS_FILE"
 	"$ISDUBA_SOURCES_SAMPLE $ISDUBA_SOURCES_FILE"
+)
+
+# URLs of services from the env
+DOMAIN_URLS=(
+	"KC_HOSTNAME keycloak"
+	"ISDUBA_CLIENT_KEYCLOAK_URL keycloak"
+	"ISDUBA_CLIENT_HOSTNAME_URL isduba"
+	"NETBOX_CLIENT_HOSTNAME_URL netbox"
 )
 
 API_PID=(
@@ -109,6 +118,7 @@ need_env() {
 			}
 			sed -i "s|^\($LOCAL_SETTING=\).*|\1true|" "$ENV_FILE"
 			info "--[ENV] $ENV_FILE created from $ENV_SAMPLE"
+			set_domain_urls
 			# Remove # for plugin_settings in plugins.py
 			set_plugin_config
 			set_local_toml
@@ -122,6 +132,19 @@ need_env() {
 			fi
 		fi
 	fi
+}
+
+read_env_value() {
+	# Reads the last value of KEY from the env file, empty if the file or key is absent
+	[ -f "$ENV_FILE" ] || return 0
+	grep -E "^$1=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2- || true
+}
+
+get_domain() {
+	# Domain suffix for the Traefik-routed services, defaults to localhost
+	local domain
+	domain=$(read_env_value "DEV_DOMAIN")
+	echo "${domain:-$DOMAIN_DEFAULT}"
 }
 
 set_local_toml() {
@@ -146,21 +169,44 @@ set_local_toml() {
 	info "--[ENV] Set local toml files done"
 }
 
+set_plugin_keycloak_url() {
+	## Keep the NetBox plugin config in sync with DEV_DOMAIN
+	local domain scheme
+	domain=$(get_domain)
+	scheme=$(get_scheme)
+	sed -i "s|^\(\s*'keycloak_url':\s*\).*|\1'$scheme://keycloak.$domain/',|" "$PLUGINS_FILE"
+}
+
 set_plugin_config() {
-	## setup assumes a comment out plugin_config
+	## create dev/configuration/plugins.py from dev/configuration/plugins.py.example
+	## Searches for the line `PLUGINS_CONFIG`
+	## and comments out the entire block
+
+	## Check if the plugins.py exists, if not create it from the template
 	if [[ ! -f "$PLUGINS_FILE" ]]; then
 		info "--[ENV] $PLUGINS_FILE is missing. $PLUGINS_SAMPLE will be modified and used."
 		cp -p "$PLUGINS_SAMPLE" "$PLUGINS_FILE"
 	fi
+
+	## Plugin config exists from a previous run, only keep the domain in sync
+	if ! grep -q '^# PLUGINS_CONFIG' "$PLUGINS_FILE" && grep -q '^PLUGINS_CONFIG' "$PLUGINS_FILE"; then
+		info "--[ENV] PLUGINS_CONFIG in $PLUGINS_FILE is already enabled"
+		set_plugin_keycloak_url
+		return 0
+	fi
+
 	## checks before action
 	LINE_START=$(awk '/^# PLUGINS_CONFIG/ { print NR }' $PLUGINS_FILE)
 	LINE_STOP=$(awk -v start="$LINE_START" 'NR > start && /^# }/ { print NR }' $PLUGINS_FILE)
 	[[ -n $LINE_START && -n $LINE_STOP ]] || {
-		echo "ERROR: Line boundaries for commenting in plugin settings not found"
+		echo "ERROR: Line boundaries for plugin settings in dev/configuraion/plugins.py not found."
+		echo "ERROR: Fix it manually or recreate it from dev/configuraion/plugins.py.example"
 		exit 1
 	}
+	## The detected config block is expected to be exactly 31 lines long
 	if (( LINE_STOP - LINE_START == 31 )); then
 		sed -i "${LINE_START},${LINE_STOP}s/^#\s//" $PLUGINS_FILE
+		set_plugin_keycloak_url
 	else
 		warning "--[ENV] Schema of PLUGIN_CONFIG seems to have changed. Installation stopped."
 		exit 1
@@ -303,11 +349,15 @@ prune_project_images() {
 }
 
 print_post_instructions() {
+	local domain scheme
+	domain=$(get_domain)
+	scheme=$(get_scheme)
 	cat <<EOF
 
 Services are starting. Useful info:
-- NetBox UI:     http://netbox.localhost/  (admin / admin)
-- ISDuBA UI:     http://isduba.localhost/  (user / user)
+- NetBox UI:     $scheme://netbox.$domain/  (admin / admin)
+- ISDuBA UI:     $scheme://isduba.$domain/  (user / user)
+- Keycloak UI:   $scheme://keycloak.$domain/
 
 To get the NetBox API token printed by the setup container:
   $COMPOSE_CMD -f $COMPOSE_FILE logs netbox-setup
@@ -470,9 +520,8 @@ checks() {
 		# The csaf/d3c plugins are mounted into the netbox container.
 		# Netbox then installs the plugins at container start in editable mode as unprivileged user.
 		# The setuptools installation (create metadata egg-info) requires write access to the submodule directories.
-		if [[ -d "dev/plugins/csaf" || -d "dev/plugins/d3c" ]]; then
-			chmod o+w dev/plugins/csaf dev/plugins/d3c 2>/dev/null || true
-		fi
+		chmod o+w dev/plugins/csaf dev/plugins/d3c
+		find dev/plugins/csaf dev/plugins/d3c -maxdepth 1 -name '*.egg-info' -exec chmod -R o+w {} + || true
 	fi
 	info "-[CHK] completed"
 }

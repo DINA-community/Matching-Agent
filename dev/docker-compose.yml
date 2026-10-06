@@ -52,7 +52,7 @@ services:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.keycloak.rule=Host(`keycloak.localhost`)"
+      - "traefik.http.routers.keycloak.rule=Host(`keycloak.${DEV_DOMAIN:-localhost}`)"
       - "traefik.http.services.keycloak.loadbalancer.server.port=8080"
 
   keycloak-setup:
@@ -110,7 +110,7 @@ services:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.isduba.rule=Host(`isduba.localhost`)"
+      - "traefik.http.routers.isduba.rule=Host(`isduba.${DEV_DOMAIN:-localhost}`)"
       - "traefik.http.services.isduba.loadbalancer.server.port=8081"
 
   # redis
@@ -183,7 +183,7 @@ services:
       - "host.local:host-gateway"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.netbox.rule=Host(`netbox.localhost`)"
+      - "traefik.http.routers.netbox.rule=Host(`netbox.${DEV_DOMAIN:-localhost}`)"
       - "traefik.http.services.netbox.loadbalancer.server.port=8080"
 
   netbox-worker:
@@ -261,7 +261,7 @@ services:
       - isduba
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.traefik.rule=Host(`traefik.localhost`)"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.${DEV_DOMAIN:-localhost}`)"
       - "traefik.http.services.traefik.loadbalancer.server.port=8080"
 
 volumes:

@@ -60,9 +60,14 @@ def get_env(key: str, default: str = "") -> str:
     return default if value is None else value
 
 
+def service_for_url(subdomain: str) -> str:
+    """URL according to env DEV_DOMAIN"""
+    return f"http://{subdomain}.{get_env('DEV_DOMAIN', 'localhost')}"
+
+
 def get_token(client: httpx.Client) -> str:
     """Wait for Keycloak and get a token"""
-    keycloak_url = get_env("ISDUBA_CLIENT_KEYCLOAK_URL", "http://keycloak.localhost")
+    keycloak_url = get_env("ISDUBA_CLIENT_KEYCLOAK_URL", service_for_url("keycloak"))
     realm = get_env("ISDUBA_CLIENT_KEYCLOAK_REALM", "isduba")
     url = f"{keycloak_url.rstrip('/')}/realms/{realm}/protocol/openid-connect/token"
     login_data = {
@@ -234,7 +239,7 @@ def main() -> int:
     info("--Configuring ISDuBA providers.")
     config = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
 
-    isduba_url = get_env("ISDUBA_CLIENT_HOSTNAME_URL", "http://isduba.localhost")
+    isduba_url = get_env("ISDUBA_CLIENT_HOSTNAME_URL", service_for_url("isduba"))
     isduba_api = f"{isduba_url.rstrip('/')}/api"
 
     with httpx.Client(timeout=TIMEOUT) as client:
