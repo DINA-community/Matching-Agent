@@ -78,7 +78,9 @@ def test_find_cachedb_type():
     [
         ({"device_id": 42}, "/api/dcim/devices/42/"),
         ({"module_id": 77}, "/api/dcim/modules/77/"),
-        ({"software_id": 99}, "/api/plugins/d3c/software/99/"),
+        ({"software_id": 99}, "/api/plugins/d3c/software-list/99/"),
+        ({"software_id": "99"}, "/api/plugins/d3c/software-list/99/"),
+        ({"software_id": "not_a_number"}, ""),
         ({"relation_id": 123}, "/api/plugins/d3c/productrelationship-list/123/"),
         ({}, ""),
         ({"device_id": "not_a_number"}, ""),
