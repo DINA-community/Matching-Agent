@@ -18,6 +18,7 @@ Contents
    matcher-cli
    cachedb
    matching-agent
+   algorithm
    production-setup
    troubleshooting
    tutorial

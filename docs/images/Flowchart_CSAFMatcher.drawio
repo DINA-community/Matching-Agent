@@ -1,0 +1,200 @@
+<mxfile host="Electron" modified="2024-06-06T13:35:21.885Z" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.4.8 Chrome/124.0.6367.207 Electron/30.0.6 Safari/537.36" etag="vhWXfY9vSRzzF6Fn-73J" version="24.4.8" type="device">
+  <diagram name="Page-1" id="2rs_Q9Wmzai6G2k5uT_s">
+    <mxGraphModel dx="3442" dy="1565" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-33" value="&lt;b&gt;Database Mapping&lt;/b&gt;" style="whiteSpace=wrap;html=1;align=left;verticalAlign=top;" parent="1" vertex="1">
+          <mxGeometry x="639.5" y="210" width="521" height="270" as="geometry" />
+        </mxCell>
+        <mxCell id="aIsCEymuxWY_xFV3WQZ2-2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="v09UNeD8kvgJ5US1XfD7-14" target="aIsCEymuxWY_xFV3WQZ2-1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="s9GZf_M6ChfGGFISjG3l-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.591;exitY=0.998;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;exitPerimeter=0;" parent="1" source="KRz0QQWoMpS5_3HJvEmI-1" target="v09UNeD8kvgJ5US1XfD7-14" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="KRz0QQWoMpS5_3HJvEmI-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" parent="1" source="7t-RzoIvsEBOWkz854Ef-1" target="KRz0QQWoMpS5_3HJvEmI-1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="7t-RzoIvsEBOWkz854Ef-1" value="&lt;div&gt;&lt;b&gt;Dataset A&lt;/b&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;CSAF Source Files&lt;/div&gt;e.g. D:\CSAF" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="181.5" y="40" width="282" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="s9GZf_M6ChfGGFISjG3l-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="7t-RzoIvsEBOWkz854Ef-4" target="v09UNeD8kvgJ5US1XfD7-33" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="7t-RzoIvsEBOWkz854Ef-4" value="&lt;div&gt;&lt;b&gt;Dataset B&lt;/b&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Asset Inventory&lt;/div&gt;via API or datafile" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="760" y="40" width="280" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="dXfiQXUah0KPG0ZW2_Km-17" value="&lt;div&gt;DatabaseMapping.json&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="989.5" y="230" width="139" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-30" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="dXfiQXUah0KPG0ZW2_Km-18" target="v09UNeD8kvgJ5US1XfD7-29" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dXfiQXUah0KPG0ZW2_Km-18" value="&lt;div&gt;&lt;b&gt;Direct Mapping&lt;/b&gt;&lt;br&gt; Map &lt;i&gt;vendor, product_name, product_family, product_version, product_version_range&lt;/i&gt; to Database Fields and Save DatabaseMapping.json&lt;/div&gt;" style="whiteSpace=wrap;html=1;rounded=0;align=left;" parent="1" vertex="1">
+          <mxGeometry x="651.5" y="250" width="320" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dXfiQXUah0KPG0ZW2_Km-22" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1064.5" y="369.0000000000002" as="sourcePoint" />
+            <mxPoint x="1064.5" y="369.0000000000002" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-2" value="" style="endArrow=none;html=1;rounded=0;" parent="1" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint y="161" as="sourcePoint" />
+            <mxPoint x="1159" y="161" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-3" value="Data Source" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=17;fontStyle=1" parent="1" vertex="1">
+          <mxGeometry x="10" y="130" width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-4" value="Preprocessing" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=17;fontStyle=1" parent="1" vertex="1">
+          <mxGeometry x="974" y="161" width="140" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-17" value="" style="endArrow=none;html=1;rounded=0;" parent="1" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint y="1351" as="sourcePoint" />
+            <mxPoint x="1160" y="1351" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-18" value="Preprocessing" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=17;fontStyle=1" parent="1" vertex="1">
+          <mxGeometry y="1321" width="140" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-19" value="Blocking/Indexing" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=17;fontStyle=1" parent="1" vertex="1">
+          <mxGeometry x="959" y="1352" width="170" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-29" value="&lt;div&gt;&lt;b&gt;Indirect Mapping&lt;/b&gt;&lt;/div&gt;&lt;div&gt;if a value is embedded within another field (description) select appropiate fields&lt;br&gt;&lt;/div&gt;" style="whiteSpace=wrap;html=1;rounded=0;align=left;" parent="1" vertex="1">
+          <mxGeometry x="651.5" y="353" width="320" height="61" as="geometry" />
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-34" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;" parent="1" source="v09UNeD8kvgJ5US1XfD7-33" target="v09UNeD8kvgJ5US1XfD7-14" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-51" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="v09UNeD8kvgJ5US1XfD7-39" target="v09UNeD8kvgJ5US1XfD7-50" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-39" value="&lt;div&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;&lt;b&gt;Set Subset&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;&amp;nbsp;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;Option A - vendor:&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;- Remove all entries with vendors not in Dataset B&lt;/span&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;--&amp;gt; Zweiter&amp;nbsp; Durchlauf, mit Assets ohne Match&lt;/span&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;&lt;br&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;Option B:&lt;/span&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;&amp;nbsp;Subset of CSAF-Documents&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;- By Date of Release&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;&lt;br&gt;&lt;/span&gt;&lt;/div&gt;" style="whiteSpace=wrap;html=1;align=left;" parent="1" vertex="1">
+          <mxGeometry x="456" y="1370" width="280" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-46" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="v09UNeD8kvgJ5US1XfD7-40" target="v09UNeD8kvgJ5US1XfD7-39" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-40" value="&lt;div&gt;&lt;b&gt;Modified Dataset A - created from CSAF&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;- pandas Dataframe (pd_a)&lt;br&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="70" y="1241" width="490" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-45" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="v09UNeD8kvgJ5US1XfD7-41" target="v09UNeD8kvgJ5US1XfD7-39" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-41" value="&lt;div&gt;&lt;b&gt;Modified Dataset B - created from Asset Inventory&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;- pandas Dataframe (pd_b)&lt;br&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="640" y="1241" width="440" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-47" value="" style="endArrow=none;html=1;rounded=0;" parent="1" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="-0.5" y="1540" as="sourcePoint" />
+            <mxPoint x="1159.5" y="1540" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-48" value="Blocking/Indexing" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=17;fontStyle=1" parent="1" vertex="1">
+          <mxGeometry x="-0.5" y="1510" width="170" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-49" value="Field comparisons" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=17;fontStyle=1" parent="1" vertex="1">
+          <mxGeometry x="959.5" y="1551" width="170" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-55" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.459;entryY=0.024;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" target="v09UNeD8kvgJ5US1XfD7-67" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="595.5" y="1970" as="sourcePoint" />
+            <mxPoint x="596.4999999999995" y="2021" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-50" value="&lt;div&gt;&lt;b&gt;Modi-1&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;Comparison functions provide similarity ratios per category&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;- match_vendor (vendor1_enriched, vendor2_enriched)&lt;/div&gt;&lt;div&gt;- match_PIH (&lt;span style=&quot;background-color: initial;&quot;&gt;vendor1_enriched, vendor2_enriched&lt;/span&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;)&lt;/span&gt;&lt;/div&gt;" style="whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+          <mxGeometry x="80" y="1581" width="1033" height="119" as="geometry" />
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-57" value="" style="endArrow=none;html=1;rounded=0;" parent="1" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="0.5" y="2130" as="sourcePoint" />
+            <mxPoint x="1160.5" y="2130" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-58" value="Field comparisons" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=17;fontStyle=1" parent="1" vertex="1">
+          <mxGeometry x="-0.5" y="2101" width="170" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-62" value="Evaluation" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=17;fontStyle=1" parent="1" vertex="1">
+          <mxGeometry x="990" y="2140" width="110" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-67" value="&lt;div&gt;&lt;b&gt;Show Match results&lt;/b&gt;&lt;/div&gt;" style="whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="500" y="2150" width="208" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="JW0nWRl3LzHlDXBMBoDT-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="aIsCEymuxWY_xFV3WQZ2-1" target="v09UNeD8kvgJ5US1XfD7-67">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="70" y="2370" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="-20" y="835" />
+              <mxPoint x="-20" y="2185" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aIsCEymuxWY_xFV3WQZ2-1" value="Logging of modifications" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="61.5" y="560" width="120" height="550" as="geometry" />
+        </mxCell>
+        <mxCell id="s9GZf_M6ChfGGFISjG3l-7" value="" style="group" parent="1" connectable="0" vertex="1">
+          <mxGeometry x="309" y="530" width="551" height="610" as="geometry" />
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-14" value="&lt;div&gt;&lt;b&gt;Data Cleansing&lt;/b&gt;&lt;b&gt;/Standardisation - general&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;- discard information that is not within the Asset Inventory &lt;br&gt;&lt;/div&gt;&lt;div&gt;- move values to the correct category or discard if not needed&lt;br&gt;&lt;/div&gt;&lt;div&gt;- lowercase only&lt;/div&gt;&lt;div&gt;- remove multicases&lt;br&gt;&lt;/div&gt;&lt;div&gt;- remove common mistakes&lt;/div&gt;&lt;div&gt;- typographical errors&lt;/div&gt;&lt;div&gt;- variations&lt;/div&gt;&lt;div&gt;- different coding schemes&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;" style="whiteSpace=wrap;html=1;align=left;verticalAlign=top;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;" parent="s9GZf_M6ChfGGFISjG3l-7" vertex="1">
+          <mxGeometry width="551" height="610" as="geometry" />
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-27" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;" parent="s9GZf_M6ChfGGFISjG3l-7" source="v09UNeD8kvgJ5US1XfD7-26" target="v09UNeD8kvgJ5US1XfD7-26" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-16" value="&lt;div&gt;&lt;b&gt;Data Cleansing&lt;/b&gt;&lt;b&gt;/Standardisation - &lt;i&gt;vendor&lt;/i&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;- Remove legal identifiers&lt;/div&gt;&lt;div&gt;- Remove special characters&lt;/div&gt;&lt;div&gt;- convert to lowercase only&lt;br&gt;&lt;/div&gt;&lt;div&gt;- extract &lt;i&gt;vendor&lt;/i&gt; from knownBranches.json and add column &lt;i&gt;vendor_cleaned&lt;/i&gt; add all aliases for &lt;i&gt;vendor&lt;/i&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;" style="whiteSpace=wrap;html=1;align=left;fillColor=#d5e8d4;strokeColor=#82b366;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;" parent="s9GZf_M6ChfGGFISjG3l-7" vertex="1">
+          <mxGeometry x="161" y="140" width="380" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-36" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;" parent="s9GZf_M6ChfGGFISjG3l-7" source="v09UNeD8kvgJ5US1XfD7-20" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="350.5" y="356" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-20" value="&lt;div&gt;&lt;b&gt;Data Cleansing&lt;/b&gt;&lt;b&gt;/Standardisation - &lt;i&gt;product_name &amp;amp; product_family&lt;br&gt;&lt;/i&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;- lowercase only&lt;/div&gt;&lt;div&gt;- product name/family seperated&lt;/div&gt;&lt;div&gt;- remove fillers (and)&lt;/div&gt;&lt;div&gt;- check pronouncability&lt;br&gt;&lt;/div&gt;&lt;div&gt;- check if &lt;i&gt;product_regex&lt;/i&gt; hits and if yes, add vendor to vendor_cleaned&lt;br&gt;&lt;/div&gt;&lt;div&gt;- move serialnumber to serialnumber&lt;br&gt;&lt;/div&gt;&lt;div&gt;- (re)move product version or range&lt;/div&gt;&lt;div&gt;- (re)move product family&lt;br&gt;&lt;/div&gt;&lt;div&gt;special case: full_product_name&lt;br&gt;&lt;/div&gt;" style="whiteSpace=wrap;html=1;align=left;fillColor=#d5e8d4;strokeColor=#82b366;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;" parent="s9GZf_M6ChfGGFISjG3l-7" vertex="1">
+          <mxGeometry x="161" y="256" width="380" height="184" as="geometry" />
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-35" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;" parent="s9GZf_M6ChfGGFISjG3l-7" source="v09UNeD8kvgJ5US1XfD7-16" target="v09UNeD8kvgJ5US1XfD7-20" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-37" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;" parent="s9GZf_M6ChfGGFISjG3l-7" target="v09UNeD8kvgJ5US1XfD7-26" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="350.5" y="436" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-26" value="&lt;div&gt;&lt;b&gt;Data Cleansing&lt;/b&gt;&lt;b&gt;/Standardisation - &lt;i&gt;Product_version&lt;/i&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;- remove &quot;v.&quot; or &quot;version&quot; or text in general&lt;/div&gt;&lt;div&gt;- move range values to &quot;product_version_range&quot;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;" style="whiteSpace=wrap;html=1;align=left;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;" parent="s9GZf_M6ChfGGFISjG3l-7" vertex="1">
+          <mxGeometry x="161" y="456" width="380" height="61.88" as="geometry" />
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-28" value="&lt;div&gt;&lt;b&gt;Data Cleansing&lt;/b&gt;&lt;b&gt;/Standardisation - &lt;i&gt;Product_version_range&lt;/i&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;- remove &quot;v.&quot; or &quot;version&quot; or text in general&lt;/div&gt;&lt;div&gt;- move range values to &quot;product_version_range&quot;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;" style="whiteSpace=wrap;html=1;align=left;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;" parent="s9GZf_M6ChfGGFISjG3l-7" vertex="1">
+          <mxGeometry x="161" y="536" width="380" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="v09UNeD8kvgJ5US1XfD7-38" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;" parent="s9GZf_M6ChfGGFISjG3l-7" source="v09UNeD8kvgJ5US1XfD7-26" target="v09UNeD8kvgJ5US1XfD7-28" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="7t-RzoIvsEBOWkz854Ef-12" value="&lt;div&gt;&lt;b&gt;String-Sysiphos&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;normalisation.json&lt;/div&gt;&lt;div&gt;re_data.yaml&lt;/div&gt;&lt;div&gt;synonym_list.yaml&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;fillColor=#d5e8d4;strokeColor=#82b366;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;verticalAlign=top;" parent="s9GZf_M6ChfGGFISjG3l-7" vertex="1">
+          <mxGeometry x="9.5" y="140" width="141" height="460" as="geometry" />
+        </mxCell>
+        <mxCell id="s9GZf_M6ChfGGFISjG3l-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="v09UNeD8kvgJ5US1XfD7-14" target="v09UNeD8kvgJ5US1XfD7-40" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="s9GZf_M6ChfGGFISjG3l-9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="v09UNeD8kvgJ5US1XfD7-14" target="v09UNeD8kvgJ5US1XfD7-41" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="9OGVLdmTLB6yUkT8jCZ4-1" value="&lt;div&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;&lt;b&gt;Modi-2&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;Comparison functions provide similarity ratios per category&lt;/span&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Comparison functions decision tree&lt;span style=&quot;background-color: initial;&quot;&gt;&lt;br&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;- match_vendor (vendor1_enriched, vendor2_enriched)&lt;/div&gt;&lt;div&gt;- match_product(product_name_enriched_1,product_name_enriched_2,product_family_enriched_1,product_family_enriched_2)&lt;/div&gt;&lt;div&gt;- match_version(product_version_enriched_1,product_version_enriched_2,product_version_range_enriched_1,product_version_range_enriched_2)&lt;/div&gt;&lt;div&gt;- match_every other CSAF-relevant field&lt;/div&gt;" style="whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+          <mxGeometry x="80" y="1720" width="1033" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="KRz0QQWoMpS5_3HJvEmI-1" value="&lt;b&gt;Flatten CSAF Data into Pandas Dataframe&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;labelPosition=center;verticalLabelPosition=middle;verticalAlign=top;textDirection=ltr;" parent="1" vertex="1">
+          <mxGeometry x="220" y="260" width="360" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="KRz0QQWoMpS5_3HJvEmI-3" value="&lt;b&gt;Process CSAF Sources&lt;/b&gt;&lt;div&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;- get possible csaf sources from a directory&lt;/div&gt;&lt;div&gt;- read in product tree (for matching)&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;align=left;" parent="1" vertex="1">
+          <mxGeometry x="266.25" y="295" width="267.5" height="115" as="geometry" />
+        </mxCell>
+        <mxCell id="LKzR7MCDVLeQFliQ-fvJ-2" value="&lt;div&gt;&lt;b&gt;Modi-3&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;Comparison functions provide similarity ratios per category&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;- match_vendor (vendor1_enriched, vendor2_enriched)&lt;/div&gt;&lt;div&gt;- match_full_product_name_t (full_product_name_t, [list of CSAF related field of an Asset])&lt;/div&gt;" style="whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+          <mxGeometry x="80" y="1880" width="1033" height="119" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
