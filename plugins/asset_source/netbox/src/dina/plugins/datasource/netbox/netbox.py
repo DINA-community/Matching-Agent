@@ -1009,7 +1009,7 @@ class NetboxDataSource(DataSourcePlugin):
             if "module_id" in origin_info:
                 return f"/api/dcim/modules/{int(origin_info['module_id'])}/"
             if "software_id" in origin_info:
-                return f"/api/plugins/d3c/software/{int(origin_info['software_id'])}/"
+                return f"/api/plugins/d3c/software-list/{int(origin_info['software_id'])}/"
             if "relation_id" in origin_info:
                 # List endpoint in generated client is productrelationship-list
                 return f"/api/plugins/d3c/productrelationship-list/{int(origin_info['relation_id'])}/"
