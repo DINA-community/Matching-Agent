@@ -134,6 +134,17 @@ Quick start
         docker compose -f dev/docker-compose.yml logs netbox-setup
 
    .. note::
+      All services use the ``.localhost`` domain by default.
+      The domain is set by the parameter ``DEV_DOMAIN`` in ``dev/.env``.
+      Changing it in an existing development environment is not possible.
+      To recreate it, run ``./dev/start-local-env.sh --recreate --volumes``.
+
+   .. warning::
+      The ISDuBA login process requires either a localhost-domain, or HTTPS.
+      If ``DEV_DOMAIN`` is set to a non-localhost domain, it is served over **HTTPS**.
+      Self-signed certificates are generated automatically.
+
+   .. note::
       The NetBox plugins ``csaf`` and ``d3c`` are included as git submodules at ``dev/plugins/csaf`` and ``dev/plugins/d3c``.
       The directories are bind-mounted into the containers ``netbox`` and ``netbox-worker`` and installed in editable mode.
       After making changes to the backend code of netbox modules, either restart the affected containers:

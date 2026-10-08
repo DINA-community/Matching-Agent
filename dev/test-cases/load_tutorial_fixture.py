@@ -31,6 +31,7 @@ class NetBoxApi:
             base_url=f"{url.rstrip('/')}/api/",
             headers={"Authorization": f"Bearer {token}"},
             timeout=30.0,
+            verify=False,
         )
 
     def close(self) -> None:
@@ -60,7 +61,9 @@ class NetBoxApi:
         except httpx.HTTPError as error:
             detail = ""
             if isinstance(error, httpx.HTTPStatusError):
-                detail = f": {error.response.text}"
+                detail = f"with status code {error.reponse.status_code}: {error.response.text}"
+            else:
+                detail = str(error)
             raise ImportFailure(f"{method} {url} failed{detail}") from error
 
 
