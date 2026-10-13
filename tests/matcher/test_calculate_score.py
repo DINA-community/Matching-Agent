@@ -312,7 +312,7 @@ def test_calculate_overall_score_triggers_cpe_shortcut_1_0(scorer):
         }
     )
     flag, msg, score_percent = scorer.calculate_overall_score(df)
-    assert score_percent == 1.0
+    assert score_percent == 100.0
 
 
 def test_calculate_overall_score_weighted_average_path(scorer):
