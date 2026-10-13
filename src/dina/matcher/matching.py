@@ -883,7 +883,7 @@ class Matching:
                             ),
                             return_dtype=pl.Float64,
                         )
-                        .alias(f"asset_{field}_match")
+                        .alias(f"{field}_match")
                     )
                     continue
 
