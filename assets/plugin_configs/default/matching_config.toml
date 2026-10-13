@@ -15,15 +15,16 @@ overlap = 0.2
 [database.ordered_fields]
 version = 0.10
 model = 0.03
-model_numbers = 0.03
-part_numbers = 0.03
-serial_numbers = 0.03
 
 [database.other_fields]
 cpe = 0.15
 purl = 0.13
 product_type = 0.02
 sbom_urls = 0.01
+hashes = 0.03
+model_numbers = 0.03
+part_numbers = 0.03
+serial_numbers = 0.03
 
 [version]
 

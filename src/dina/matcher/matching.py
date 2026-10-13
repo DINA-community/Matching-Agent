@@ -687,13 +687,25 @@ class Matching:
             self._compare_freetext(csaf_field, asset_field, ignore_order=False) or 0.0
         )
 
-    def _compare_list_fields(self, csaf_list: list, asset_list: list) -> float:
+    def _compare_list_fields(self, csaf_list: list, asset_list: list, normalize=None) -> float:
         """Compare lists of string values and return 1.0 if any overlap exists."""
+        normalize = normalize or (lambda v: v)
+        csaf_values = {normalize(v) for v in csaf_list if isinstance(v, str)}
         for asset in asset_list:
-            for csaf in csaf_list:
-                if isinstance(asset, str) and isinstance(csaf, str) and asset == csaf:
-                    return 1.0
+            if isinstance(asset, str) and normalize(asset) in csaf_values:
+                return 1.0
         return 0.0
+
+    def _compare_identifier_lists(self, csaf_list: list | None, asset_list: list | None) -> float | None:
+        if not any(v for v in csaf_list or [] if isinstance(v, str)):
+            return None
+        if not any(v for v in asset_list or [] if isinstance(v, str)):
+            return None
+        return self._compare_list_fields(csaf_list, asset_list, self._normalize_identifier)
+
+    @staticmethod
+    def _normalize_identifier(value: str) -> str:
+        return value.strip().casefold()
 
     def _compare_dict_fields(
         self, csaf_dict: dict, asset_dict: dict, weight: dict | None = None
@@ -861,6 +873,20 @@ class Matching:
             weight = None
 
             match field:
+                case "serial_numbers" | "model_numbers" | "part_numbers" | "hashes":
+                    df = df.with_columns(
+                        pl.struct([csaf_col, asset_col])
+                        .map_elements(
+                            lambda row: self._compare_identifier_lists(
+                                self._safe_load(row[csaf_col]),
+                                self._safe_load(row[asset_col]),
+                            ),
+                            return_dtype=pl.Float64,
+                        )
+                        .alias(f"asset_{field}_match")
+                    )
+                    continue
+
                 case "cpe":
                     weight = self.cpe_weights
                     # Extra: compare version field inside CPE

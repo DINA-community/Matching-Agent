@@ -73,3 +73,20 @@ def test_match_pairs_sets_run_and_config_hash():
     assert all(m.matcher_run_id == 99 for m in matches)
     assert all(uuid.UUID(m.trace_uuid) for m in matches)
     assert all(m.matching_config_hash == cfg_hash for m in matches)
+
+
+def test_product_columns_flattens_files_to_hashes():
+    from types import SimpleNamespace
+
+    from dina.cachedb.model import File, FileList
+    from dina.matcher.main import _product_columns
+
+    product = SimpleNamespace(
+        to_dict=lambda: {
+            "name": "x",
+            "files": FileList(files=[File("a", "ABC", "SHA256")]),
+        }
+    )
+    columns = _product_columns(product)
+    assert "files" not in columns
+    assert columns["hashes"] == ["sha256:abc"]
