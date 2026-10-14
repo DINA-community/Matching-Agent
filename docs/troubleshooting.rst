@@ -32,26 +32,20 @@ Solutions
 
        uv pip install "polars[rtcompat]"
 
+
 Netbox Plugin: Document Titles Not Loading in Local Development
 ----------------------------------------------------------------
 
-When using the Netbox plugin in the local development environment, you may notice that document titles from ISDUBA are not displayed correctly in the web UI, even though links are clickable.
+New CSAF documents are created in NetBox with only their ISDuBA URL and the title ``Loading...``.
+The CSAF plugin contains a background job *CSAF Document Sync* that runs in the docker container ``netbox-worker`` and is responsible to fetch the document details from ISDuBA.
+It runs every hour and after new matches are added.
 
-Root Cause
-~~~~~~~~~~
+If you see CSAF documents with title ``Loading...``, the background job cannot reach ISDuBA or retrieve the information.
 
-This is a known limitation of the local development setup due to URL accessibility constraints:
+The job uses the URL from setting ``keycloak_url`` (in ``isduba-local.toml``) to connect to Keycloak/ISDuBA.
+If these are not reachable from inside the NetBox containers, the documents cannot be fetched.
 
-- The ISDUBA instance in the local Docker Compose environment can be reached via two different URLs:
+In the local development environment, the docker compose setup add internal aliases for ``*.localhost``, so the URLs work internally as they do in the browser.
+In other setups make sure the ISDuBA document URLs and ``keycloak_url`` are reachable from within the NetBox worker container.
 
-  - ``http://isduba.localhost`` (accessible from your browser)
-  - ``http://isduba-server`` (accessible from within the Docker network)
-
-- The Netbox plugin must use **one** URL configuration to fetch document titles and generate links
-- If configured with ``localhost``: Links work in the browser, but the Netbox container cannot fetch titles (it cannot resolve ``localhost`` to the ISDUBA container)
-- If configured with ``isduba``: The Netbox container can fetch titles, but links are not clickable from your browser (your browser cannot resolve the ``isduba`` hostname)
-
-Solution
-~~~~~~~~
-
-This is **not an issue in production environments**, where a single publicly accessible URL serves both purposes (e.g., ``https://isduba.example.com``).
+All errors of the backgroun job are printed to the ``netbox-worker`` docker container log.
