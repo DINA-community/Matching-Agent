@@ -1,6 +1,9 @@
+import httpx
 import pytest
+import tomllib
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
+from pathlib import Path
 from types import SimpleNamespace
 from pydantic import HttpUrl
 
@@ -22,7 +25,7 @@ from examples import DOCS_META, DOCUMENTS_FULL
 
 @pytest.fixture
 def mock_config():
-    """Creates a fake plugin configuration for tests."""
+    """Fake plugin configuration"""
     plugin_data = dict(
         url="https://fake.url",
         keycloak_url="https://fake.keycloak",
@@ -36,8 +39,47 @@ def mock_config():
     return SimpleNamespace(DataSource=datasource)
 
 
+# Assumes it was written by dev/start-local-env.sh, CI, or some other automation
+LIVE_CONFIG = Path(__file__).parents[4] / "assets/plugin_configs/data_source/csaf/isduba-local.toml"
+
+
+@pytest.fixture(params=["mock", pytest.param("live", marks=pytest.mark.integration)])
+def backend(request):
+    """Mocked ISDuBA API"""
+    return request.param
+
+
+@pytest.fixture
+def plugin_config(backend, mock_config):
+    """
+    Plugin configuration for the backend
+    live: requires running dev stack with ISDuBA
+    mock: just unit-tests with mocked APIs
+    """
+    if backend == "mock":
+        return mock_config
+    try:
+        with LIVE_CONFIG.open("rb") as file:
+            plugin_data = tomllib.load(file)["DataSource"]["Plugin"]
+    except (OSError, KeyError, tomllib.TOMLDecodeError) as e:
+        pytest.fail(f"Integation tests: cannot load {LIVE_CONFIG}: {e!s}", pytrace=False)
+    try:
+        httpx.get(plugin_data["url"], verify=plugin_data["verify_ssl"]).raise_for_status()
+    except httpx.HTTPError as e:
+        pytest.fail(f"Integration tests: ISDuBA at {plugin_data['url']} is unreachable: {e!s}",
+                    pytrace=False)
+    return SimpleNamespace(DataSource=SimpleNamespace(Plugin=plugin_data))
+
+
+def _mock_isduba(monkeypatch, plugin, docs_meta, docs_full):
+    """Mock token, API client and configuration"""
+    plugin._get_token = AsyncMock(return_value="fake-token")
+    _make_dummy_api(monkeypatch, docs_meta, docs_full)
+    plugin._create_api_config = MagicMock(return_value=MagicMock())
+
+
 def _make_dummy_api(monkeypatch, docs_meta, docs_full):
-    """Mocks the isduba_api_client so that it returns fake documents."""
+    """Mock isduba_api_client to return fake docs"""
     fake_api = MagicMock()
     fake_api.documents_get = AsyncMock(
         return_value=SimpleNamespace(documents=docs_meta)
@@ -65,7 +107,6 @@ def _make_dummy_api(monkeypatch, docs_meta, docs_full):
 
 
 def _dummy_fetcher_view():
-    """Creates a simple mock FetcherView object."""
     view = MagicMock()
     view.last_run = AsyncMock(return_value=datetime.now(timezone.utc))
     view.get_existing = AsyncMock(return_value=[])
@@ -78,12 +119,11 @@ def _dummy_fetcher_view():
 
 
 @pytest.mark.asyncio
-async def test_fetch_products_with_docs(monkeypatch, mock_config):
+async def test_fetch_products_with_docs(monkeypatch, backend, plugin_config):
     """Tests that fetch_products correctly returns a list of documents when API data is available."""
-    plugin = IsdubaDataSource(mock_config)
-    plugin._get_token = AsyncMock(return_value="fake-token")
-    _make_dummy_api(monkeypatch, DOCS_META, DOCUMENTS_FULL)
-    plugin._create_api_config = MagicMock(return_value=MagicMock())
+    plugin = IsdubaDataSource(plugin_config)
+    if backend == "mock":
+        _mock_isduba(monkeypatch, plugin, DOCS_META, DOCUMENTS_FULL)
 
     result = await plugin.fetch_products(_dummy_fetcher_view())
 
@@ -94,12 +134,11 @@ async def test_fetch_products_with_docs(monkeypatch, mock_config):
 
 
 @pytest.mark.asyncio
-async def test_fetch_products_empty_response(monkeypatch, mock_config):
+async def test_fetch_products_empty_response(monkeypatch, backend, plugin_config):
     """Ensures fetch_products handles an empty API response gracefully."""
-    plugin = IsdubaDataSource(mock_config)
-    plugin._get_token = AsyncMock(return_value="fake-token")
-    _make_dummy_api(monkeypatch, [], [])
-    plugin._create_api_config = MagicMock(return_value=MagicMock())
+    plugin = IsdubaDataSource(plugin_config)
+    if backend == "mock":
+        _mock_isduba(monkeypatch, plugin, [], [])
 
     result = await plugin.fetch_products(_dummy_fetcher_view())
     assert not result.again
@@ -107,29 +146,30 @@ async def test_fetch_products_empty_response(monkeypatch, mock_config):
 
 
 @pytest.mark.asyncio
-async def test_fetch_products_error_in_document(monkeypatch, mock_config):
+async def test_fetch_products_error_in_document(monkeypatch, backend, plugin_config):
     """Verifies that fetch_products raises an exception when fetching a document fails."""
-    plugin = IsdubaDataSource(mock_config)
-    plugin._get_token = AsyncMock(return_value="fake-token")
+    plugin = IsdubaDataSource(plugin_config)
+    if backend == "mock":
+        plugin._get_token = AsyncMock(return_value="fake-token")
 
-    fake_api = MagicMock()
-    fake_api.documents_get = AsyncMock(
-        return_value=SimpleNamespace(documents=DOCS_META[:1])
-    )
-    fake_api.documents_id_get = AsyncMock(side_effect=Exception("Error"))
+        fake_api = MagicMock()
+        fake_api.documents_get = AsyncMock(
+            return_value=SimpleNamespace(documents=DOCS_META[:1])
+        )
+        fake_api.documents_id_get = AsyncMock(side_effect=Exception("Error"))
 
-    class DummyApiClientCtx:
-        async def __aenter__(self):
-            return MagicMock()
+        class DummyApiClientCtx:
+            async def __aenter__(self):
+                return MagicMock()
 
-        async def __aexit__(self, exc_type, exc, tb):
-            pass
+            async def __aexit__(self, exc_type, exc, tb):
+                pass
 
-    monkeypatch.setattr(
-        "dina.plugins.datasource.isduba.isduba.isduba_api_client.ApiClient",
-        lambda conf: DummyApiClientCtx(),
-    )
-    plugin._create_api_config = MagicMock(return_value=MagicMock())
+        monkeypatch.setattr(
+            "dina.plugins.datasource.isduba.isduba.isduba_api_client.ApiClient",
+            lambda conf: DummyApiClientCtx(),
+        )
+        plugin._create_api_config = MagicMock(return_value=MagicMock())
 
     fetcher_view = _dummy_fetcher_view()
 
@@ -138,41 +178,42 @@ async def test_fetch_products_error_in_document(monkeypatch, mock_config):
 
 
 @pytest.mark.asyncio
-async def test_cleanup_products_returns_expected_decisions(monkeypatch, mock_config):
+async def test_cleanup_products_returns_expected_decisions(monkeypatch, backend, plugin_config):
     """Tests that cleanup_products correctly returns CleanUpDecision objects."""
 
-    plugin = IsdubaDataSource(mock_config)
+    plugin = IsdubaDataSource(plugin_config)
 
-    plugin._get_token = AsyncMock(return_value="fake-token")
+    if backend == "mock":
+        plugin._get_token = AsyncMock(return_value="fake-token")
 
-    plugin._create_api_config = MagicMock(
-        return_value=isduba_api_client.Configuration(
-            host="https://fake.api",
-            api_key={"bearerAuth": "fake-token"},
-            api_key_prefix={"bearerAuth": "Bearer"},
-            debug=False,
+        plugin._create_api_config = MagicMock(
+            return_value=isduba_api_client.Configuration(
+                host="https://fake.api",
+                api_key={"bearerAuth": "fake-token"},
+                api_key_prefix={"bearerAuth": "Bearer"},
+                debug=False,
+            )
         )
-    )
 
-    class DummyDefaultApi:
-        def __init__(self, *_, **__):
-            pass
+        class DummyDefaultApi:
+            def __init__(self, *_, **__):
+                pass
 
-        def select_header_accept(self, _):
-            return "application/json"
+            def select_header_accept(self, _):
+                return "application/json"
 
-        async def documents_id_get(self, doc_id):
-            return {
-                "id": doc_id,
-                "title": f"Mocked document {doc_id}",
-                "status": "ok",
-                "product_tree": {"branches": []},
-            }
+            async def documents_id_get(self, doc_id):
+                return {
+                    "id": doc_id,
+                    "title": f"Mocked document {doc_id}",
+                    "status": "ok",
+                    "product_tree": {"branches": []},
+                }
 
-    monkeypatch.setattr(
-        "dina.plugins.datasource.isduba.isduba.isduba_api_client.DefaultApi",
-        lambda api_client: DummyDefaultApi(),
-    )
+        monkeypatch.setattr(
+            "dina.plugins.datasource.isduba.isduba.isduba_api_client.DefaultApi",
+            lambda api_client: DummyDefaultApi(),
+        )
 
     product1 = MagicMock(spec=CsafProduct)
     product1.id = 101
@@ -258,10 +299,9 @@ def test_create_api_config(mock_config):
 
 
 @pytest.mark.asyncio
-async def test_fetch_relationships(monkeypatch, mock_config):
+async def test_fetch_relationships(monkeypatch, backend, plugin_config):
     """Ensures fetch_relationships correctly returns Relationship objects."""
-    plugin = IsdubaDataSource(mock_config)
-    plugin._get_token = AsyncMock(return_value="fake-token")
+    plugin = IsdubaDataSource(plugin_config)
 
     csaf1, csaf2 = MagicMock(spec=CsafProduct), MagicMock(spec=CsafProduct)
     csaf1.id, csaf2.id = 1, 2
@@ -274,8 +314,8 @@ async def test_fetch_relationships(monkeypatch, mock_config):
         side_effect=[[csaf1, csaf2], [csaf1], [csaf2]]
     )
 
-    _make_dummy_api(monkeypatch, DOCS_META[:1], DOCUMENTS_FULL[:1])
-    plugin._create_api_config = MagicMock(return_value=MagicMock())
+    if backend == "mock":
+        _mock_isduba(monkeypatch, plugin, DOCS_META[:1], DOCUMENTS_FULL[:1])
 
     result = await plugin.fetch_relationships(fetcher_view)
 
