@@ -257,8 +257,11 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
-      - netbox
-      - isduba
+      netbox:
+        aliases:
+          - isduba.localhost
+          - keycloak.localhost
+      isduba:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.traefik.rule=Host(`traefik.localhost`)"
