@@ -32,6 +32,35 @@ Solutions
 
        uv pip install "polars[rtcompat]"
 
+Daemon authentication problems
+------------------------------
+
+If the the assetsync daemon ``uv run assetsync`` log message like these:
+
+.. code-block::
+
+   RuntimeError: Could not authenticate with the netbox instance. Probably invalid access token. Please make sure to correctly configure your access token in the plugin configuration.
+   dina.synchronizer.base - ERROR - Error fetching data from plugin netbox_fetcher for endpoint http://netbox.localhost/: Could not authenticate with the netbox instance. Probably invalid access token. Please make sure to correctly configure your access token in the plugin configuration.
+
+or the ``csaf_matcher``:
+
+.. code-block::
+
+   dina.plugins.datasource.netbox.netbox - ERROR - Failed to notify new matches: Unexpected status code: 403
+
+Then the configured authentication token is not correct.
+Configure the NetBox token in the assetsync configuration, see Getting started, section *Configure plugins*.
+A new token is generated with every new setup of the NetBox instance and needs to be set manually.
+
+Then start the ``csaf_matcher`` and ``assetsync`` again.
+
+Please note, that matches that were previously found, are not automatically published to NetBox again.
+To force a Re-Publish, run this command:
+
+.. code-block:: bash
+
+   access_token=$(curl -s -X POST http://localhost:8998/token -d "username=admin&password=admin" | jq -r .access_token)
+   curl -s -X POST -H "Authorization: Bearer $access_token" -H "Content-Type: application/json" -d '{"force_recompute": true}' http://localhost:8998/task/start
 
 Netbox Plugin: Document Titles Not Loading in Local Development
 ----------------------------------------------------------------
