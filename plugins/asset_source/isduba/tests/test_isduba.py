@@ -1,5 +1,6 @@
 import httpx
 import pytest
+import re
 import tomllib
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
@@ -15,7 +16,7 @@ from dina.synchronizer.plugin_base.data_source import (
     FetchRelationshipsResult,
     Relationship,
 )
-from examples import DOCS_META, DOCUMENTS_FULL
+from examples import DOCS_META, ISDUBA_DOCUMENTS
 
 
 # -----------------------------------------------------------
@@ -71,44 +72,52 @@ def plugin_config(backend, mock_config):
     return SimpleNamespace(DataSource=SimpleNamespace(Plugin=plugin_data))
 
 
-def _mock_isduba(monkeypatch, plugin, docs_meta, docs_full):
+# The query fetch_products sends, ISDuBA filters the documents by it
+QUERY = re.compile(r"\$current_release_date (\S+) timestamp >= \$current_release_date (\S+) timestamp <=")
+EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+
+class FakeIsdubaApi:
+    """Mock the python client generated based on the openAPI spec"""
+
+    def __init__(self, api_client):
+        self.api_client = api_client
+
+    def _authorize(self):
+        if self.api_client.configuration.api_key["bearerAuth"] != "fake-token":
+            raise isduba_api_client.exceptions.UnauthorizedException(status=401, reason="Unauthorized")
+
+    async def documents_get(self, limit=None, offset=0, query=None, orders=None):
+        self._authorize()
+        # parse the isduba query syntax, used by test_fetch_products_empty_response
+        since, until = map(datetime.fromisoformat, QUERY.fullmatch(query).groups())
+        documents = [
+            meta
+            for meta in DOCS_META  # already ordered by descending `critical` value
+            if since <= datetime.fromisoformat(ISDUBA_DOCUMENTS[meta["id"]]["document"]["tracking"]["current_release_date"]) <= until
+        ][offset : offset + limit]
+        # ISDuBA returns no list instead of an empty one
+        return SimpleNamespace(documents=documents or None)
+
+    async def documents_id_get(self, doc_id):
+        self._authorize()
+        if doc_id not in ISDUBA_DOCUMENTS:
+            raise isduba_api_client.exceptions.NotFoundException(status=404, reason="Not Found")
+        return ISDUBA_DOCUMENTS[doc_id]
+
+
+def _mock_isduba(monkeypatch, plugin):
     """Mock token, API client and configuration"""
     plugin._get_token = AsyncMock(return_value="fake-token")
-    _make_dummy_api(monkeypatch, docs_meta, docs_full)
-    plugin._create_api_config = MagicMock(return_value=MagicMock())
-
-
-def _make_dummy_api(monkeypatch, docs_meta, docs_full):
-    """Mock isduba_api_client to return fake docs"""
-    fake_api = MagicMock()
-    fake_api.documents_get = AsyncMock(
-        return_value=SimpleNamespace(documents=docs_meta)
-    )
-    lookup = {m["id"]: f for m, f in zip(docs_meta, docs_full)}
-    fake_api.documents_id_get = AsyncMock(side_effect=lambda doc_id: lookup.get(doc_id))
-
     monkeypatch.setattr(
         "dina.plugins.datasource.isduba.isduba.isduba_api_client.DefaultApi",
-        lambda _: fake_api,
+        FakeIsdubaApi,
     )
 
-    class DummyCtx:
-        async def __aenter__(self):
-            return MagicMock()
 
-        async def __aexit__(self, *_):
-            pass
-
-    monkeypatch.setattr(
-        "dina.plugins.datasource.isduba.isduba.isduba_api_client.ApiClient",
-        lambda _: DummyCtx(),
-    )
-    return fake_api
-
-
-def _dummy_fetcher_view():
+def _dummy_fetcher_view(last_run=None):
     view = MagicMock()
-    view.last_run = AsyncMock(return_value=datetime.now(timezone.utc))
+    view.last_run = AsyncMock(return_value=last_run or datetime.now(timezone.utc))
     view.get_existing = AsyncMock(return_value=[])
     return view
 
@@ -123,14 +132,15 @@ async def test_fetch_products_with_docs(monkeypatch, backend, plugin_config):
     """Tests that fetch_products correctly returns a list of documents when API data is available."""
     plugin = IsdubaDataSource(plugin_config)
     if backend == "mock":
-        _mock_isduba(monkeypatch, plugin, DOCS_META, DOCUMENTS_FULL)
+        _mock_isduba(monkeypatch, plugin)
 
-    result = await plugin.fetch_products(_dummy_fetcher_view())
+    result = await plugin.fetch_products(_dummy_fetcher_view(last_run=EPOCH))
 
     assert result.again is True
     assert isinstance(result.data, list)
-    assert len(result.data) == 4
-    assert result.data[0].uri.endswith(str(DOCS_META[0]["id"]))
+    assert {p.origin_info["path"] for p in result.data} == {f"/api/documents/{doc_id}" for doc_id in ISDUBA_DOCUMENTS}
+    # The products of the most critical document come first
+    assert result.data[0].uri.startswith(f"{plugin.origin_uri}api/documents/{DOCS_META[0]['id']}#")
 
 
 @pytest.mark.asyncio
@@ -138,40 +148,23 @@ async def test_fetch_products_empty_response(monkeypatch, backend, plugin_config
     """Ensures fetch_products handles an empty API response gracefully."""
     plugin = IsdubaDataSource(plugin_config)
     if backend == "mock":
-        _mock_isduba(monkeypatch, plugin, [], [])
+        _mock_isduba(monkeypatch, plugin)
 
+    # No documents were released since now
     result = await plugin.fetch_products(_dummy_fetcher_view())
     assert not result.again
     assert not result.data
 
 
 @pytest.mark.asyncio
-async def test_fetch_products_error_in_document(monkeypatch, backend, plugin_config):
-    """Verifies that fetch_products raises an exception when fetching a document fails."""
+async def test_fetch_products_invalid_token(monkeypatch, backend, plugin_config):
+    """Verifies that fetch_products raises an exception when ISDuBA rejects the token."""
     plugin = IsdubaDataSource(plugin_config)
     if backend == "mock":
-        plugin._get_token = AsyncMock(return_value="fake-token")
+        _mock_isduba(monkeypatch, plugin)
+    plugin._get_token = AsyncMock(return_value="invalid-token")
 
-        fake_api = MagicMock()
-        fake_api.documents_get = AsyncMock(
-            return_value=SimpleNamespace(documents=DOCS_META[:1])
-        )
-        fake_api.documents_id_get = AsyncMock(side_effect=Exception("Error"))
-
-        class DummyApiClientCtx:
-            async def __aenter__(self):
-                return MagicMock()
-
-            async def __aexit__(self, exc_type, exc, tb):
-                pass
-
-        monkeypatch.setattr(
-            "dina.plugins.datasource.isduba.isduba.isduba_api_client.ApiClient",
-            lambda conf: DummyApiClientCtx(),
-        )
-        plugin._create_api_config = MagicMock(return_value=MagicMock())
-
-    fetcher_view = _dummy_fetcher_view()
+    fetcher_view = _dummy_fetcher_view(last_run=EPOCH)
 
     with pytest.raises(Exception, match="Exception when calling DefaultApi"):
         await plugin.fetch_products(fetcher_view)
@@ -184,44 +177,18 @@ async def test_cleanup_products_returns_expected_decisions(monkeypatch, backend,
     plugin = IsdubaDataSource(plugin_config)
 
     if backend == "mock":
-        plugin._get_token = AsyncMock(return_value="fake-token")
+        _mock_isduba(monkeypatch, plugin)
 
-        plugin._create_api_config = MagicMock(
-            return_value=isduba_api_client.Configuration(
-                host="https://fake.api",
-                api_key={"bearerAuth": "fake-token"},
-                api_key_prefix={"bearerAuth": "Bearer"},
-                debug=False,
-            )
-        )
-
-        class DummyDefaultApi:
-            def __init__(self, *_, **__):
-                pass
-
-            def select_header_accept(self, _):
-                return "application/json"
-
-            async def documents_id_get(self, doc_id):
-                return {
-                    "id": doc_id,
-                    "title": f"Mocked document {doc_id}",
-                    "status": "ok",
-                    "product_tree": {"branches": []},
-                }
-
-        monkeypatch.setattr(
-            "dina.plugins.datasource.isduba.isduba.isduba_api_client.DefaultApi",
-            lambda api_client: DummyDefaultApi(),
-        )
+    # Documents that exist in ISDuBA
+    doc_id1, doc_id2 = list(ISDUBA_DOCUMENTS)[:2]
 
     product1 = MagicMock(spec=CsafProduct)
     product1.id = 101
-    product1.origin_info = {"path": "/api/documents/101"}
+    product1.origin_info = {"path": f"/api/documents/{doc_id1}"}
 
     product2 = MagicMock(spec=CsafProduct)
     product2.id = 202
-    product2.origin_info = {"path": "/api/documents/202"}
+    product2.origin_info = {"path": f"/api/documents/{doc_id2}"}
 
     data_to_check = [product1, product2]
 
@@ -303,19 +270,27 @@ async def test_fetch_relationships(monkeypatch, backend, plugin_config):
     """Ensures fetch_relationships correctly returns Relationship objects."""
     plugin = IsdubaDataSource(plugin_config)
 
+    # A document in ISDuBA with relationships in its product tree
+    doc_id, relationships = next(
+        (doc_id, document["product_tree"]["relationships"])
+        for doc_id, document in ISDUBA_DOCUMENTS.items()
+        if document["product_tree"].get("relationships")
+    )
+
     csaf1, csaf2 = MagicMock(spec=CsafProduct), MagicMock(spec=CsafProduct)
     csaf1.id, csaf2.id = 1, 2
-    csaf1.origin_info = {"product_name_id": "p1", "path": "/api/documents/1"}
-    csaf2.origin_info = {"product_name_id": "p2", "path": "/api/documents/1"}
+    csaf1.origin_info = {"product_name_id": "p1", "path": f"/api/documents/{doc_id}"}
+    csaf2.origin_info = {"product_name_id": "p2", "path": f"/api/documents/{doc_id}"}
 
     fetcher_view = MagicMock()
     fetcher_view.last_run = AsyncMock(return_value=datetime.now(timezone.utc))
+    # The existing products, then both related products for each relationship
     fetcher_view.get_existing = AsyncMock(
-        side_effect=[[csaf1, csaf2], [csaf1], [csaf2]]
+        side_effect=[[csaf1, csaf2]] + [[csaf1], [csaf2]] * len(relationships)
     )
 
     if backend == "mock":
-        _mock_isduba(monkeypatch, plugin, DOCS_META[:1], DOCUMENTS_FULL[:1])
+        _mock_isduba(monkeypatch, plugin)
 
     result = await plugin.fetch_relationships(fetcher_view)
 
