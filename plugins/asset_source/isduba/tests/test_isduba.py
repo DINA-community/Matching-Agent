@@ -78,7 +78,7 @@ EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
 
 class FakeIsdubaApi:
-    """Mock the python client generated based on the openAPI spec"""
+    """Mock the python client generated based on the OpenAPI spec"""
 
     def __init__(self, api_client):
         self.api_client = api_client
