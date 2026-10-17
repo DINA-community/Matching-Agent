@@ -302,6 +302,30 @@ Plugin tests are included automatically when the corresponding plugin is install
 If a plugin is not installed, its tests will be skipped.
 
 
+Integration tests
+^^^^^^^^^^^^^^^^^
+
+ISDuBA
+~~~~~~
+
+The integration tests require services to be running in the background and are not executed by default.
+They are marked with ``integration``. To run them:
+
+.. code-block:: bash
+
+    ./dev/start-local-env.sh
+    ./dev/isduba-set-sources.py
+    uv run pytest -m integration
+
+They have these requirements and fail if these are not met:
+
+These tests are included in the CI workflow ``.github/workflows/integration.yml``.
+
+NetBox
+~~~~~~
+
+NetBox integration tests (``plugins/asset_source/netbox/tests/``) start their own NetBox with Docker Compose.
+
 Testing with Coverage
 ^^^^^^^^^^^^^^^^^^^^^
 
