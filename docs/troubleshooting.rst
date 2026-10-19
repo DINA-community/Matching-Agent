@@ -35,12 +35,12 @@ Solutions
 Daemon authentication problems
 ------------------------------
 
-If the the assetsync daemon ``uv run assetsync`` log message like these:
+If the assetsync daemon ``uv run assetsync`` logs messages like these:
 
 .. code-block::
 
-   RuntimeError: Could not authenticate with the netbox instance. Probably invalid access token. Please make sure to correctly configure your access token in the plugin configuration.
-   dina.synchronizer.base - ERROR - Error fetching data from plugin netbox_fetcher for endpoint http://netbox.localhost/: Could not authenticate with the netbox instance. Probably invalid access token. Please make sure to correctly configure your access token in the plugin configuration.
+   RuntimeError: Could not authenticate with the NetBox instance. Probably invalid access token. Please make sure to correctly configure your access token in the plugin configuration.
+   dina.synchronizer.base - ERROR - Error fetching data from plugin netbox_fetcher for endpoint http://netbox.localhost/: Could not authenticate with the NetBox instance. Probably invalid access token. Please make sure to correctly configure your access token in the plugin configuration.
 
 or the ``csaf_matcher``:
 
@@ -74,7 +74,7 @@ If you see CSAF documents with title ``Loading...``, the background job cannot r
 The job uses the URL from setting ``keycloak_url`` (in ``isduba-local.toml``) to connect to Keycloak/ISDuBA.
 If these are not reachable from inside the NetBox containers, the documents cannot be fetched.
 
-In the local development environment, the docker compose setup add internal aliases for ``*.localhost``, so the URLs work internally as they do in the browser.
+In the local development environment, the docker compose setup adds internal aliases for ``*.localhost``, so the URLs work internally as they do in the browser.
 In other setups make sure the ISDuBA document URLs and ``keycloak_url`` are reachable from within the NetBox worker container.
 
-All errors of the backgroun job are printed to the ``netbox-worker`` docker container log.
+All errors of the background job are printed to the ``netbox-worker`` docker container log.
