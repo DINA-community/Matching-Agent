@@ -60,6 +60,7 @@ def convert_into_database_format(
                 cpe=helper.cpe if helper and helper.cpe else None,
                 purl=helper.purl if helper and helper.purl else None,
                 sbom_urls=list(getattr(helper, "sbom_urls", []) or []),
+                x_generic_uris=list(getattr(helper, "x_generic_uris", []) or []),
                 serial_numbers=list(getattr(helper, "serial_numbers", []) or []),
                 files=getattr(helper, "files", None),
                 model_numbers=list(getattr(helper, "model_numbers", []) or []),
@@ -92,6 +93,7 @@ def _update_product_fields(target: Product, source: Product) -> None:
     target.cpe = source.cpe
     target.purl = source.purl
     target.sbom_urls = source.sbom_urls
+    target.x_generic_uris = source.x_generic_uris
     target.serial_numbers = source.serial_numbers
     target.files = source.files
     target.model_numbers = source.model_numbers

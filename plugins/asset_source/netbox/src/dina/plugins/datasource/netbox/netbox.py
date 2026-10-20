@@ -26,6 +26,8 @@ from sqlalchemy import Integer
 from dina.cachedb.fetcher_view import FetcherView
 from dina.cachedb.model import (
     Asset,
+    File,
+    FileList,
     CsafProduct,
     Product,
     ProductType,
@@ -43,6 +45,8 @@ from dina.plugins.datasource.netbox.generated.api_client.api.dcim import (
 from dina.plugins.datasource.netbox.generated.api_client.api.plugins import (
     plugins_d3c_productrelationship_list_list,
     plugins_d3c_software_list_list,
+    plugins_d3c_filehash_list_list,
+    plugins_d3c_xgenericuri_list_list,
     plugins_csaf_csafmatch_list_create,
 )
 from dina.plugins.datasource.netbox.generated.api_client.errors import UnexpectedStatus
@@ -133,6 +137,8 @@ class NetboxDataSource(DataSourcePlugin):
             device_types_result,
             module_types_result,
             manufacturers_result,
+            file_hashes_result,
+            generic_uris_result,
         ) = await asyncio.gather(
             dcim_devices_list.asyncio(
                 client=self.client, last_updated_gt=[last_run], ordering="-id"
@@ -151,6 +157,10 @@ class NetboxDataSource(DataSourcePlugin):
             ),
             dcim_manufacturers_list.asyncio(
                 client=self.client, last_updated_gt=[last_run], ordering="-id"
+            ),
+            plugins_d3c_filehash_list_list.asyncio(client=self.client, ordering="id"),
+            plugins_d3c_xgenericuri_list_list.asyncio(
+                client=self.client, ordering="id"
             ),
             return_exceptions=True,
         )
@@ -215,6 +225,36 @@ class NetboxDataSource(DataSourcePlugin):
         except UnexpectedStatus as e:
             logger.error(f"Failed to fetch manufacturers: {e.status_code}")
             manufacturers = {}
+
+        # TODO: Only the first result page is read here, like for the other requests above.
+        # Check whether this is a problem.
+        file_hashes = None
+        try:
+            file_hashes = validate_response(file_hashes_result).results
+        except UnexpectedStatus as e:
+            logger.error(f"Failed to fetch file hashes: {e.status_code}")
+
+        generic_uris = None
+        try:
+            generic_uris = validate_response(generic_uris_result).results
+        except UnexpectedStatus as e:
+            logger.error(f"Failed to fetch generic URIs: {e.status_code}")
+
+        files_by_software: dict[int, list[File]] | None = None
+        if file_hashes is not None:
+            files_by_software = {}
+            for record in file_hashes:
+                files_by_software.setdefault(record.hash_.software.id, []).append(
+                    File(record.hash_.filename, record.value, record.algorithm)
+                )
+        uris_by_parent: dict[tuple[str, int], list[dict[str, str]]] | None = None
+        if generic_uris is not None:
+            uris_by_parent = {}
+            for record in generic_uris:
+                key = (record.content_type, record.content_object["id"])
+                uris_by_parent.setdefault(key, []).append(
+                    {"namespace": record.namespace, "uri": record.uri}
+                )
 
         # TODO: Maybe we can use graphql instead to reduce the amount of communication needed?
         if manufacturers:
@@ -570,7 +610,24 @@ class NetboxDataSource(DataSourcePlugin):
             asset.product.manufacturer_name = manufacturer.name
             assets.append(asset)
 
+        for asset in assets:
+            info = asset.origin_info
+            if files_by_software is not None and "software_id" in info:
+                asset.product.files = FileList(
+                    files_by_software.get(info["software_id"], [])
+                )
+            parent = self._generic_uri_parent(info)
+            if uris_by_parent is not None and parent is not None:
+                asset.product.x_generic_uris = uris_by_parent.get(parent, [])
         return FetchProductsResult(again=False, data=assets)
+
+    @staticmethod
+    def _generic_uri_parent(info: dict[str, Any]) -> tuple[str, int] | None:
+        if "software_id" in info:
+            return ("d3c.software", info["software_id"])
+        if "device_type_id" in info:
+            return ("dcim.devicetype", info["device_type_id"])
+        return None
 
     async def fetch_relationships(
         self, fetcher_view: FetcherView

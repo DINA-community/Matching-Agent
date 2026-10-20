@@ -23,6 +23,7 @@ from sqlalchemy import (
     or_,
     select,
     tuple_,
+    text,
     update,
 )
 from sqlalchemy.dialects.postgresql import insert
@@ -99,6 +100,12 @@ class CacheDB:
         async with self.engine.begin() as conn:
             await conn.execute(CreateSchema("cacheDB", if_not_exists=True))
             await conn.run_sync(Base.metadata.create_all)
+            await conn.execute(
+                text(
+                    'ALTER TABLE "cacheDB".product ADD COLUMN IF NOT EXISTS '
+                    "x_generic_uris JSONB NOT NULL DEFAULT '[]'::jsonb"
+                )
+            )
 
     def fetcher_view(self, origin: HttpUrl) -> FetcherView:
         """
