@@ -32,26 +32,49 @@ Solutions
 
        uv pip install "polars[rtcompat]"
 
+Daemon authentication problems
+------------------------------
+
+If the assetsync daemon ``uv run assetsync`` logs messages like these:
+
+.. code-block::
+
+   RuntimeError: Could not authenticate with the NetBox instance. Probably invalid access token. Please make sure to correctly configure your access token in the plugin configuration.
+   dina.synchronizer.base - ERROR - Error fetching data from plugin netbox_fetcher for endpoint http://netbox.localhost/: Could not authenticate with the NetBox instance. Probably invalid access token. Please make sure to correctly configure your access token in the plugin configuration.
+
+or the ``csaf_matcher``:
+
+.. code-block::
+
+   dina.plugins.datasource.netbox.netbox - ERROR - Failed to notify new matches: Unexpected status code: 403
+
+Then the configured authentication token is not correct.
+Configure the NetBox token in the assetsync configuration, see Getting started, section *Configure plugins*.
+A new token is generated with every new setup of the NetBox instance and needs to be set manually.
+
+Then start the ``csaf_matcher`` and ``assetsync`` again.
+
+Please note, that matches that were previously found, are not automatically published to NetBox again.
+To force a Re-Publish, run this command:
+
+.. code-block:: bash
+
+   access_token=$(curl -s -X POST http://localhost:8998/token -d "username=admin&password=admin" | jq -r .access_token)
+   curl -s -X POST -H "Authorization: Bearer $access_token" -H "Content-Type: application/json" -d '{"force_recompute": true}' http://localhost:8998/task/start
+
 Netbox Plugin: Document Titles Not Loading in Local Development
 ----------------------------------------------------------------
 
-When using the Netbox plugin in the local development environment, you may notice that document titles from ISDUBA are not displayed correctly in the web UI, even though links are clickable.
+New CSAF documents are created in NetBox with only their ISDuBA URL and the title ``Loading...``.
+The CSAF plugin contains a background job *CSAF Document Sync* that runs in the docker container ``netbox-worker`` and is responsible to fetch the document details from ISDuBA.
+It runs every hour and after new matches are added.
 
-Root Cause
-~~~~~~~~~~
+If you see CSAF documents with title ``Loading...``, the background job cannot reach ISDuBA or retrieve the information.
 
-This is a known limitation of the local development setup due to URL accessibility constraints:
+The job uses the URL from setting ``keycloak_url`` (in ``isduba-local.toml``) to connect to Keycloak/ISDuBA.
+If these are not reachable from inside the NetBox containers, the documents cannot be fetched.
 
-- The ISDUBA instance in the local Docker Compose environment can be reached via two different URLs:
+In the local development environment, the docker compose setup adds internal aliases for ``*.localhost``, so the URLs work internally as they do in the browser.
+In other setups make sure the ISDuBA document URLs and ``keycloak_url`` are reachable from within the NetBox worker container.
 
-  - ``http://isduba.localhost`` (accessible from your browser)
-  - ``http://isduba-server`` (accessible from within the Docker network)
-
-- The Netbox plugin must use **one** URL configuration to fetch document titles and generate links
-- If configured with ``localhost``: Links work in the browser, but the Netbox container cannot fetch titles (it cannot resolve ``localhost`` to the ISDUBA container)
-- If configured with ``isduba``: The Netbox container can fetch titles, but links are not clickable from your browser (your browser cannot resolve the ``isduba`` hostname)
-
-Solution
-~~~~~~~~
-
-This is **not an issue in production environments**, where a single publicly accessible URL serves both purposes (e.g., ``https://isduba.example.com``).
+All errors of the background job are printed to the ``netbox-worker`` docker container log.

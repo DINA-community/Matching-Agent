@@ -56,11 +56,15 @@ After this, the source is not active yet. Here, the :ref:`checkbox <csaf-cisa-ac
 Provide NetBox Test Data
 ------------------------
 
-Load the sample assets through the NetBox API using the token printed by the ``netbox-setup`` container (``docker logs netbox-setup``):
+Load the sample assets into NetBox:
 
 .. code-block:: bash
 
-   NETBOX_TOKEN='<token>' uv run dev/test-cases/load_tutorial_fixture.py --url http://netbox.localhost
+   uv run dev/test-cases/load_tutorial_fixture.py
+
+By default, the script uses the API token and NetBox URL from the configuration file
+``assets/plugin_configs/data_source/asset/netbox-local.toml`` (see :ref:`quick-start`, step *Configure plugins*).
+See ``--help`` for more options.
 
 The loader reads ``dev/test-cases/tutorial-1.fixture.json`` and creates or updates the device types, devices, modules, and software used below.
 
