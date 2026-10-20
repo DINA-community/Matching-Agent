@@ -335,6 +335,7 @@ class Product(Base):
     :ivar cpe: Common Platform Enumeration identifier.
     :ivar purl: Package URL identifier.
     :ivar sbom_urls: List of Software Bill of Materials URLs.
+    :ivar x_generic_uris: List of namespace/URI identification pairs.
     :ivar serial_numbers: List of device serial numbers.
     :ivar files: List of associated files with hashes.
     :ivar model: Device model identifier.
@@ -374,6 +375,9 @@ class Product(Base):
     cpe: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     purl: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     sbom_urls: Mapped[List[str]] = mapped_column(JSONB, default=[])
+    x_generic_uris: Mapped[List[Dict[str, str]]] = mapped_column(
+        JSONB, default=list, server_default="[]"
+    )
     serial_numbers: Mapped[List[str]] = mapped_column(JSONB, default=[])
     files: Mapped[FileList] = mapped_column(FileListType, default=FileList(files=[]))
 
@@ -413,6 +417,7 @@ class Product(Base):
             "cpe": self.cpe,
             "purl": self.purl,
             "sbom_urls": self.sbom_urls,
+            "x_generic_uris": self.x_generic_uris,
             "serial_numbers": self.serial_numbers,
             "files": self.files,
             "model": self.model,

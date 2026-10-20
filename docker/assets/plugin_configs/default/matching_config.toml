@@ -22,6 +22,7 @@ purl = 0.13
 product_type = 0.02
 sbom_urls = 0.01
 hashes = 0.03
+x_generic_uris = 0.03
 model_numbers = 0.03
 part_numbers = 0.03
 serial_numbers = 0.03

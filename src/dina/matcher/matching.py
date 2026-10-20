@@ -704,6 +704,31 @@ class Matching:
         return self._compare_list_fields(csaf_list, asset_list, self._normalize_identifier)
 
     @staticmethod
+    def _generic_uri_pairs(uris: list[dict[str, str]]) -> set[tuple[str, str]]:
+        """Collect (namespace, uri) pairs and skip entries missing either part."""
+        pairs = set()
+        for entry in uris:
+            namespace = entry.get("namespace")
+            uri = entry.get("uri")
+            if namespace and uri:
+                pairs.add((namespace, uri))
+        return pairs
+
+    @staticmethod
+    def _compare_generic_uris(
+        csaf_uris: list[dict[str, str]] | None,
+        asset_uris: list[dict[str, str]] | None,
+    ) -> float | None:
+        """Match complete namespace/URI pairs."""
+        if not csaf_uris or not asset_uris:
+            return None
+
+        csaf_pairs = Matching._generic_uri_pairs(csaf_uris)
+        asset_pairs = Matching._generic_uri_pairs(asset_uris)
+        has_common_pair = bool(csaf_pairs & asset_pairs)
+        return 1.0 if has_common_pair else 0.0
+
+    @staticmethod
     def _normalize_identifier(value: str) -> str:
         return value.strip().casefold()
 
@@ -878,6 +903,20 @@ class Matching:
                         pl.struct([csaf_col, asset_col])
                         .map_elements(
                             lambda row: self._compare_identifier_lists(
+                                self._safe_load(row[csaf_col]),
+                                self._safe_load(row[asset_col]),
+                            ),
+                            return_dtype=pl.Float64,
+                        )
+                        .alias(f"{field}_match")
+                    )
+                    continue
+
+                case "x_generic_uris":
+                    df = df.with_columns(
+                        pl.struct([csaf_col, asset_col])
+                        .map_elements(
+                            lambda row: self._compare_generic_uris(
                                 self._safe_load(row[csaf_col]),
                                 self._safe_load(row[asset_col]),
                             ),
