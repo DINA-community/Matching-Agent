@@ -40,8 +40,8 @@ TERMINAL_PAYLOAD='
 
 # argv handed to every emulator: bash -c <payload> <arg0> <title> <cmd> <dir> <pid>
 build_payload() {
-  keep="${3:-${API_KEEP_OPEN:-1}}"
-  payload=(bash -c "$TERMINAL_PAYLOAD" bash "$title" "$cmd" "$workdir" "$pidfile")
+  local keep="${API_KEEP_OPEN:-1}}"
+  payload=(bash -c "$TERMINAL_PAYLOAD" bash "$title" "$cmd" "$workdir" "$pidfile" "$keep")
 }
 
 # Report a broken launch here instead of leaving stop_apis() without a PID file.
@@ -84,14 +84,10 @@ open_terminal() {
 
   elif has_xdg_terminal; then
     # 2) generic way to launch the standard terminal
-    info_api "xdg will be used. Starting API $title..."
-    # xdg-terminal-exec -- bash -ilc "$inner" bash "$title" "$cmd" "$workdir" "$pidfile" &
-    #                                   $0            $1       $2      $3        $4
     if command -v xdg-terminal-exec >/dev/null 2>&1; then
-      # The first argument selects the terminal (desktop file ID), the payload
-      # command must follow "--".
       info_api "xdg-terminal-exec will be used. Starting API $title..."
-      xdg-terminal-exec -- "${payload[@]}" &
+      # GTK/libadwaita portal warnings go to the emulator's stderr
+      xdg-terminal-exec -- "${payload[@]}" 2>/dev/null &
       wait $! 2>/dev/null \
         || info_api "xdg-terminal-exec failed - set \$TERMINAL to your emulator"
       wait_for_pidfile
@@ -100,6 +96,8 @@ open_terminal() {
     # 3) the slightly older variant to launch the standard terminal, only
     #    accepts a single command string (run via the shell), not argv.
     if command -v xdg-terminal >/dev/null 2>&1; then
+      echo "--[WARNING] deprecated" >&2;
+      info_api "  xdg-terminal will be used. Starting API $title..."
       xdg-terminal "$full_cmd" &
       wait_for_pidfile
       return

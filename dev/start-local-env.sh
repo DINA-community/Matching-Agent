@@ -575,7 +575,7 @@ stop_process() {
     # Force kill if still running
     if kill -0 "$pid" 2>/dev/null; then
         kill -SIGKILL "$pid" 2>/dev/null || true
-        info "Force killed $label with SIGKILL ($pid)"
+        info "Force killed $label ($pid)"
     fi
 }
 
