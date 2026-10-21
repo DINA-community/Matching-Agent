@@ -1,20 +1,6 @@
 #!/usr/bin/env bash
 
 # Starts the local development environment defined in dev/docker-compose.yml
-#
-# Usage:
-#   ./dev/start-local-env.sh                         # start services in background
-#   ./dev/start-local-env.sh --recreate              # recreate containers
-#   ./dev/start-local-env.sh --stop                  # stop
-#   ./dev/start-local-env.sh --down                  # stop and remove services
-#   ./dev/start-local-env.sh --down --volumes        # stop, remove services AND named volumes
-#   ./dev/start-local-env.sh --recreate --volumes    # full reset: down -v, then up (fresh volumes)
-#   ./dev/start-local-env.sh --clean                 # remove local images + local env/toml/plugins.py
-#
-# Notes:
-# - Requires Docker and Docker Compose (v2: `docker compose`).
-# - After startup, retrieve the NetBox API token with:
-#     docker compose -f dev/docker-compose.yml logs netbox-setup
 
 set -euo pipefail
 
@@ -277,7 +263,7 @@ remove_plugins_config() {
 
 ensure_local_configs() {
 	# Set sample files in case file is missing
-	# Note that the dev/.env is already set by fkt need_env
+	# Note that the dev/.env is already set by function need_env
 	for pair in "${FILE_PAIRS[@]}"; do
 		set -- $pair
 		local target_file="$2"
@@ -312,13 +298,14 @@ Services are starting. Useful info:
 To get the NetBox API token printed by the setup container:
   $COMPOSE_CMD -f $COMPOSE_FILE logs netbox-setup
 
-./dev/start-local-env.sh                       # start services in background
-./dev/start-local-env.sh -c, --clean               # remove local images + local env/toml/plugins.py
-./dev/start-local-env.sh -d, --down                # stop and remove services
+./dev/start-local-env.sh                              # start services in background
+./dev/start-local-env.sh -c, --clean                  # remove local images + local env/toml/plugins.py
+./dev/start-local-env.sh -d, --down                   # stop and remove services
 ./dev/start-local-env.sh -d -r, --down --volumes      # stop and remove services AND named volumes
 ./dev/start-local-env.sh -r -v, --recreate --volumes  # full reset: down -v, then up (fresh volumes)
-./dev/start-local-env.sh -r, --recreate            # recreate containers
-./dev/start-local-env.sh -s, --stop                # stop
+./dev/start-local-env.sh -r, --recreate               # recreate containers
+./dev/start-local-env.sh -n , --new                   # full reset: -d -v, then --up with fresh volumes
+./dev/start-local-env.sh -s, --stop                   # stop
 
 If you want to use a test database for netbox look at
   dev/test-cases
@@ -331,8 +318,8 @@ EOF
 parse_arguments() {
 	local ACTION="up"        # Default action
 	local WITH_VOLUMES=false # Default value for volumes flag
-	local valid_actions=("up" "down" "recreate" "stop" "clean")
-	local valid_flags=("u" "d" "r" "s" "c" "v")
+	local valid_actions=("up" "down" "recreate" "stop" "clean" "new")
+	local valid_flags=("u" "d" "r" "s" "c" "v" "n")
 
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
@@ -342,6 +329,7 @@ Usage: $0 [Options]
     Options:
     -c, --clean      Remove local images and configs.
     -d, --down       Stop and remove services.
+	-n, --new        Full reset -d -v -u
     -r, --recreate   Recreate containers. (up -d --force-recreate --remove-orphans))
     -s, --stop       Stop services.
     -u, --up         Start services. (default)
@@ -363,12 +351,14 @@ USAGE
 				print_help "$1"
 			else
 				case "$1" in
+				--clean) ACTION="clean" ;;
+				--down) ACTION="down" ;;
+				--new) ACTION="new" 
+					   WITH_VOLUMES=true;;
+				--recreate) ACTION="recreate" ;;
+				--stop) ACTION="stop" ;;
 				--up) ACTION="up" ;;
 				--volumes) WITH_VOLUMES=true ;;
-				--down) ACTION="down" ;;
-				--stop) ACTION="stop" ;;
-				--recreate) ACTION="recreate" ;;
-				--clean) ACTION="clean" ;;
 				*)
 					print_help "$1"
 					;;
@@ -389,12 +379,14 @@ USAGE
 						print_help "$arg"
 					fi
 					case "$arg" in
+					c) ACTION="clean" ;;
+					d) ACTION="down" ;;
+					n) ACTION="new" 
+					   WITH_VOLUMES=true;;
+					r) ACTION="recreate" ;;
+					s) ACTION="stop" ;;
 					u) ACTION="up" ;;
 					v) WITH_VOLUMES=true ;;
-					d) ACTION="down" ;;
-					s) ACTION="stop" ;;
-					r) ACTION="recreate" ;;
-					c) ACTION="clean" ;;
 					esac
 				done
 			fi
@@ -444,7 +436,7 @@ checks() {
 		exit 2
 	fi
 	info "## Check Setting"
-	if [[ "$ACTION" == "clean" || "$ACTION" == "down" || "$ACTION" == "stop" ]]; then
+	if [[ "$ACTION" == "clean" || "$ACTION" == "down" || "$ACTION" == "stop" || "$ACTION" == "new" ]]; then
 		need_cmd docker
 		COMPOSE_CMD=$(ensure_compose)
 	else # Skipping unnecessary checks for cleaning
@@ -480,12 +472,6 @@ checks() {
 execute() {
 	info "## Execute Action $ACTION"
 	case "$ACTION" in
-	stop)
-		info "--[EXE] Stopping dev environment..."
-		stop_apis
-		$COMPOSE_CMD -f "$COMPOSE_FILE" stop
-		exit 0
-		;;
 	clean)
 		info "--[EXE] Cleaning local development environment..."
 		prune_project_images "$COMPOSE_FILE"
@@ -505,18 +491,34 @@ execute() {
 		fi
 		exit 0
 		;;
-	recreate)
+	new)
+		stop_apis
+		info "--[EXE] Remove everything"
+		$COMPOSE_CMD -f "$COMPOSE_FILE" down -v
+		prune_project_images "$COMPOSE_FILE"
+		remove_local_configs
+		remove_plugins_config
+		info "--[EXE] New installation"
+		need_env
 		ensure_local_configs
+		$COMPOSE_CMD -f "$COMPOSE_FILE" up -d --build --force-recreate --remove-orphans
+		;;
+	recreate)
 		stop_apis
 		sleep 2
 		if [[ "$WITH_VOLUMES" == true ]]; then
 			info "-- [EXE] Recreating dev environment with volume reset (down -v; up)..."
 			$COMPOSE_CMD -f "$COMPOSE_FILE" down -v || true
-			$COMPOSE_CMD -f "$COMPOSE_FILE" up -d --build --force-recreate --remove-orphans
 		else
-			info "-- [EXE] Starting dev environment (recreate containers)..."
-			$COMPOSE_CMD -f "$COMPOSE_FILE" up -d --build --force-recreate --remove-orphans
+			info "-- [EXE] Starting dev environment (recreate containers)..."	
 		fi
+		$COMPOSE_CMD -f "$COMPOSE_FILE" up -d --build --force-recreate --remove-orphans
+		;;
+	stop)
+		info "--[EXE] Stopping dev environment..."
+		stop_apis
+		$COMPOSE_CMD -f "$COMPOSE_FILE" stop
+		exit 0
 		;;
 	up)
 		info "-- [EXE] Starting dev environment..."
