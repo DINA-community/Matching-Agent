@@ -135,7 +135,7 @@ else
 fi
 
 if id -nG "$suser" | grep -qw docker; then
-  echo "ohh noee"
+  :
 else
   sudo usermod -aG docker "$suser" || { echo "usermod failed" >&2; exit 1; }
   echo "--[DOCKER] added user $suser to docker group; re-login (or: newgrp docker) required"

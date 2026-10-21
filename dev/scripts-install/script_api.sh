@@ -1,9 +1,6 @@
 #!/bin/bash
 
-SCRIPT_DIR="${BASH_SOURCE[0]}"
-echo $SCRIPT_DIR
 SCRIPT_DIR="$(dirname -- "${BASH_SOURCE[0]}")"
-echo $SCRIPT_DIR
 [[ -f $SCRIPT_DIR/"utils.sh" ]] || { echo "[ERROR] utils.sh not found (looked in $SCRIPT_DIR)" >&2; exit 127; }
 # shellcheck source=dev/scripts-install/utils.sh
 source "${SCRIPT_DIR}/utils.sh"
