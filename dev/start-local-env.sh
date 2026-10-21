@@ -84,7 +84,7 @@ need_dep() {
 			sed -i "s|^\(DEP=\).*|\1true|" "$ENV_FILE"
 			info "--DEP set true in $ENV_FILE"
 		else
-			if ! check_response "Asking again? [y/N] " "N"; then
+			if ! check_response "Should dependencies be checked on next run? [y/N] " "N"; then
 				sed -i "s|^\(DEP=\).*|\1true|" "$ENV_FILE"
 				info "--DEP set true in $ENV_FILE"
 			fi
