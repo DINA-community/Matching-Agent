@@ -9,6 +9,7 @@ ENV_FILE="dev/.env"
 ENV_SAMPLE="dev/configuration/.env.example"
 NETBOX_URL="NETBOX_CLIENT_HOSTNAME_URL"
 ISDUBA_SAMPLE="assets/plugin_configs/data_source/csaf/sample/isduba.toml"
+NETBOX_ASSET_SCRIPT="dev/test-cases/load_tutorial_fixture.py"
 NETBOX_SAMPLE="assets/plugin_configs/data_source/asset/sample/netbox.toml"
 NETBOX_FILE="assets/plugin_configs/data_source/asset/netbox-local.toml"
 ISDUBA_FILE="assets/plugin_configs/data_source/csaf/isduba-local.toml"
@@ -620,15 +621,22 @@ post_processing() {
 		sleep 2
 	done
 
-	set_isduba_sources
+	set_workshop
 }
 
 # Configures providers in ISDuBA
-set_isduba_sources() {
+set_workshop() {
 	info "--[PoP] Configuring default CSAF providers in ISDuBA..."
 	if ! "$ISDUBA_SOURCES_SCRIPT"; then
 		warning "--[PoP] Failed to configure ISDuBA providers."
 		warning "--[PoP] You can retry later with: $ISDUBA_SOURCES_SCRIPT"
+	fi
+    uv pip install httpx
+
+	info "--[PoP] Configuring default Asset data in NetBox..."
+	if ! "$NETBOX_ASSET_SCRIPT"; then
+		warning "--[PoP] Failed to configure NetBox assets."
+		warning "--[PoP] You can retry later with: $NETBOX_ASSET_SCRIPT"
 	fi
 }
 
