@@ -215,7 +215,7 @@ services:
     depends_on:
       netbox:
         condition: service_healthy
-    entrypoint: ["/opt/netbox/docker-entrypoint-plugins.sh", "bash", "/opt/netbox/init-scripts/netbox-token.sh"]
+    entrypoint: ["/opt/netbox/docker-entrypoint-plugins.sh", "bash", "/opt/netbox/scripts-install/netbox-token.sh"]
     environment:
       <<: *netbox-environment
       DJANGO_SUPERUSER_PASSWORD: ${NETBOX_SUPERUSER_PASSWORD}
