@@ -10,7 +10,7 @@ services:
       - "2345:5432"
     volumes:
       - cachedb_postgres:/var/lib/postgresql
-      - ./init-scripts:/docker-entrypoint-initdb.d:z,ro
+      - ./scripts-install:/docker-entrypoint-initdb.d:z,ro
     restart: unless-stopped
     shm_size: 1G
 
@@ -173,7 +173,7 @@ services:
       - netbox
     volumes:
       - ./configuration:/etc/netbox/config:z,ro
-      - ./init-scripts:/opt/netbox/init-scripts:z,ro
+      - ./scripts-install:/opt/netbox/scripts-install:z,ro
       - netbox-media-files:/opt/netbox/netbox/media:rw
       - netbox-reports-files:/opt/netbox/netbox/reports:rw
       - netbox-scripts-files:/opt/netbox/netbox/scripts:rw
