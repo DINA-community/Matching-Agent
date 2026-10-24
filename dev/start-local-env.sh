@@ -71,7 +71,7 @@ need_dep() {
 			sed -i "s|^\(DEP=\).*|\1true|" "$ENV_FILE"
 			info "--DEP set true in $ENV_FILE"
 		else
-			if ! check_response "Asking again? [y/N] " "N"; then
+			if ! check_response "Should dependencies be checked on next run? [y/N] " "N"; then
 				sed -i "s|^\(DEP=\).*|\1true|" "$ENV_FILE"
 				info "--DEP set true in $ENV_FILE"
 			fi
@@ -501,7 +501,7 @@ execute() {
 		remove_plugins_config
 		info "--[EXE] New installation"
 		need_env
-    need_dep
+    	need_dep
 		ensure_local_configs
 		$COMPOSE_CMD -f "$COMPOSE_FILE" up -d --build --force-recreate --remove-orphans
 		;;
