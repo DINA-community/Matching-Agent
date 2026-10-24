@@ -68,6 +68,17 @@ need_cmd() {
 	fi
 }
 
+need_plugins() {
+	# Plugins are separate packages as extras
+	# Make sure they are properly set up
+	need_cmd uv
+	info "--[DEP] Syncing plugin extras"
+	uv sync --all-extras || {
+		error "--[DEP] 'uv sync --all-extras' failed"
+		exit 1
+	}
+}
+
 need_dep() {
 	## INSTALL DEPENDENCIES
 	KEY=$(grep -E '^DEP=' "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2- || true)
@@ -99,10 +110,6 @@ need_env() {
 	info "--[ENV] Check for $ENV_FILE"
 	if [ ! -f "$ENV_FILE" ]; then
 		if check_response "$ENV_FILE does not exist. Create from $ENV_SAMPLE? This will create a fully local setup [Y/n]" "Y"; then
-			if ! check_response "Did you execute the following command? uv sync --all-extras? Otherwise it will be executed now. [y/N]" "N"; then
-				info "--[ENV] sync wird ausgeführt"
-				uv sync --all-extras
-			fi
 			cp -p "$ENV_SAMPLE" "$ENV_FILE" || {
 				error "Failed to copy $ENV_SAMPLE to $ENV_FILE"
 				exit 127
@@ -450,6 +457,7 @@ checks() {
 	else # Skipping unnecessary checks for cleaning
 		## INSTALL DEPENDENCIES
 		need_env
+		need_plugins
 		need_dep
 		need_cmd docker
 		COMPOSE_CMD=$(ensure_compose)
