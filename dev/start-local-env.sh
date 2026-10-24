@@ -501,7 +501,7 @@ execute() {
 		remove_plugins_config
 		info "--[EXE] New installation"
 		need_env
-		need_dep
+    need_dep
 		ensure_local_configs
 		$COMPOSE_CMD -f "$COMPOSE_FILE" up -d --build --force-recreate --remove-orphans
 		;;
