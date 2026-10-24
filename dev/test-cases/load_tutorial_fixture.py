@@ -33,6 +33,8 @@ ENV_FILE =  Path(__file__).parents[1] / ".env"
 FIXTURE = Path(__file__).with_name("tutorial-1.fixture.json")
 NETBOX_CONFIG = Path(__file__).parents[2] / "assets/plugin_configs/data_source/asset/netbox-local.toml"
 
+def info(*args):
+    print("[INFO] ", *args, file=sys.stderr)
 
 class ImportFailure(RuntimeError):
     """Raised when the fixture cannot be loaded."""
@@ -345,7 +347,7 @@ def main() -> int:
         api.close()
 
 
-    print("Tutorial fixture loaded.")
+    info("--[DOC] Tutorial fixture loaded.")
     p = Path(ENV_FILE)
     raw = p.read_text(encoding="utf-8", newline="")      # keep CRLF as-is
     p.write_text(raw.replace("NETBOX_WORKSHOP=false", "NETBOX_WORKSHOP=true", 1), encoding="utf-8", newline="")

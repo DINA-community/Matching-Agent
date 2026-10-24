@@ -305,7 +305,7 @@ To get the NetBox API token printed by the setup container:
 ./dev/start-local-env.sh -d -r, --down --volumes      # stop and remove services AND named volumes
 ./dev/start-local-env.sh -r -v, --recreate --volumes  # full reset: down -v, then up (fresh volumes)
 ./dev/start-local-env.sh -r, --recreate               # recreate containers
-./dev/start-local-env.sh -n , --new                   # full reset: -d -v, then --up with fresh volumes
+./dev/start-local-env.sh -n, --new                    # full reset: -d -v, then --up with fresh volumes
 ./dev/start-local-env.sh -s, --stop                   # stop
 
 If you want to use a test database for netbox look at
@@ -330,7 +330,7 @@ Usage: $0 [Options]
     Options:
     -c, --clean      Remove local images and configs.
     -d, --down       Stop and remove services.
-	-n, --new        Full reset -d -v -u
+    -n, --new        Full reset -d -v -u
     -r, --recreate   Recreate containers. (up -d --force-recreate --remove-orphans))
     -s, --stop       Stop services.
     -u, --up         Start services. (default)
@@ -501,6 +501,7 @@ execute() {
 		remove_plugins_config
 		info "--[EXE] New installation"
 		need_env
+		need_dep
 		ensure_local_configs
 		$COMPOSE_CMD -f "$COMPOSE_FILE" up -d --build --force-recreate --remove-orphans
 		;;
@@ -621,7 +622,6 @@ post_processing() {
 		sleep 2
 	done
 
-	set_workshop
 }
 
 # Configures providers in ISDuBA
@@ -631,7 +631,6 @@ set_workshop() {
 		warning "--[PoP] Failed to configure ISDuBA providers."
 		warning "--[PoP] You can retry later with: $ISDUBA_SOURCES_SCRIPT"
 	fi
-    uv pip install httpx
 
 	info "--[PoP] Configuring default Asset data in NetBox..."
 	if ! "$NETBOX_ASSET_SCRIPT"; then
@@ -659,6 +658,7 @@ cleanup() {
 			sed -i "s|^\($JWT=\).*|\1true|" "$ENV_FILE"
 			info "--[CLE] JWT was created successfully"
 		fi
+		set_workshop
 		# Start API
 		local excess
 		if check_response "Do you want to start the apis right away? [y/N]" "N"; then

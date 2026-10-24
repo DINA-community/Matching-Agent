@@ -15,6 +15,7 @@ dependencies = [
     "colorlog>=6.9.0",
     "dotenv>=0.9.9",
     "fastapi>=0.116.1",
+    "httpx",
     "hatchling>=1.27.0",
     "lazy-imports",
     "mypy>=1.16.1",
