@@ -19,7 +19,11 @@ def netbox(request: pytest.FixtureRequest) -> str:
     project = f"matching-netbox-{uuid.uuid4().hex[:8]}"
 
     def cleanup() -> None:
-        compose(project, ["down", "--volumes", "--remove-orphans", "--rmi", "local"], timeout=60)
+        compose(
+            project,
+            ["down", "--volumes", "--remove-orphans", "--rmi", "local"],
+            timeout=60,
+        )
 
     request.addfinalizer(cleanup)
     try:
@@ -32,7 +36,12 @@ def netbox(request: pytest.FixtureRequest) -> str:
     execute(
         project,
         "netbox",
-        MANAGE + ["shell", "-c", "from users.models import Token; assert not Token.objects.exists()"],
+        MANAGE
+        + [
+            "shell",
+            "-c",
+            "from users.models import Token; assert not Token.objects.exists()",
+        ],
     )
     return project
 

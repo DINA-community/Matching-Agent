@@ -20,7 +20,9 @@ def test_pepper_configuration(monkeypatch: pytest.MonkeyPatch, path: str) -> Non
         pytest.skip()
 
     monkeypatch.setenv("API_TOKEN_PEPPER_1", "environment-pepper")
-    with patch("builtins.open", side_effect=FileNotFoundError):  # force return of default/env value
+    with patch(
+        "builtins.open", side_effect=FileNotFoundError
+    ):  # force return of default/env value
         settings = runpy.run_path(str(config))
 
     assert settings["API_TOKEN_PEPPERS"] == {1: "environment-pepper"}
@@ -39,6 +41,10 @@ def test_checked_in_development_peppers_are_valid(path: str) -> None:
     if not config.is_file():
         pytest.skip()
 
-    pepper = next(line.split("=", 1)[1] for line in config.read_text().splitlines() if line.startswith("API_TOKEN_PEPPER_1="))
+    pepper = next(
+        line.split("=", 1)[1]
+        for line in config.read_text().splitlines()
+        if line.startswith("API_TOKEN_PEPPER_1=")
+    )
 
     assert len(pepper) >= 50
