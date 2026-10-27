@@ -22,6 +22,9 @@ ISDUBA_SOURCES_SAMPLE="dev/configuration/isduba-sources.example.json"
 LOCAL_SETTING="FULLY_LOCAL"
 JWT="JWT_KEY"
 
+# global variables
+clean_full=false
+
 ENV_FILES=(
 	".env"
 	"dev/.env"
@@ -181,6 +184,26 @@ check_response() {
 	done
 }
 
+get_env_value() {
+	local key="$1"
+	local value
+	value=$(grep -E "^${key}=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2- || true)
+	if [ -z "$value" ]; then
+		error "Key '$key' not found in $ENV_FILE"
+		exit 1
+	fi
+	if [ -z "$value" ]; then
+      echo "ERROR: Key '$key' not found in $ENV_FILE" >&2
+      return 1
+    fi
+    printf '%s\n' "$value"
+	# Load everything approach
+	#set -a            
+	#source $ENV_FILE
+	#set +a
+
+}
+
 ensure_compose() {
 	# Prefer `docker compose` (v2). Fall back to `docker-compose` (v1) if available.
 	if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
@@ -210,10 +233,14 @@ remove_local_configs() {
 	# Ask for confirmation at the beginning for a full cleanup
 	local confirm_all=true
 	local removed=false
-	if check_response "--[EXE] Remove all local files directly? [Y/n]" "Y"; then
+	if $clean_full; then
 		confirm_all=true
 	else
-		confirm_all=false
+		if check_response "--[EXE] Remove all local files directly? [Y/n]" "Y"; then
+			confirm_all=true
+		else
+			confirm_all=false
+		fi
 	fi
 
 	# remove .env files
@@ -257,7 +284,7 @@ remove_local_configs() {
 
 remove_plugins_config() {
 	local plugins_file=$PLUGINS_FILE
-	if [[ -f "$plugins_file" ]]; then
+	if [[ $clean_full == true && -f "$plugins_file" ]]; then
 		if check_response "Remove $plugins_file? [Y/n]" "Y"; then
 			info "--[EXE] Removing local plugins configuration: $plugins_file"
 			rm -f "$plugins_file"
@@ -305,21 +332,6 @@ Services are starting. Useful info:
 
 To get the NetBox API token printed by the setup container:
   $COMPOSE_CMD -f $COMPOSE_FILE logs netbox-setup
-
-./dev/start-local-env.sh                              # start services in background
-./dev/start-local-env.sh -c, --clean                  # remove local images + local env/toml/plugins.py
-./dev/start-local-env.sh -d, --down                   # stop and remove services
-./dev/start-local-env.sh -d -r, --down --volumes      # stop and remove services AND named volumes
-./dev/start-local-env.sh -r -v, --recreate --volumes  # full reset: down -v, then up (fresh volumes)
-./dev/start-local-env.sh -r, --recreate               # recreate containers
-./dev/start-local-env.sh -n, --new                    # full reset: -d -v, then --up with fresh volumes
-./dev/start-local-env.sh -s, --stop                   # stop
-
-If you want to use a test database for netbox look at
-  dev/test-cases
-
-If not done yet, please set account for API access:
-  uv run csaf_matcher_cli user create -u admin
 EOF
 }
 
@@ -421,16 +433,6 @@ print_help() {
 	exit 1
 }
 
-main() {
-	local parameter
-	parameter=$(parse_arguments "$@")
-	IFS='|' read -r ACTION WITH_VOLUMES <<<"$parameter"
-	checks
-	execute
-	post_processing
-	cleanup
-}
-
 checks() {
 	info "#Checks started"
 	info "## Check Argument"
@@ -483,6 +485,9 @@ execute() {
 	case "$ACTION" in
 	clean)
 		info "--[EXE] Cleaning local development environment..."
+		if check_response "Do you want to delete all settings? [Y/n]" "Y"; then
+			$clean_full=true
+		fi
 		prune_project_images "$COMPOSE_FILE"
 		remove_local_configs
 		remove_plugins_config
@@ -504,6 +509,7 @@ execute() {
 		stop_apis
 		info "--[EXE] Remove everything"
 		$COMPOSE_CMD -f "$COMPOSE_FILE" down -v
+		clean_full=true
 		prune_project_images "$COMPOSE_FILE"
 		remove_local_configs
 		remove_plugins_config
@@ -634,6 +640,7 @@ post_processing() {
 # Configures providers in ISDuBA
 set_workshop() {
 	info "--[PoP] Configuring default CSAF providers in ISDuBA..."
+	sleep 2
 	if ! "$ISDUBA_SOURCES_SCRIPT"; then
 		warning "--[PoP] Failed to configure ISDuBA providers."
 		warning "--[PoP] You can retry later with: $ISDUBA_SOURCES_SCRIPT"
@@ -645,12 +652,24 @@ set_workshop() {
 	fi
 }
 
+set_api_matcher() {
+	info "--[PoP] Create user for API matcher..."
+	sleep 2
+	local ADMIN_PASSWORD=$(get_env_value "API_MATCHER_PASSWORD")
+	out=$(uv run csaf_matcher_cli user create --username=admin --password="$ADMIN_PASSWORD" 2>&1)\
+  	|| { printf 'csaf_matcher_cli failed:\n%s\n' "$out" >&2; exit 1; }
+
+	
+	if grep -qi 'already exists' <<<"$out"; then
+			info "--[POP] Overwrite password for csaf_matcher api with default"
+	fi
+}
+
 cleanup() {
 	info "#Start cleanup from script."
 	if [ -n "$token" ]; then
-		echo
 		info "--[CLE] NetBox API token detected:"
-		echo "$token"
+		info "--[CLE] $token"
 		## set it in env
 		local LOCAL_SETTING_VAL=$(grep -E "^$LOCAL_SETTING=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2-)
 		if [ "$LOCAL_SETTING_VAL" == "true" ]; then
@@ -666,6 +685,7 @@ cleanup() {
 		fi
 		set_workshop
 		# Start API
+		set_api_matcher	
 		local excess
 		if check_response "Do you want to start the apis right away? [y/N]" "N"; then
 			if check_response "Do you execute the APIs in separate windows each (Y) or all in this terminal (N) [y/N]" "N"; then
@@ -682,6 +702,16 @@ cleanup() {
 	fi
 	print_post_instructions
 
+}
+
+main() {
+	local parameter
+	parameter=$(parse_arguments "$@")
+	IFS='|' read -r ACTION WITH_VOLUMES <<<"$parameter"
+	checks
+	execute
+	post_processing
+	cleanup
 }
 
 main "$@"
