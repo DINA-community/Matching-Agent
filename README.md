@@ -12,14 +12,14 @@ The matches can be retrieved via a REST API, and alternatively, a hook can be se
 
 ## Feature Matrix
 
-| Feature                | Status | Notes                                                                         |
-|------------------------|--------|:------------------------------------------------------------------------------|
+| Feature                | Status  | Notes                                                                        |
+|------------------------|-------- |------------------------------------------------------------------------------|
 | Asset Synchronization  | ✅ Done | Basic asset data syncing implemented                                         |
 | CSAF Synchronization   | ✅ Done | CSAF advisory data syncing implemented                                       |
 | Asset-CSAF Matching    | ✅ Done | A simple Matcher that matches everything with maximum score.                 |
-| Useable Matching | 🚧 WIP | A reliable matching algorithm that properly assigns match probabilities. |
-| REST API               | 🚧 WIP | Groundwork has been done. Need to specify API                                 |
-| Webhook Notifications  | 🚧 WIP | Notification system being developed                                           |
+| Useable Matching       | 🚧 WIP  | A reliable matching algorithm that properly assigns match probabilities.     |
+| REST API               | 🚧 WIP  | Groundwork has been done. Need to specify API                                |
+| Webhook Notifications  | 🚧 WIP  | Notification system being developed                                          |
 | Plugin System          | ✅ Done | Extensible plugin architecture ready                                         |
 
 ## Project Structure

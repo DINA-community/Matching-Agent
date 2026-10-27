@@ -1,20 +1,6 @@
 #!/usr/bin/env bash
 
 # Starts the local development environment defined in dev/docker-compose.yml
-#
-# Usage:
-#   ./dev/start-local-env.sh                         # start services in background
-#   ./dev/start-local-env.sh --recreate              # recreate containers
-#   ./dev/start-local-env.sh --stop                  # stop
-#   ./dev/start-local-env.sh --down                  # stop and remove services
-#   ./dev/start-local-env.sh --down --volumes        # stop, remove services AND named volumes
-#   ./dev/start-local-env.sh --recreate --volumes    # full reset: down -v, then up (fresh volumes)
-#   ./dev/start-local-env.sh --clean                 # remove local images + local env/toml/plugins.py
-#
-# Notes:
-# - Requires Docker and Docker Compose (v2: `docker compose`).
-# - After startup, retrieve the NetBox API token with:
-#     docker compose -f dev/docker-compose.yml logs netbox-setup
 
 set -euo pipefail
 
@@ -23,6 +9,7 @@ ENV_FILE="dev/.env"
 ENV_SAMPLE="dev/configuration/.env.example"
 NETBOX_URL="NETBOX_CLIENT_HOSTNAME_URL"
 ISDUBA_SAMPLE="assets/plugin_configs/data_source/csaf/sample/isduba.toml"
+NETBOX_ASSET_SCRIPT="dev/test-cases/load_tutorial_fixture.py"
 NETBOX_SAMPLE="assets/plugin_configs/data_source/asset/sample/netbox.toml"
 NETBOX_FILE="assets/plugin_configs/data_source/asset/netbox-local.toml"
 ISDUBA_FILE="assets/plugin_configs/data_source/csaf/isduba-local.toml"
@@ -34,6 +21,9 @@ ISDUBA_SOURCES_FILE="dev/configuration/isduba-sources.json"
 ISDUBA_SOURCES_SAMPLE="dev/configuration/isduba-sources.example.json"
 LOCAL_SETTING="FULLY_LOCAL"
 JWT="JWT_KEY"
+
+# global variables
+clean_full=false
 
 ENV_FILES=(
 	".env"
@@ -68,6 +58,17 @@ need_cmd() {
 	fi
 }
 
+need_plugins() {
+	# Plugins are separate packages as extras
+	# Make sure they are properly set up
+	need_cmd uv
+	info "--[DEP] Syncing plugin extras"
+	uv sync --all-extras || {
+		error "--[DEP] 'uv sync --all-extras' failed"
+		exit 1
+	}
+}
+
 need_dep() {
 	## INSTALL DEPENDENCIES
 	KEY=$(grep -E '^DEP=' "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2- || true)
@@ -84,7 +85,7 @@ need_dep() {
 			sed -i "s|^\(DEP=\).*|\1true|" "$ENV_FILE"
 			info "--DEP set true in $ENV_FILE"
 		else
-			if ! check_response "Asking again? [y/N] " "N"; then
+			if ! check_response "Should dependencies be checked on next run? [y/N] " "N"; then
 				sed -i "s|^\(DEP=\).*|\1true|" "$ENV_FILE"
 				info "--DEP set true in $ENV_FILE"
 			fi
@@ -99,10 +100,6 @@ need_env() {
 	info "--[ENV] Check for $ENV_FILE"
 	if [ ! -f "$ENV_FILE" ]; then
 		if check_response "$ENV_FILE does not exist. Create from $ENV_SAMPLE? This will create a fully local setup [Y/n]" "Y"; then
-			if ! check_response "Did you execute the following command? uv sync --all-extras? Otherwise it will be executed now. [y/N]" "N"; then
-				info "--[ENV] sync wird ausgeführt"
-				uv sync --all-extras
-			fi
 			cp -p "$ENV_SAMPLE" "$ENV_FILE" || {
 				error "Failed to copy $ENV_SAMPLE to $ENV_FILE"
 				exit 127
@@ -187,6 +184,26 @@ check_response() {
 	done
 }
 
+get_env_value() {
+	local key="$1"
+	local value
+	value=$(grep -E "^${key}=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2- || true)
+	if [ -z "$value" ]; then
+		error "Key '$key' not found in $ENV_FILE"
+		exit 1
+	fi
+	if [ -z "$value" ]; then
+      echo "ERROR: Key '$key' not found in $ENV_FILE" >&2
+      return 1
+    fi
+    printf '%s\n' "$value"
+	# Load everything approach
+	#set -a            
+	#source $ENV_FILE
+	#set +a
+
+}
+
 ensure_compose() {
 	# Prefer `docker compose` (v2). Fall back to `docker-compose` (v1) if available.
 	if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
@@ -216,10 +233,14 @@ remove_local_configs() {
 	# Ask for confirmation at the beginning for a full cleanup
 	local confirm_all=true
 	local removed=false
-	if check_response "--[EXE] Remove all local files directly? [Y/n]" "Y"; then
+	if $clean_full; then
 		confirm_all=true
 	else
-		confirm_all=false
+		if check_response "--[EXE] Remove all local files directly? [Y/n]" "Y"; then
+			confirm_all=true
+		else
+			confirm_all=false
+		fi
 	fi
 
 	# remove .env files
@@ -263,7 +284,7 @@ remove_local_configs() {
 
 remove_plugins_config() {
 	local plugins_file=$PLUGINS_FILE
-	if [[ -f "$plugins_file" ]]; then
+	if [[ $clean_full == true && -f "$plugins_file" ]]; then
 		if check_response "Remove $plugins_file? [Y/n]" "Y"; then
 			info "--[EXE] Removing local plugins configuration: $plugins_file"
 			rm -f "$plugins_file"
@@ -277,7 +298,7 @@ remove_plugins_config() {
 
 ensure_local_configs() {
 	# Set sample files in case file is missing
-	# Note that the dev/.env is already set by fkt need_env
+	# Note that the dev/.env is already set by function need_env
 	for pair in "${FILE_PAIRS[@]}"; do
 		set -- $pair
 		local target_file="$2"
@@ -311,28 +332,14 @@ Services are starting. Useful info:
 
 To get the NetBox API token printed by the setup container:
   $COMPOSE_CMD -f $COMPOSE_FILE logs netbox-setup
-
-./dev/start-local-env.sh                       # start services in background
-./dev/start-local-env.sh -c, --clean               # remove local images + local env/toml/plugins.py
-./dev/start-local-env.sh -d, --down                # stop and remove services
-./dev/start-local-env.sh -d -r, --down --volumes      # stop and remove services AND named volumes
-./dev/start-local-env.sh -r -v, --recreate --volumes  # full reset: down -v, then up (fresh volumes)
-./dev/start-local-env.sh -r, --recreate            # recreate containers
-./dev/start-local-env.sh -s, --stop                # stop
-
-If you want to use a test database for netbox look at
-  dev/test-cases
-
-If not done yet, please set account for API access:
-  uv run csaf_matcher_cli user create -u admin
 EOF
 }
 
 parse_arguments() {
 	local ACTION="up"        # Default action
 	local WITH_VOLUMES=false # Default value for volumes flag
-	local valid_actions=("up" "down" "recreate" "stop" "clean")
-	local valid_flags=("u" "d" "r" "s" "c" "v")
+	local valid_actions=("up" "down" "recreate" "stop" "clean" "new")
+	local valid_flags=("u" "d" "r" "s" "c" "v" "n")
 
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
@@ -342,6 +349,7 @@ Usage: $0 [Options]
     Options:
     -c, --clean      Remove local images and configs.
     -d, --down       Stop and remove services.
+    -n, --new        Full reset -d -v -u
     -r, --recreate   Recreate containers. (up -d --force-recreate --remove-orphans))
     -s, --stop       Stop services.
     -u, --up         Start services. (default)
@@ -363,12 +371,14 @@ USAGE
 				print_help "$1"
 			else
 				case "$1" in
+				--clean) ACTION="clean" ;;
+				--down) ACTION="down" ;;
+				--new) ACTION="new" 
+					   WITH_VOLUMES=true;;
+				--recreate) ACTION="recreate" ;;
+				--stop) ACTION="stop" ;;
 				--up) ACTION="up" ;;
 				--volumes) WITH_VOLUMES=true ;;
-				--down) ACTION="down" ;;
-				--stop) ACTION="stop" ;;
-				--recreate) ACTION="recreate" ;;
-				--clean) ACTION="clean" ;;
 				*)
 					print_help "$1"
 					;;
@@ -389,12 +399,14 @@ USAGE
 						print_help "$arg"
 					fi
 					case "$arg" in
+					c) ACTION="clean" ;;
+					d) ACTION="down" ;;
+					n) ACTION="new" 
+					   WITH_VOLUMES=true;;
+					r) ACTION="recreate" ;;
+					s) ACTION="stop" ;;
 					u) ACTION="up" ;;
 					v) WITH_VOLUMES=true ;;
-					d) ACTION="down" ;;
-					s) ACTION="stop" ;;
-					r) ACTION="recreate" ;;
-					c) ACTION="clean" ;;
 					esac
 				done
 			fi
@@ -421,16 +433,6 @@ print_help() {
 	exit 1
 }
 
-main() {
-	local parameter
-	parameter=$(parse_arguments "$@")
-	IFS='|' read -r ACTION WITH_VOLUMES <<<"$parameter"
-	checks
-	execute
-	post_processing
-	cleanup
-}
-
 checks() {
 	info "#Checks started"
 	info "## Check Argument"
@@ -444,12 +446,13 @@ checks() {
 		exit 2
 	fi
 	info "## Check Setting"
-	if [[ "$ACTION" == "clean" || "$ACTION" == "down" || "$ACTION" == "stop" ]]; then
+	if [[ "$ACTION" == "clean" || "$ACTION" == "down" || "$ACTION" == "stop" || "$ACTION" == "new" ]]; then
 		need_cmd docker
 		COMPOSE_CMD=$(ensure_compose)
 	else # Skipping unnecessary checks for cleaning
 		## INSTALL DEPENDENCIES
 		need_env
+		need_plugins
 		need_dep
 		need_cmd docker
 		COMPOSE_CMD=$(ensure_compose)
@@ -480,14 +483,11 @@ checks() {
 execute() {
 	info "## Execute Action $ACTION"
 	case "$ACTION" in
-	stop)
-		info "--[EXE] Stopping dev environment..."
-		stop_apis
-		$COMPOSE_CMD -f "$COMPOSE_FILE" stop
-		exit 0
-		;;
 	clean)
 		info "--[EXE] Cleaning local development environment..."
+		if check_response "Do you want to delete all settings? [Y/n]" "Y"; then
+			$clean_full=true
+		fi
 		prune_project_images "$COMPOSE_FILE"
 		remove_local_configs
 		remove_plugins_config
@@ -505,18 +505,36 @@ execute() {
 		fi
 		exit 0
 		;;
-	recreate)
+	new)
+		stop_apis
+		info "--[EXE] Remove everything"
+		$COMPOSE_CMD -f "$COMPOSE_FILE" down -v
+		clean_full=true
+		prune_project_images "$COMPOSE_FILE"
+		remove_local_configs
+		remove_plugins_config
+		info "--[EXE] New installation"
+		need_env
+    	need_dep
 		ensure_local_configs
+		$COMPOSE_CMD -f "$COMPOSE_FILE" up -d --build --force-recreate --remove-orphans
+		;;
+	recreate)
 		stop_apis
 		sleep 2
 		if [[ "$WITH_VOLUMES" == true ]]; then
 			info "-- [EXE] Recreating dev environment with volume reset (down -v; up)..."
 			$COMPOSE_CMD -f "$COMPOSE_FILE" down -v || true
-			$COMPOSE_CMD -f "$COMPOSE_FILE" up -d --build --force-recreate --remove-orphans
 		else
-			info "-- [EXE] Starting dev environment (recreate containers)..."
-			$COMPOSE_CMD -f "$COMPOSE_FILE" up -d --build --force-recreate --remove-orphans
+			info "-- [EXE] Starting dev environment (recreate containers)..."	
 		fi
+		$COMPOSE_CMD -f "$COMPOSE_FILE" up -d --build --force-recreate --remove-orphans
+		;;
+	stop)
+		info "--[EXE] Stopping dev environment..."
+		stop_apis
+		$COMPOSE_CMD -f "$COMPOSE_FILE" stop
+		exit 0
 		;;
 	up)
 		info "-- [EXE] Starting dev environment..."
@@ -617,25 +635,41 @@ post_processing() {
 		fi
 		sleep 2
 	done
-
-	set_isduba_sources
 }
 
 # Configures providers in ISDuBA
-set_isduba_sources() {
+set_workshop() {
 	info "--[PoP] Configuring default CSAF providers in ISDuBA..."
+	sleep 2
 	if ! "$ISDUBA_SOURCES_SCRIPT"; then
 		warning "--[PoP] Failed to configure ISDuBA providers."
 		warning "--[PoP] You can retry later with: $ISDUBA_SOURCES_SCRIPT"
+	fi
+	info "--[PoP] Configuring default Asset data in NetBox..."
+	if ! "$NETBOX_ASSET_SCRIPT"; then
+		warning "--[PoP] Failed to configure NetBox assets."
+		warning "--[PoP] You can retry later with: $NETBOX_ASSET_SCRIPT"
+	fi
+}
+
+set_api_matcher() {
+	info "--[PoP] Create user for API matcher..."
+	sleep 2
+	local ADMIN_PASSWORD=$(get_env_value "API_MATCHER_PASSWORD")
+	out=$(uv run csaf_matcher_cli user create --username=admin --password="$ADMIN_PASSWORD" 2>&1)\
+  	|| { printf 'csaf_matcher_cli failed:\n%s\n' "$out" >&2; exit 1; }
+
+	
+	if grep -qi 'already exists' <<<"$out"; then
+			info "--[POP] Overwrite password for csaf_matcher api with default"
 	fi
 }
 
 cleanup() {
 	info "#Start cleanup from script."
 	if [ -n "$token" ]; then
-		echo
 		info "--[CLE] NetBox API token detected:"
-		echo "$token"
+		info "--[CLE] $token"
 		## set it in env
 		local LOCAL_SETTING_VAL=$(grep -E "^$LOCAL_SETTING=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2-)
 		if [ "$LOCAL_SETTING_VAL" == "true" ]; then
@@ -649,7 +683,9 @@ cleanup() {
 			sed -i "s|^\($JWT=\).*|\1true|" "$ENV_FILE"
 			info "--[CLE] JWT was created successfully"
 		fi
+		set_workshop
 		# Start API
+		set_api_matcher	
 		local excess
 		if check_response "Do you want to start the apis right away? [y/N]" "N"; then
 			if check_response "Do you execute the APIs in separate windows each (Y) or all in this terminal (N) [y/N]" "N"; then
@@ -666,6 +702,16 @@ cleanup() {
 	fi
 	print_post_instructions
 
+}
+
+main() {
+	local parameter
+	parameter=$(parse_arguments "$@")
+	IFS='|' read -r ACTION WITH_VOLUMES <<<"$parameter"
+	checks
+	execute
+	post_processing
+	cleanup
 }
 
 main "$@"

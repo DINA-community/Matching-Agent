@@ -104,13 +104,14 @@ Quick start
 
     .. code-block:: bash
 
-        ./dev/start-local-env.sh                       # start services in background
-        ./dev/start-local-env.sh --recreate            # recreate containers
-        ./dev/start-local-env.sh --stop                # stop
-        ./dev/start-local-env.sh --down                # stop and remove services
-        ./dev/start-local-env.sh --down --volumes      # stop and remove services AND named volumes
-        ./dev/start-local-env.sh --recreate --volumes  # full reset: down -v, then up
-        ./dev/start-local-env.sh --clean               # remove local images + local env/toml/plugins.py
+        ./dev/start-local-env.sh                   # Default: equals --up
+        ./dev/start-local-env.sh  -c, --clean      # Remove local images and configs.
+        ./dev/start-local-env.sh  -d, --down       # Stop and remove services.
+        ./dev/start-local-env.sh  -n, --new        # Full reset -d -v -u
+        ./dev/start-local-env.sh  -r, --recreate   # Recreate containers. (up -d --force-recreate --remove-orphans))
+        ./dev/start-local-env.sh  -s, --stop       # Stop services.
+        ./dev/start-local-env.sh  -u, --up         # Start services. (default)
+        ./dev/start-local-env.sh  -v, --volumes    # Remove named volumes (with --down or --recreate).
 
     - Alternative: run Docker Compose directly
 

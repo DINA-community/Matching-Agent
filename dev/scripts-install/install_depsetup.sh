@@ -87,7 +87,7 @@ if [[ "$package_manager" == "apt" ]]; then
 fi
 
 # Install JDK21
-dep "Installing OpenJDK21..."
+dep "Installing JDK..."
 pkg_install "${jdk_packages[@]}"
 
 # Install xdg-terminal-exec (optional)
@@ -125,14 +125,21 @@ if ! command -v docker >/dev/null 2>&1; then
 	dep "Installing docker.."
 
 	if [[ "$package_manager" == "apt" ]]; then
-		bash ./install_dockerrepo.sh
+		source ./dev/scripts-install/install_dockerrepo.sh
 		pkg_update
 	fi
 
 	pkg_install "${docker_packages[@]}"
-	sudo usermod -aG docker "$suser"
 else
 	dep "Found a docker installation"
+fi
+
+if id -nG "$suser" | grep -qw docker; then
+  :
+else
+  sudo usermod -aG docker "$suser" || { echo "usermod failed" >&2; exit 1; }
+  echo "--[DOCKER] added user $suser to docker group; re-login (or: newgrp docker) required"
+  exit 1
 fi
 
 dep "All Dependencies installed"
