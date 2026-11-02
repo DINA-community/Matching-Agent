@@ -285,6 +285,8 @@ remove_local_configs() {
 remove_plugins_config() {
 	local plugins_file=$PLUGINS_FILE
 	if [[ $clean_full == true && -f "$plugins_file" ]]; then
+		rm -f "$plugins_file"
+	elif [[ -f "$plugins_file" ]]; then	
 		if check_response "Remove $plugins_file? [Y/n]" "Y"; then
 			info "--[EXE] Removing local plugins configuration: $plugins_file"
 			rm -f "$plugins_file"
