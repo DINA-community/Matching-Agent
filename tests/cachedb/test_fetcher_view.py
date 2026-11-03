@@ -14,8 +14,11 @@ from dina.cachedb.fetcher_view import FetcherView
 from dina.cachedb.model import relationship
 
 
+import sys
+
 # Ensure Windows event loop compatibility
-asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+if sys.platform.startswith("win"):
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 # Postgres test container (optional)
 with suppress(ImportError):

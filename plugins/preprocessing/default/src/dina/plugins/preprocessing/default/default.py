@@ -29,6 +29,9 @@ class DefaultPreprocessor(PreprocessorPlugin):
                         if value:
                             new_value = normalizer.parse_version(value)
 
+                            if isinstance(new_value, dict):
+                                new_value = [new_value]
+
                             if col == "model" and isinstance(new_value, (dict, list)):
                                 new_value = json.dumps(new_value)
 

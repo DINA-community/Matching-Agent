@@ -20,7 +20,7 @@ Create a new project by typing `uv init --package your_plugin_name`.
 
 Adjust the structure of the new package to the following if necessary:
 
-```
+```text
 your_plugin_name/
 ├── README.md
 ├── pyproject.toml
@@ -162,9 +162,9 @@ some_param = "value"
 Required fields:
 
 - `[DataSource]` section with:
-    - `plugin_name`: Must match the entry point name in pyproject.toml
-    - `timeout_seconds`: Timeout for data fetching operations
-    - `update_interval`: How often to fetch data (in seconds)
+  - `plugin_name`: Must match the entry point name in pyproject.toml
+  - `timeout_seconds`: Timeout for data fetching operations
+  - `update_interval`: How often to fetch data (in seconds)
 - Plugin-specific section with any parameters your plugin needs
 
 ## Plugin Loading Process

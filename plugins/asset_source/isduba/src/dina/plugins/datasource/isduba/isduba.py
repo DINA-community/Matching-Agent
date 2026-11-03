@@ -84,8 +84,21 @@ class IsdubaDataSource(DataSourcePlugin):
                     *[
                         api_instance.documents_id_get(document["id"])
                         for document in api_response.documents
-                    ]
+                    ],
+                    return_exceptions=True,
                 )
+
+                # Filter out exceptions and log failed document IDs
+                successful_results = []
+                for document, result in zip(api_response.documents, document_results):
+                    if isinstance(result, Exception):
+                        logger.error(
+                            f"Failed to fetch document with ID {document['id']}: {result}"
+                        )
+                    else:
+                        successful_results.append(result)
+
+                document_results = successful_results
                 logger.info(f"Fetched {len(document_results)} documents")
 
                 with concurrent.futures.ProcessPoolExecutor() as pool:
@@ -384,7 +397,11 @@ class IsdubaDataSource(DataSourcePlugin):
 
     def build_resource_path(self, origin_info: dict[str, Any]) -> str:
         path = origin_info.get("path")
-        return str(path) if path else ""
+        if path:
+            path = str(path) + f"#product_id={origin_info.get('product_name_id')}"
+        else:
+            path = ""
+        return path
 
 
 def process_document(

@@ -8,8 +8,7 @@ It includes two concrete implementations:
 2. **CSAF Synchronizer (`csafsync`)**: Fetches and processes CSAF (Common Security Advisory Framework) data.
 
 Furthermore, it includes the matcher implementation that uses the data from the synchronizers to match assets.
-The matches can be retrieved via a REST API, and alternatively, a hook can be set up to be notified of new matches (
-WIP).
+The matches can be retrieved via a REST API, and alternatively, a hook can be set up to be notified of new matches (WIP).
 
 ## Feature Matrix
 
@@ -18,7 +17,7 @@ WIP).
 | Asset Synchronization  | ✅ Done | Basic asset data syncing implemented                                         |
 | CSAF Synchronization   | ✅ Done | CSAF advisory data syncing implemented                                       |
 | Asset-CSAF Matching    | ✅ Done | A simple Matcher that matches everything with maximum score.                 |
-| Sophisticated Matching | 🚧 WIP | A sophisticated matching algorithm that properly assigns match probabilities. |
+| Useable Matching | 🚧 WIP | A reliable matching algorithm that properly assigns match probabilities. |
 | REST API               | 🚧 WIP | Groundwork has been done. Need to specify API                                 |
 | Webhook Notifications  | 🚧 WIP | Notification system being developed                                           |
 | Plugin System          | ✅ Done | Extensible plugin architecture ready                                         |
@@ -32,6 +31,11 @@ WIP).
 - `plugins/`: Plugin implementations for extending functionality.
 
 For more details about the synchronizer infrastructure, see the Synchronizer Infrastructure README. (TODO)
+
+## Documentation
+
+Read the [documentation](https://dina-community.github.io/Matching-Agent/) online, or build it locally with
+`make docs` and open `docs/_build/html/index.html`.
 
 ## Getting Started
 
@@ -51,42 +55,42 @@ For other distributions or operating systems, you may need to adjust the instruc
 First, clone the repository:
 
 ```shell
-git clone -b feat/initial_structure --recurse-submodules https://github.com/DINA-community/Matching-Agent.git
+git clone --recurse-submodules https://github.com/DINA-community/Matching-Agent.git
 cd Matching-Agent
 uv sync --extra isduba_fetcher # If you plan to use the ISDuBA CSAF source (default plugin name `isduba_fetcher`)
 ```
 
-You can either build the docs with `make docs` and follow the instructions there or proceed with the instructions below.
+You can follow the [Getting Started guide](https://dina-community.github.io/Matching-Agent/getting-started.html)
+or proceed with the instructions below.
 
 ## Installation
 
 To set up a development environment, follow the steps below.
 
 - Use either of the following methods to set up the runtime environment:
-  - [Fully local setup](#fully-local-setup)
+  - [Fully local setup](#fully-local-setup-for-netbox-plugin)
   - [Setup with external asset sources](#setup-with-external-asset-sources)
 - And then configure according to the [Configuration](#configuration) documentation
   - [Plugins](#configure-plugins)
   - [API](#configure-apis)
 - For production use refer to the [Production Docker setup](#production-docker-setup)
 
-### Fully Local Setup
+### Fully Local Setup for Netbox-Plugin
 
-You can start, stop, and recreate the full local development stack (PostgreSQL, NetBox, ISDuBA, etc.) using the helper script in the `dev/` directory:
+Using the helper script `./dev/start-local-env.sh`, a full local development stack with the asset source plugins `isduba` and `netbox` can e set up using the provided sample files.
 
-```bash
-./dev/start-local-env.sh                       # start services in background
-./dev/start-local-env.sh --recreate            # recreate containers
-./dev/start-local-env.sh --down                # stop and remove services
-./dev/start-local-env.sh --down --volumes      # stop and remove services AND named volumes
-./dev/start-local-env.sh --recreate --volumes  # full reset: down -v, then up (fresh volumes)
-```
-
-After startup, the API token is printed. This information is needed for the [configuration of the NetBox plugin](#configure-plugins). You can retrieve the NetBox API token any time from the setup container logs:
+To configure the environment variables, modify the values as needed in the `.env.example` file. After startup, the API token is printed. This information is needed for the [configuration of the NetBox plugin](#configure-plugins). You can retrieve the NetBox API token any time from the setup container logs:
 
 ```bash
 docker compose -f dev/docker-compose.yml logs netbox-setup
 ```
+
+Set the retrieved value in `assets/plugin_configs/data_source/asset/netbox-local.toml` for the parameter `api_token`.
+
+Proceed with:
+
+- [Authenticate with the API](#authenticate-with-the-api)
+- [Running Applications](#running-applications)
 
 ### Setup with External Asset Sources
 
@@ -104,25 +108,22 @@ Before starting the services, make sure to configure the plugins and the APIs ac
 
 ### Configure Plugins
 
-To configure the Netbox fetcher plugin, copy the file [`assets/plugin_configs/data_source/asset/sample/netbox.toml`](assets/plugin_configs/data_source/asset/sample/netbox.toml) to `assets/plugin_configs/data_source/asset/netbox_local.toml` and adjust the values to your environment.
+To configure the Netbox fetcher plugin, copy the file [`assets/plugin_configs/data_source/asset/sample/netbox.toml`](assets/plugin_configs/data_source/asset/sample/netbox.toml) to `assets/plugin_configs/data_source/asset/netbox-local.toml` and adjust the values to your environment.
 The file can be named any way you like, but it must be a toml file.
-
 
 ```shell
-cp assets/plugin_configs/data_source/asset/sample/netbox.toml assets/plugin_configs/data_source/asset/netbox_local.toml
-vim assets/plugin_configs/data_source/asset/netbox_local.toml
+cp assets/plugin_configs/data_source/asset/sample/netbox.toml assets/plugin_configs/data_source/asset/netbox-local.toml
 ```
 
-To configure the ISDuBA fetcher plugin, copy the file [`assets/plugin_configs/data_source/csaf/sample/isduba.toml`](assets/plugin_configs/data_source/csaf/sample/isduba.toml) to `assets/plugin_configs/data_source/csaf/isduba_local.toml` and adjust the values to your environment.
+To configure the ISDuBA fetcher plugin, copy the file [`assets/plugin_configs/data_source/csaf/sample/isduba.toml`](assets/plugin_configs/data_source/csaf/sample/isduba.toml) to `assets/plugin_configs/data_source/csaf/isduba-local.toml` and adjust the values to your environment.
 The file can be named any way you like, but it must be a toml file.
+
+```shell
+cp assets/plugin_configs/data_source/csaf/sample/isduba.toml assets/plugin_configs/data_source/csaf/isduba-local.toml
+```
 
 Before starting the synchronizers, make sure to create some assets and CSAF documents in the NetBox and ISDuBA instances.
 Follow the corresponding instructions in the [NetBox](https://netboxlabs.com/docs/netbox/) and [ISDuBA documentation](https://github.com/ISDuBA/ISDuBA/blob/main/docs/README.md).
-
-```shell
-cp assets/plugin_configs/data_source/csaf/sample/isduba.toml assets/plugin_configs/data_source/csaf/isduba_local.toml
-vim assets/plugin_configs/data_source/csaf/isduba_local.toml
-```
 
 Next, install the python dependencies with uv by running in your terminal or inside pycharm (double tap `<Ctrl>` and enter the command) to set up the local python environment:
 
@@ -137,113 +138,127 @@ To install multiple extras, provide multiple `--extra` arguments.
 
 ### Configure APIs
 
-This project provides three long-running components: two synchronizers and the matcher. Each reads a TOML
-configuration file from the `assets/` directory and exposes a small HTTP API.
+This project provides three long-running components: two synchronizers and the matcher. All components read a shared TOML
+configuration file from `assets/config.toml` and expose their respective HTTP APIs.
 
 - Asset Synchronizer (assetsync)
-  - Config file: assets/assetsync.toml
   - Default API: <http://0.0.0.0:8992>
 - CSAF Synchronizer (csafsync)
-  - Config file: assets/csafsync.toml
   - Default API: <http://0.0.0.0:8991>
 - Matcher
-  - Config file: assets/matcher.toml
   - Default API: <http://0.0.0.0:8998>
 
-You can change host and port for each service in the respective config under the [..Api] section.
+You can change host and port for each service in the `assets/config.toml` config under the respective `[..Api]` section.
 The API documentation can be found at `http://<host:port>/docs`.
 
-#### Matcher configuration (assets/matcher.toml)
+#### Configuration (assets/config.toml)
 
-Minimal example (defaults in repo):
+The `assets/config.toml` file contains configuration for all three components:
 
 ```toml
+[Cachedb]
+host = "localhost"
+port = 2345
+database = "cachedb"
+username = "admin"
+password = "secret"
+
 [Matcher]
-sync_interval = 60  # seconds between matching runs
+# Seconds between matching runs (mutually exclusive with fixed_time_of_day)
+sync_interval = 86400
+# OR: Run at a fixed time of day (mutually exclusive with sync_interval)
+# fixed_time_of_day = "02:30"  # Format: "HH:MM" in 24-hour format
+# Maximum duration in seconds for a matching run (optional)
+# max_duration = 3600  # Stop matching after 1 hour
+# Threshold for showing matches
 match_threshold = 0
+# Path to asset data source plugin configs used for the assetsync
 asset_plugins_path = "./assets/plugin_configs/data_source/asset"
+# Path to CSAF data source plugin configs used for the csafsync
 csaf_plugins_path = "./assets/plugin_configs/data_source/csaf"
 
 [Matcher.Api]
 host = "0.0.0.0"
 port = 8998
 
-[Matcher.Cachedb]
-host = "localhost"
-port = 2345
-database = "cachedb"
-username = "admin"
-password = "secret"
-```
-
-- `Matcher.sync_interval`: Minimal delay between matching cycles.
-- `Matcher.match_threshold`: Value for showing possible matches
-- `Matcher.asset_plugins_path`: Path to the directory containing asset-specific plugin configuration files.
-- `Matcher.csaf_plugins_path`: Path to the directory containing CSAF-specific plugin configuration files.
-- `Matcher.Api.host/port`: Address where the FastAPI server listens.
-- `Matcher.Cachedb`: Connection to the shared cache DB used by all components.
-
-#### Asset Synchronizer configuration (assets/assetsync.toml)
-
-Example (defaults in repo):
-
-```toml
 [Assetsync]
-# Asset-specific options go here (plugin-specific)
+# Assetsync specific configuration
 
-[Synchronizer]
-sync_interval = 60
-preprocessor_plugins = ["identity"]
-plugin_configs_path = "./assets/plugin_configs/data_source/asset"
-cleanup_grace_period = 3600
+[Assetsync.Synchronizer]
+# Seconds between sync runs (mutually exclusive with fixed_time_of_day)
+sync_interval = 86400
+# OR: Run at a fixed time of day (mutually exclusive with sync_interval)
+# fixed_time_of_day = "03:00"  # Format: "HH:MM" in 24-hour format
+plugin_configs_path = "./assets/plugin_configs/data_source/asset/"
+# When false, do not trigger the matcher after a successful sync batch is stored
+# This is true by default.
+# trigger_matcher_on_sync = false
+cleanup_grace_period = 86400
+cleanup_interval = 60
+preprocessor_plugins = ["identity", "default"]
 
-[Synchronizer.Api]
+[Assetsync.Api]
 host = "0.0.0.0"
 port = 8992
 
-[Cachedb]
-host = "localhost"
-port = 2345
-database = "cachedb"
-username = "admin"
-password = "secret"
-```
-
-- `Synchronizer.sync_interval`: Minimal delay between fetch cycles.
-- `Synchronizer.preprocessor_plugins`: List and order of preprocessing plugins.
-- `Synchronizer.plugin_configs_path`: Path to the directory containing plugin configuration files.
-- `Synchronizer.cleanup_grace_period`: Time in seconds from the last synchronization after which assets are considered stale and will be deleted.
-- `Synchronizer.Api.host/port`: Address for the synchronizer API.
-- `Cachedb`: Connection to the shared cache DB.
-- `Data source plugins`: Configuration TOML files are loaded from assets/plugin_configs/asset_source/…
-
-#### CSAF Synchronizer configuration (assets/csafsync.toml)
-
-Example (defaults in repo):
-
-```toml
 [Csafsync]
-# CSAF-specific options go here (plugin-specific)
+# Csaf specific configuration
 
-[Synchronizer]
-sync_interval = 60
-preprocessor_plugins = ["identity"]
+[Csafsync.Synchronizer]
+# Seconds between sync runs (mutually exclusive with fixed_time_of_day)
+sync_interval = 86400
+# OR: Run at a fixed time of day (mutually exclusive with sync_interval)
+# fixed_time_of_day = "03:00"  # Format: "HH:MM" in 24-hour format
 plugin_configs_path = "./assets/plugin_configs/data_source/csaf"
-cleanup_grace_period = 3600
+# When false, do not trigger the matcher after a successful sync batch is stored
+# This is true by default.
+# trigger_matcher_on_sync = false
+cleanup_grace_period = 86400
+cleanup_interval = 60
+preprocessor_plugins = ["identity", "default"]
 
-[Synchronizer.Api]
+[Csafsync.Api]
 host = "0.0.0.0"
 port = 8991
-
-[Cachedb]
-host = "localhost"
-port = 2345
-database = "cachedb"
-username = "admin"
-password = "secret"
 ```
 
-- Same meaning as for the Asset Synchronizer
+#### Scheduling Configuration
+
+Both the Matcher and Synchronizers support two mutually exclusive scheduling modes:
+
+**Interval-based scheduling** (default):
+
+- `sync_interval`: Time in seconds between runs. For example, `86400` runs every 24 hours after the previous run completes.
+
+**Fixed time of day scheduling**:
+
+- `fixed_time_of_day`: Run once per day at a specific time in 24-hour format (e.g., `"02:30"` for 2:30 AM).
+
+**Important**: For the Matcher, you must specify at most one of these options. If you omit both,
+matching only runs when triggered manually. Synchronizers still require exactly one scheduling option.
+
+#### Configuration Options
+
+- `Matcher.sync_interval` or `Matcher.fixed_time_of_day`: When to run matching cycles (omit both for manual-only).
+- `Matcher.max_duration`: (Optional) Maximum duration in seconds for a matching run. If set, the matching process will gracefully stop after this duration, preserving all matches found up to that point. Useful for preventing excessively long matching runs.
+- `Matcher.match_threshold`: Value for showing possible matches
+- `Matcher.asset_plugins_path`: Path to the directory containing asset-specific plugin configuration files.
+- `Matcher.csaf_plugins_path`: Path to the directory containing CSAF-specific plugin configuration files.
+- `Matcher.Api.host/port`: Address where the Matcher FastAPI server listens.
+- `Assetsync.Synchronizer.Api.host/port`: Address where the Asset Synchronizer FastAPI server listens.
+- `Csafsync.Synchronizer.Api.host/port`: Address where the CSAF Synchronizer FastAPI server listens.
+- `Cachedb`: Connection to the shared cache DB used by all components.
+
+Both synchronizers share the following configuration (Assetsync.Synchronizer and Csafsync.Synchronizer):
+
+- `.Synchronizer.sync_interval` or `.Synchronizer.fixed_time_of_day`: When to run fetch cycles.
+- `.Synchronizer.trigger_matcher_on_sync`: When false, do not trigger a matcher run after synchronization.
+- `.Synchronizer.preprocessor_plugins`: List and order of preprocessing plugins.
+- `.Synchronizer.plugin_configs_path`: Path to the directory containing plugin configuration files.
+- `.Synchronizer.cleanup_grace_period`: Time in seconds from the last synchronization after which assets are considered stale and will be deleted.
+- `.Api.host/port`: Address for the synchronizer API.
+
+The configuration for the plugins is located in the `assets/plugin_configs` directory.
 
 #### Netbox CSAF Plugin configuration
 
@@ -258,12 +273,14 @@ The synchronizer components (Asset/CSAF) and the Matcher expose a small FastAPI 
 
 Quick start:
 
-1) Make sure the component is running (e.g., Matcher default at <http://localhost:8998/>; configurable in `assets/matcher.toml`) after executing the setup and configuration.
+1) Make sure the component is running (e.g., Matcher default at <http://localhost:8998/>; configurable in `assets/config.toml`) after executing the setup and configuration.
 2) Create or update a user in the CacheDB using the CLI:
 
 ```bash
 uv run csaf_matcher_cli user create -u admin
 ```
+
+Set the password to `admin`.
 
 **Note**: For interactive use, do not pass passwords via `-p/--password`. The CLI will securely prompt
 for the password. Reserve `-p` only for non-interactive environments (e.g., CI) and source secrets
@@ -303,24 +320,69 @@ uv run csafsync
 
 ### Running Tests
 
-Tests can be executed using uv as well. All test targets are defined in the pyproject.toml, so you can run them with:
+Run all unit and integration tests:
 
 ```shell
 uv run pytest -v -s
 ```
 
-To run a single test file:
+Run a single test file:
 
 ```shell
-uv run pytest -v  -s tests/matcher/test_matching.py
+uv run pytest -v -s tests/matcher/test_matching.py
+```
+
+### API Performance Tests
+
+Run API performance tests with Locust:
+
+```shell
+uv run locust -f tests_api_performance --assetsync-host http://localhost:8992 --csafsync-host http://localhost:8991 --matcher-host http://localhost:8998
+```
+
+### `match_pairs` Benchmark Tests
+
+Run the benchmark script for `match_pairs`:
+
+```shell
+uv run python tests_benchmarks/test_match_pairs_benchmark.py --limits 10 20 30 --rounds 5 --threshold 50 --output-dir ./tests_benchmarks/reports_match_pairs_benchmark
+```
+
+### Matcher Resource and Performance Tests
+
+Scenario A: increasing assets, constant CSAFs
+
+```shell
+uv run python tests_benchmarks/test_measure_matcher_resources.py --pairs 5:30 10:30 15:30 20:30 25:30 30:30 --threshold 20 --output-dir ./tests_benchmarks/reports_measure_matcher_resources/plots_A
+```
+
+Scenario B: increasing CSAFs, constant assets
+
+```shell
+uv run python tests_benchmarks/test_measure_matcher_resources.py --pairs 30:5 30:10 30:15 30:20 30:25 30:30 --threshold 20 --output-dir ./tests_benchmarks/reports_measure_matcher_resources/plots_B
+```
+
+Scenario C: symmetric scaling
+
+```shell
+uv run python tests_benchmarks/test_measure_matcher_resources.py --pairs 5:5 10:10 15:15 20:20 25:25 30:30 --threshold 20 --output-dir ./tests_benchmarks/reports_measure_matcher_resources/plots_C
+```
+
+Scenario D: asymmetric scaling
+
+```shell
+uv run python tests_benchmarks/test_measure_matcher_resources.py --pairs 5:30 10:30 15:30 30:5 30:10 30:15 --threshold 20 --output-dir ./tests_benchmarks/reports_measure_matcher_resources/plots_D
 ```
 
 ## Production Docker Setup
 
-This repository ships a simple production‑ready Docker setup that runs the three services (assetsync, csafsync, matcher) with a shared PostgreSQL database and exposes all three APIs over HTTPS using a self‑signed certificate.
+This repository ships a simple production‑ready Docker setup that runs the three services (assetsync, csafsync, matcher) with a shared PostgreSQL database and exposes all three APIs over HTTPS via an NGINX reverse proxy.
 
-For instructions on how to set up the environment, see the corresponding section in the docs.
-The docs are built with `make docs` and can be found in the `docs/_build/html/production-setup.html` directory.
+The core services themselves do not implement native TLS listeners. Without a reverse proxy, there is no TLS support for external traffic. This separation is intentional and follows common industry practice (TLS termination at the edge proxy, application services kept lean).
+
+For instructions on how to set up the environment, see the
+[production setup guide](https://dina-community.github.io/Matching-Agent/production-setup.html).
+For professional deployments, use the SSL/TLS guidance in the production docs (trusted certificates, reverse proxy hardening, and NGINX example configuration).
 
 > Note Under development see [Issue #9](https://github.com/DINA-community/Matching-Agent/issues/9)
 

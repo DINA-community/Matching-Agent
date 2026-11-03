@@ -1,3 +1,15 @@
+"""DINA command-line interface.
+
+This module provides a unified CLI for managing DINA services including:
+- User management (creating/updating users in the cache database)
+- Matcher API operations (querying matches, controlling tasks, managing configuration)
+- Synchronizer API operations (controlling asset and CSAF synchronization)
+
+The CLI supports both human-readable and JSON output formats via the --json flag.
+Authentication credentials and service URLs can be provided as command-line arguments
+or interactively when omitted.
+"""
+
 import argparse
 import asyncio
 import tomllib
@@ -15,14 +27,31 @@ logger = get_logger(__name__)
 
 
 class CLI:
+    """Main CLI application class for DINA utilities.
+
+    Provides command-line access to DINA services via an argument-based interface.
+    Supports multiple service groups (user, matcher, sync) with subcommands for
+    specific operations.
+    """
+
     def __init__(self):
         super().__init__()
         self.parser = self._build_parser()
 
     def _build_parser(self) -> argparse.ArgumentParser:
+        """Build the argument parser with all supported commands and options.
+
+        Returns:
+            Configured ArgumentParser instance with all CLI commands.
+        """
         parser = argparse.ArgumentParser(
             prog="csaf_matcher_cli",
             description="DINA command-line utilities",
+        )
+        parser.add_argument(
+            "--json",
+            action="store_true",
+            help="Output machine-readable JSON",
         )
         # Allow passing common API args at the root level (before selecting a group)
         # These are optional here; we'll validate when dispatching a specific group.
@@ -46,7 +75,7 @@ class CLI:
             "--config",
             "-c",
             type=Path,
-            default=Path("./assets/assetsync.toml"),
+            default=Path("./assets/config.toml"),
             help="Path to TOML config containing a [Cachedb] section",
         )
 
@@ -66,7 +95,12 @@ class CLI:
 
         matches_list = matches_sub.add_parser("list", help="List matches")
         matches_list.add_argument("--limit", type=int, default=100)
-        matches_list.add_argument("--offset", type=int, default=0)
+        matches_list.add_argument(
+            "--after-id",
+            type=int,
+            default=0,
+            help="Return matches with an id greater than this value",
+        )
         matches_list.add_argument("--origin-uri", type=str)
         matches_list.add_argument("--time-lte", type=float)
         matches_list.add_argument("--time-gte", type=float)
@@ -96,22 +130,50 @@ class CLI:
         task_start = task_sub.add_parser("start", help="Start a matching task")
         task_start.add_argument(
             "--assets",
-            type=int,
             nargs="*",
-            help="Asset IDs to match",
+            help="Asset URLs to match",
         )
         task_start.add_argument(
-            "--csaf-products",
-            type=int,
+            "--csaf-documents",
             nargs="*",
-            help="CSAF product IDs to match",
+            help="CSAF document URLs to match",
         )
         task_start.set_defaults(action="matcher_task_start")
 
         task_status = task_sub.add_parser("status", help="Get matcher status")
         task_status.set_defaults(action="matcher_task_status")
 
+        task_running = task_sub.add_parser(
+            "running", help="List running matching tasks"
+        )
+        task_running.add_argument("--limit", type=int, default=100)
+        task_running.add_argument("--after-id", type=int, default=0)
+        task_running.set_defaults(action="matcher_task_running")
+
+        task_running_get = task_sub.add_parser(
+            "running-get", help="Get a single running matching task"
+        )
+        task_running_get.add_argument("id", type=int, help="Task ID")
+        task_running_get.set_defaults(action="matcher_task_running_get")
+
+        task_history = task_sub.add_parser("history", help="List past matching runs")
+        task_history.add_argument("--limit", type=int, default=100)
+        task_history.add_argument("--after-id", type=int, default=0)
+        task_history.add_argument(
+            "--state",
+            type=str,
+            help="Optional run state filter (e.g. running, completed, cancelled)",
+        )
+        task_history.set_defaults(action="matcher_task_history")
+
+        task_history_get = task_sub.add_parser(
+            "history-get", help="Get a single historical matching run"
+        )
+        task_history_get.add_argument("id", type=int, help="Run ID")
+        task_history_get.set_defaults(action="matcher_task_history_get")
+
         task_stop = task_sub.add_parser("stop", help="Stop the matcher")
+        task_stop.add_argument("--task-id", type=int, help="Stop a specific task")
         task_stop.set_defaults(action="matcher_task_stop")
 
         # matcher clear group
@@ -126,6 +188,9 @@ class CLI:
         clear_matches = clear_sub.add_parser("matches", help="Clear matches cache")
         clear_matches.set_defaults(action="matcher_clear_matches")
 
+        clear_runs = clear_sub.add_parser("runs", help="Clear matcher run history")
+        clear_runs.set_defaults(action="matcher_clear_runs")
+
         clear_assets = clear_sub.add_parser("assets", help="Clear assets cache")
         clear_assets.add_argument("--origin-uri", required=True)
         clear_assets.set_defaults(action="matcher_clear_assets")
@@ -133,6 +198,22 @@ class CLI:
         clear_csaf = clear_sub.add_parser("csaf", help="Clear CSAF cache")
         clear_csaf.add_argument("--origin-uri", required=True)
         clear_csaf.set_defaults(action="matcher_clear_csaf")
+
+        # matcher config group
+        matcher_config = matcher_sub.add_parser("config", help="View or update config")
+        matcher_config.add_argument(
+            "--get",
+            action="store_true",
+            help="Get matcher configuration",
+        )
+        matcher_config.add_argument(
+            "--set",
+            dest="updates",
+            action="append",
+            default=[],
+            help="Update value (key=value). Use dotted keys for nested fields.",
+        )
+        matcher_config.set_defaults(action="matcher_config")
 
         # synchronizer subcommands (generic for any sync service base URL)
         sync = subparsers.add_parser(
@@ -155,8 +236,13 @@ class CLI:
         return parser
 
     async def run(self):
-        """Run the CLI."""
+        """Parse command-line arguments and execute the requested command.
+
+        Handles argument parsing, password resolution, and routing to the appropriate
+        command handler based on the selected service group.
+        """
         args = self.parser.parse_args()
+        self._output_json = bool(getattr(args, "json", False))
         if args.command == "user" and args.user_command == "create":
             # Prompt for password if not provided
             resolved_pwd = self._resolve_password(getattr(args, "password", None))
@@ -174,10 +260,14 @@ class CLI:
 
     # ------------- helpers -------------
     def _add_common_api_args(self, p: argparse.ArgumentParser) -> None:
-        """Add common API arguments without making them parser-required.
+        """Add common API authentication arguments to a parser.
 
-        We validate their presence in the dispatch functions so callers can supply
-        them at the root level (before command/group).
+        Args:
+            p: ArgumentParser to add arguments to.
+
+        Note:
+            Arguments are not marked as required to allow flexibility in where they
+            are specified. Validation occurs in dispatch methods.
         """
         p.add_argument(
             "--base-url",
@@ -194,9 +284,16 @@ class CLI:
 
     @staticmethod
     def _resolve_password(pwd: str | None) -> str:
-        """Return provided password or interactively prompt for one.
+        """Obtain password from argument or interactive prompt.
 
-        Uses getpass to avoid echoing the password on the terminal.
+        Args:
+            pwd: Password provided via command-line argument, or None.
+
+        Returns:
+            The resolved password string.
+
+        Note:
+            Uses getpass for secure password entry when not provided via argument.
         """
         if pwd is not None and pwd != "":
             return pwd
@@ -205,30 +302,215 @@ class CLI:
         return getpass.getpass("Password: ")
 
     async def _get_token(self, base_url: str, username: str, password: str) -> str:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        """Obtain an access token from an API service.
+
+        Args:
+            base_url: Base URL of the service.
+            username: Username for authentication.
+            password: Password for authentication.
+
+        Returns:
+            JWT access token string.
+
+        Raises:
+            RuntimeError: If authentication fails or response is invalid.
+        """
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             resp = await client.post(
                 f"{base_url.rstrip('/')}/token",
                 data={"username": username, "password": password},
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
-            resp.raise_for_status()
+            self._raise_for_status(resp, "auth")
             data = resp.json()
             if not isinstance(data, dict) or "access_token" not in data:
                 raise RuntimeError("Unexpected token response")
             return str(data["access_token"])
 
+    def _raise_for_status(self, resp: httpx.Response, context: str) -> None:
+        """Check HTTP response status and raise on error.
+
+        Args:
+            resp: HTTP response to check.
+            context: Context string for error messages (e.g., "auth", "matches list").
+
+        Raises:
+            RuntimeError: If response status code indicates an error (>= 400).
+        """
+        if resp.status_code < 400:
+            return
+        detail = ""
+        try:
+            payload = resp.json()
+            if isinstance(payload, dict) and "detail" in payload:
+                detail = str(payload["detail"])
+        except Exception:
+            detail = resp.text.strip()
+        if resp.status_code == 401:
+            msg = "Unauthorized. Check username/password."
+        elif resp.status_code == 403:
+            msg = "Forbidden. The account lacks permission."
+        elif resp.status_code == 404:
+            msg = "Not found. Check the ID or endpoint."
+        elif resp.status_code == 409:
+            msg = "Conflict. The request could not be completed."
+        elif resp.status_code == 422:
+            msg = "Unprocessable entity. Check parameter types."
+        elif resp.status_code >= 500:
+            msg = "Server error. Try again or check server logs."
+        else:
+            msg = f"HTTP {resp.status_code}"
+        if detail:
+            msg = f"{msg} ({detail})"
+        raise RuntimeError(f"{context} failed: {msg}")
+
     def _auth_headers(self, token: str) -> dict[str, str]:
+        """Create HTTP headers with bearer token authentication.
+
+        Args:
+            token: JWT access token.
+
+        Returns:
+            Dictionary with Authorization header.
+        """
         return {"Authorization": f"Bearer {token}"}
 
     @staticmethod
+    def _parse_update_value(raw: str) -> Any:
+        """Parse a string value into an appropriate Python type.
+
+        Args:
+            raw: String value to parse.
+
+        Returns:
+            Parsed value as bool, None, int, float, JSON object/array, or string.
+
+        Note:
+            Attempts parsing in order: boolean, null, JSON, int, float, string.
+        """
+        lowered = raw.lower()
+        if lowered in ("true", "false"):
+            return lowered == "true"
+        if lowered in ("null", "none"):
+            return None
+        if raw.startswith(("{", "[", '"')):
+            import json
+
+            try:
+                return json.loads(raw)
+            except json.JSONDecodeError:
+                pass
+        try:
+            return int(raw)
+        except ValueError:
+            pass
+        try:
+            return float(raw)
+        except ValueError:
+            pass
+        return raw
+
+    def _parse_updates(self, updates: list[str]) -> dict[str, Any]:
+        """Parse configuration update strings into a dictionary.
+
+        Args:
+            updates: List of "key=value" strings.
+
+        Returns:
+            Dictionary mapping keys to parsed values.
+
+        Raises:
+            RuntimeError: If any update string is malformed.
+        """
+        result: dict[str, Any] = {}
+        for item in updates:
+            if "=" not in item:
+                raise RuntimeError(f"Invalid update '{item}'. Use key=value.")
+            key, raw = item.split("=", 1)
+            key = key.strip()
+            if not key:
+                raise RuntimeError(f"Invalid update '{item}'. Use key=value.")
+            result[key] = self._parse_update_value(raw.strip())
+        return result
+
+    @staticmethod
     def _print_json(data: Any) -> None:
+        """Print data as formatted JSON.
+
+        Args:
+            data: Data to serialize and print.
+        """
         # Avoid additional dependency; use built-in print of dict/list
         import json
 
         print(json.dumps(data, indent=2, ensure_ascii=False))
 
+    def _format_value(self, value: Any, indent: int = 0) -> str:
+        """Format a value as human-readable text.
+
+        Args:
+            value: Value to format (dict, list, primitive).
+            indent: Current indentation level.
+
+        Returns:
+            Formatted string representation.
+        """
+        pad = "  " * indent
+        if isinstance(value, dict):
+            if not value:
+                return "{}"
+            lines = []
+            for key, val in value.items():
+                formatted = self._format_value(val, indent + 1)
+                if "\n" in formatted:
+                    lines.append(f"{pad}{key}:\n{formatted}")
+                else:
+                    lines.append(f"{pad}{key}: {formatted}")
+            return "\n".join(lines)
+        if isinstance(value, list):
+            if not value:
+                return "[]"
+            # If list of dicts, show each item as a block
+            if all(isinstance(item, dict) for item in value):
+                blocks = []
+                for idx, item in enumerate(value, start=1):
+                    blocks.append(f"{pad}- [{idx}]")
+                    blocks.append(self._format_value(item, indent + 1))
+                return "\n".join(blocks)
+            # Simple list
+            items = ", ".join(self._format_value(item, 0) for item in value)
+            return f"[{items}]"
+        if isinstance(value, str):
+            return value
+        if value is None:
+            return "null"
+        return str(value)
+
+    def _print_output(self, data: Any, *, force_json: bool = False) -> None:
+        """Print output in JSON or human-readable format.
+
+        Args:
+            data: Data to print.
+            force_json: If True, always use JSON output regardless of --json flag.
+        """
+        if force_json or self._output_json:
+            self._print_json(data)
+            return
+        print(self._format_value(data))
+
     # ------------- matcher commands -------------
     async def _dispatch_matcher(self, args: argparse.Namespace) -> None:
+        """Execute a matcher API command.
+
+        Args:
+            args: Parsed command-line arguments.
+
+        Raises:
+            RuntimeError: If required arguments are missing or API call fails.
+
+        Note:
+            Validates presence of --base-url and --username before proceeding.
+        """
         # Validate required auth/base options (can be provided at root or group level)
         missing: list[str] = []
         base = getattr(args, "base_url", None)
@@ -255,12 +537,14 @@ class CLI:
         token = await self._get_token(base, username, resolved_pwd)
         headers = self._auth_headers(token)
 
-        async with httpx.AsyncClient(timeout=60.0, headers=headers) as client:
+        async with httpx.AsyncClient(
+            timeout=60.0, headers=headers, follow_redirects=True
+        ) as client:
             action = getattr(args, "action", None)
             if action == "matcher_matches_list":
                 params: dict[str, Any] = {
                     "limit": args.limit,
-                    "offset": args.offset,
+                    "after_id": args.after_id,
                 }
                 if args.origin_uri:
                     params["origin_uri"] = args.origin_uri
@@ -276,54 +560,93 @@ class CLI:
                     params["threshold"] = args.threshold
 
                 resp = await client.get(f"{base.rstrip('/')}/matches/", params=params)
-                resp.raise_for_status()
-                self._print_json(resp.json())
+                self._raise_for_status(resp, "matches list")
+                self._print_output(resp.json())
 
             elif action == "matcher_matches_get":
                 resp = await client.get(
                     f"{base.rstrip('/')}/matches/{args.id}",
                 )
-                resp.raise_for_status()
-                self._print_json(resp.json())
+                self._raise_for_status(resp, "match get")
+                self._print_output(resp.json())
 
             elif action == "matcher_task_start":
                 qparams: dict[str, Any] = {}
                 if args.assets:
                     qparams["assets"] = args.assets
-                if args.csaf_products:
-                    qparams["csaf_products"] = args.csaf_products
+                if args.csaf_documents:
+                    qparams["csaf_documents"] = args.csaf_documents
                 resp = await client.post(
                     f"{base.rstrip('/')}/task/start", params=qparams
                 )
-                resp.raise_for_status()
-                print("Started.")
+                self._raise_for_status(resp, "task start")
+                self._print_output(resp.json())
 
             elif action == "matcher_task_status":
                 resp = await client.get(f"{base.rstrip('/')}/task/status")
-                resp.raise_for_status()
-                self._print_json(resp.json())
+                self._raise_for_status(resp, "task status")
+                self._print_output(resp.json())
+
+            elif action == "matcher_task_running":
+                params = {"limit": args.limit, "after_id": args.after_id}
+                resp = await client.get(
+                    f"{base.rstrip('/')}/task/running", params=params
+                )
+                self._raise_for_status(resp, "task running")
+                self._print_output(resp.json())
+
+            elif action == "matcher_task_running_get":
+                resp = await client.get(f"{base.rstrip('/')}/task/running/{args.id}")
+                self._raise_for_status(resp, "task running get")
+                self._print_output(resp.json())
+
+            elif action == "matcher_task_history":
+                params: dict[str, Any] = {
+                    "limit": args.limit,
+                    "after_id": args.after_id,
+                }
+                if args.state:
+                    params["state"] = args.state
+                resp = await client.get(
+                    f"{base.rstrip('/')}/task/history", params=params
+                )
+                self._raise_for_status(resp, "task history")
+                self._print_output(resp.json())
+
+            elif action == "matcher_task_history_get":
+                resp = await client.get(f"{base.rstrip('/')}/task/history/{args.id}")
+                self._raise_for_status(resp, "task history get")
+                self._print_output(resp.json())
 
             elif action == "matcher_task_stop":
-                resp = await client.post(f"{base.rstrip('/')}/task/stop")
-                resp.raise_for_status()
+                params = {}
+                if args.task_id is not None:
+                    params["task_id"] = args.task_id
+                resp = await client.post(f"{base.rstrip('/')}/task/stop", params=params)
+                self._raise_for_status(resp, "task stop")
                 print("Stop requested.")
 
             elif action == "matcher_clear_all":
                 resp = await client.post(f"{base.rstrip('/')}/clear/all")
-                resp.raise_for_status()
+                self._raise_for_status(resp, "clear all")
                 print("Cleared all caches.")
 
             elif action == "matcher_clear_matches":
                 resp = await client.post(f"{base.rstrip('/')}/clear/matches")
-                resp.raise_for_status()
+                self._raise_for_status(resp, "clear matches")
                 print("Cleared matches cache.")
+
+            elif action == "matcher_clear_runs":
+                resp = await client.post(f"{base.rstrip('/')}/clear/runs")
+                self._raise_for_status(resp, "clear runs")
+                print("Cleared matcher run history.")
 
             elif action == "matcher_clear_assets":
                 resp = await client.post(
                     f"{base.rstrip('/')}/clear/assets",
                     params={"origin_uri": args.origin_uri},
                 )
-                resp.raise_for_status()
+                self._raise_for_status(resp, "clear assets")
                 print("Cleared assets cache.")
 
             elif action == "matcher_clear_csaf":
@@ -331,14 +654,41 @@ class CLI:
                     f"{base.rstrip('/')}/clear/csaf",
                     params={"origin_uri": args.origin_uri},
                 )
-                resp.raise_for_status()
+                self._raise_for_status(resp, "clear csaf")
                 print("Cleared CSAF cache.")
+
+            elif action == "matcher_config":
+                if not args.get and not args.updates:
+                    raise RuntimeError("config requires --get or --set")
+                if args.get:
+                    resp = await client.get(f"{base.rstrip('/')}/config")
+                    self._raise_for_status(resp, "config get")
+                    self._print_output(resp.json())
+                if args.updates:
+                    updates = self._parse_updates(args.updates)
+                    resp = await client.post(
+                        f"{base.rstrip('/')}/config",
+                        json=updates,
+                    )
+                    self._raise_for_status(resp, "config set")
+                    self._print_output(resp.json())
 
             else:
                 self.parser.error("Unknown matcher command")
 
     # ------------- synchronizer commands -------------
     async def _dispatch_sync(self, args: argparse.Namespace) -> None:
+        """Execute a synchronizer API command.
+
+        Args:
+            args: Parsed command-line arguments.
+
+        Raises:
+            RuntimeError: If required arguments are missing or API call fails.
+
+        Note:
+            Validates presence of --base-url and --username before proceeding.
+        """
         # Validate required auth/base options (can be provided at root or group level)
         missing: list[str] = []
         base = getattr(args, "base_url", None)
@@ -364,23 +714,37 @@ class CLI:
         token = await self._get_token(base, username, resolved_pwd)
         headers = self._auth_headers(token)
 
-        async with httpx.AsyncClient(timeout=60.0, headers=headers) as client:
+        async with httpx.AsyncClient(
+            timeout=60.0, headers=headers, follow_redirects=True
+        ) as client:
             action = getattr(args, "action", None)
             if action == "sync_task_start":
                 resp = await client.post(f"{base.rstrip('/')}/task/start")
-                resp.raise_for_status()
+                self._raise_for_status(resp, "sync start")
                 print("Synchronization start requested.")
 
             elif action == "sync_task_status":
                 resp = await client.get(f"{base.rstrip('/')}/task/status")
-                resp.raise_for_status()
-                self._print_json(resp.json())
+                self._raise_for_status(resp, "sync status")
+                self._print_output(resp.json())
 
             else:
                 self.parser.error("Unknown sync command")
 
     @staticmethod
     def _load_cachedb_config(config_path: Path) -> CacheDB.Config:
+        """Load cache database configuration from TOML file.
+
+        Args:
+            config_path: Path to TOML configuration file.
+
+        Returns:
+            Parsed CacheDB configuration object.
+
+        Raises:
+            FileNotFoundError: If config file does not exist.
+            ValueError: If config file lacks [Cachedb] section.
+        """
         try:
             with config_path.open("rb") as f:
                 data = tomllib.load(f)
@@ -397,23 +761,43 @@ class CLI:
     async def _cmd_user_create(
         self, *, config_path: Path, username: str, password: str
     ) -> None:
+        """Create or update a user in the cache database.
+
+        Args:
+            config_path: Path to TOML configuration file with [Cachedb] section.
+            username: Username for the new or updated user.
+            password: Password for the user.
+
+        Raises:
+            FileNotFoundError: If config file does not exist.
+            ValueError: If config file is invalid.
+        """
         # Load DB config
         config = self._load_cachedb_config(config_path)
 
-        cache_db = CacheDB()
+        cache_db = CacheDB(config)
         try:
-            await cache_db.connect(config)
+            await cache_db.connect()
             await cache_db.create_user(username, password)
         finally:
             await cache_db.disconnect()
 
 
 async def run_cli():
-    """Run the CLI."""
+    """Execute the CLI application.
+
+    Raises:
+        SystemExit: On RuntimeError with exit code 1.
+        Exception: On unexpected errors (re-raised).
+    """
     cli = CLI()
 
     try:
         await cli.run()
+
+    except RuntimeError as e:
+        logger.error(str(e))
+        raise SystemExit(1)
 
     except Exception as e:
         logger.error(f"CLI failed: {str(e)}")
@@ -421,7 +805,10 @@ async def run_cli():
 
 
 def main():
-    """Entry point for the CLI."""
+    """Entry point for the CLI application.
+
+    Handles keyboard interrupts gracefully and logs any errors that occur.
+    """
     try:
         asyncio.run(run_cli())
     except KeyboardInterrupt:

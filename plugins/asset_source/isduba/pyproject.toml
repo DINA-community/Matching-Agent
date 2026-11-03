@@ -44,3 +44,10 @@ dependencies = [
 
 [tool.uv.sources]
 "dina.matcher" = { workspace = true }
+
+# Force rebuild when any of those files changes
+[tool.uv]
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "assets/isduba-api.json" }
+]

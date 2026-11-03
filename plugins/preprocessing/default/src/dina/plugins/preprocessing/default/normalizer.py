@@ -3,8 +3,6 @@ import re
 import polars as pl
 import enum
 from packaging.version import Version
-# from pathlib import Path
-# import tomllib
 
 
 class Standards(enum.Enum):
@@ -427,8 +425,8 @@ class Normalizer:
 
                 results.append(
                     {
-                        "min": min_v,
-                        "max": max_v,
+                        "min": self._clean_min_max_version(min_v),
+                        "max": self._clean_min_max_version(max_v),
                         "min_inclusive": min_inclusive,
                         "max_inclusive": max_inclusive,
                     }
@@ -453,7 +451,12 @@ class Normalizer:
 
         d = self._base_dict(Standards.CALVER.value, expr)
         d["date"] = {"year": year, "month": month, "day": day}
-        d["min_max_version"] = [{"min": expr, "max": expr}]
+        d["min_max_version"] = [
+            {
+                "min": self._clean_min_max_version(expr),
+                "max": self._clean_min_max_version(expr),
+            }
+        ]
 
         return d
 
@@ -468,7 +471,10 @@ class Normalizer:
         max_parts = ["9999" if p == "+" else p for p in parts]
 
         d["min_max_version"] = [
-            {"min": ".".join(min_parts), "max": ".".join(max_parts)}
+            {
+                "min": self._clean_min_max_version(".".join(min_parts)),
+                "max": self._clean_min_max_version(".".join(max_parts)),
+            }
         ]
 
         return d
@@ -494,7 +500,12 @@ class Normalizer:
             d["epoch"] = g["epoch"]
             d["architecture"] = g["arch"]
             d["build_number"] = g["release"]
-            d["min_max_version"] = [{"min": g["version"], "max": g["version"]}]
+            d["min_max_version"] = [
+                {
+                    "min": self._clean_min_max_version(g["version"]),
+                    "max": self._clean_min_max_version(g["version"]),
+                }
+            ]
             return d
 
         evr = re.match(
@@ -509,7 +520,12 @@ class Normalizer:
             d = self._base_dict(Standards.RPM.value, expr)
             d["epoch"] = g["epoch"]
             d["build_number"] = g["release"]
-            d["min_max_version"] = [{"min": g["version"], "max": g["version"]}]
+            d["min_max_version"] = [
+                {
+                    "min": self._clean_min_max_version(g["version"]),
+                    "max": self._clean_min_max_version(g["version"]),
+                }
+            ]
             return d
 
         return None
@@ -528,7 +544,12 @@ class Normalizer:
         d = self._base_dict(Standards.DEB.value, expr)
         d["build_number"] = revision
         d["epoch"] = epoch
-        d["min_max_version"] = [{"min": upstream, "max": upstream}]
+        d["min_max_version"] = [
+            {
+                "min": self._clean_min_max_version(upstream),
+                "max": self._clean_min_max_version(upstream),
+            }
+        ]
 
         return d
 
@@ -555,7 +576,12 @@ class Normalizer:
         d["build_number"] = f"upd{upd}" if upd else None
 
         normalized_version = f"{major}.{minor}.{sp}.{upd}"
-        d["min_max_version"] = [{"min": normalized_version, "max": normalized_version}]
+        d["min_max_version"] = [
+            {
+                "min": self._clean_min_max_version(normalized_version),
+                "max": self._clean_min_max_version(normalized_version),
+            }
+        ]
 
         return d
 
@@ -605,7 +631,10 @@ class Normalizer:
                 d["build_number"] = build
 
         d["min_max_version"] = [
-            {"min": f"{major}.{minor}.{patch}", "max": f"{major}.{minor}.{patch}"}
+            {
+                "min": self._clean_min_max_version(f"{major}.{minor}.{patch}"),
+                "max": self._clean_min_max_version(f"{major}.{minor}.{patch}"),
+            }
         ]
 
         return d
@@ -627,7 +656,12 @@ class Normalizer:
 
         norm = f"{rel}.{branch}.{qnum}" if qnum else f"{rel}.{branch}"
 
-        d["min_max_version"] = [{"min": norm, "max": norm}]
+        d["min_max_version"] = [
+            {
+                "min": self._clean_min_max_version(norm),
+                "max": self._clean_min_max_version(norm),
+            }
+        ]
 
         return d
 
@@ -656,7 +690,12 @@ class Normalizer:
         elif dev_num:
             d["qualifier"] = ["dev", int(dev_num)]
 
-        d["min_max_version"] = [{"min": expr, "max": expr}]
+        d["min_max_version"] = [
+            {
+                "min": self._clean_min_max_version(base),
+                "max": self._clean_min_max_version(base),
+            }
+        ]
 
         return d
 
@@ -673,130 +712,9 @@ class Normalizer:
 
         return d
 
-
-# def main():
-#     config_path = Path("./assets/plugin_configs/default/matching_config.toml")
-
-#     if not config_path.exists():
-#         raise FileNotFoundError(f"Config file not found: {config_path}")
-
-#     with open(config_path, "rb") as f:
-#         mc = tomllib.load(f)
-
-#     normalizer = Normalizer(mc)
-
-#     examples = [
-#         # "<V4.2.5015",
-#         # "grafana-0:5.2.4-6.el7rhgs.src",
-#         # "22.1.4_2024-11-11_Hot_Fix",
-#         # "< 3.12.0",
-#         # "> 3.12.0",
-#         # ">= 3.12.0",
-#         # "vers:all/*",
-#         # "vers:all/<V3.1.2.1",
-#         # "<=3.4.2.2.6",
-#         # "0.81",
-#         # "R15B_PC4",
-#         # "22.04",
-#         # "V6 + SP9 + Upd2",
-#         # "6.+.9.+.2",
-#         # "1.0.post1",
-#         # "1.0a1",
-#         # "1:2.31.1-0ubuntu9.9",
-#         # ">=0.68|<=0.80",
-#         # "vers:pypi/>=1.0,<2.0|>=2.0",
-#         # "vers:pypi/>=1.0|<2.0",
-#         # "vers:pypi/1.5",
-#         # "5.1.106.0",
-#         # "1.3.4",
-#         # "R15B",
-#         # "R15B_PC4",
-#         # "R17A_SP3",
-#         # "2024.11.11",
-#         # "nginx-1:1.18.0-1.amd64.rpm",
-#         # "v4.2sp3",
-#         # "R18C_MR2",
-#         # "0.81.0",
-#         # "2.1.0rc2",
-#         # "1.0.dev2",
-#         # "6.+.9",
-#         # "+.1",
-#         # "2.31.1-1",
-#         # "random-string",
-#         # "7 sp2",
-#         # "All versions < V5.7 SP1 HF1"
-#         # "13",
-#         # "<V3.0"
-#         # "14 Sp1",
-#         # "All versions < V5.7 SP1 HF1"
-#         # "21.0.0.0",
-#         # "1.0.0-0.3.7",
-#         # "1.0.0-alpha",
-#         # "1.0.0-alpha.1",
-#         # "1.0.0-x.7.z.92",
-#         # "1.0.0-x-y-z.-",
-#         # "1.0.0+20130313144700",
-#         # "1.0.0+21AF26D3--117B344092BD",
-#         # "1.0.0-alpha+001",
-#         # "1.0.0-beta+exp.sha.5114f85",
-#         # "v4.2sp3"
-#     ]
-
-#     for ex in examples:
-#         ex = ex.lower()
-#         ex = re.sub(r"\s*\+\s*", "+", ex).strip()
-#         detect = normalizer._detect_schema(ex)
-
-#         print(f"'{ex}': '{detect}'")
-#         match detect:
-#             case Standards.VERS:
-#                 print(normalizer._parse_csaf(Standards.VERS, ex))
-#             case Standards.VLS:
-#                 print(normalizer._parse_csaf(Standards.VLS, ex))
-#             case Standards.CALVER:
-#                 print(normalizer._parse_calver(ex))
-#             case Standards.RPM:
-#                 print(normalizer._parse_rpm(ex))
-#             case Standards.SAP:
-#                 print(normalizer._parse_sap(ex))
-#             case Standards.PEP440:
-#                 print(normalizer._parse_pep440(ex))
-#             case Standards.ERICSSON_RELEASE_SCHEMA:
-#                 print(normalizer._parse_ericsson(ex))
-#             case Standards.SEMVER:
-#                 print(normalizer._parse_semver(ex))
-#             case Standards.WILDCARD:
-#                 print(normalizer._parse_csaf_wildcard(ex))
-#             case Standards.DEB:
-#                 print(normalizer._parse_deb(ex))
-#             case _:
-#                 print(normalizer._parse_version_freetext(ex))
-#         print("\n")
-
-#     # print(normalizer.parse_cpe("cpe:/a:redhat:rhel_eus:8.1::appstream"))
-#     # print(normalizer.parse_cpe("cpe:/a:redhat:jboss_fuse:6.3"))
-#     # print(normalizer.parse_cpe("cpe:2.3:a:versa-networks:versa_director:22.1.4:2024-11-11_Hot_Fix:*:*:*:*:*:*"))
-#     # print(normalizer.parse_cpe("cpe:/a:example:software:1.0.0"))
-
-#     # print(normalizer.parse_purl("pkg:generic/example@1.0.0"))
-#     # print(normalizer.parse_purl("pkg:npm/angular/animation@12.3.1"))
-#     # print(normalizer.parse_purl("pkg:deb/debian/curl@7.50.3-1?arch=i386&distro=jessie"))
-#     # print(normalizer.parse_purl("pkg:rpm/redhat/openssl"))
-#     # print(normalizer.parse_purl("pkg:oci/multicluster-observability-rhel8-operator@sha256:94974d6bf61f1c71b46e270464caefb9c90b5006533a894cffada70f836ff19b?arch=s390x&repository_url=registry.redhat.io/rhacm2/multicluster-observability-rhel8-operator&tag=v2.6.1-1"))
-#     # print(normalizer.parse_purl("pkg:rpm/redhat/servicemesh-proxy-wasm@2.1.3-1.el8?arch=noarch"))
-#     # files = [
-#     #     {"name": "mybinary-1.0.0-linux-x86_64.tar.gz", "hash_algorithm": "sha256", "file_hash": "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"},
-#     #     {"name": "test-1.0.0-linux-x86_64.tar.gz", "hash_algorithm": "sha256", "file_hash": "94974d6bf61f1c71b46e270464caefb9c90b5006533a894cffada70f836ff19b?arch=s390x"},
-#     # ]
-
-#     # print(normalizer.parse_files(files))
-
-#     # print(normalizer.parse_version(examples))
-
-#     # textc = "Oracle Database 21c Express Edition"
-#     # texta = "Oracle Database 21c Express Edition"
-
-#     # print(normalizer.parse_freetext(texta))
-
-# if __name__ == "__main__":
-#     main()
+    def _clean_min_max_version(self, value: str):
+        try:
+            value = re.sub(r"[A-Za-z]", "", value)
+            return str(value)
+        except (TypeError, ValueError):
+            return None

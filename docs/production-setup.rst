@@ -9,6 +9,17 @@ using the Docker assets located in the repository's ``docker/`` directory.
 Overview
 --------
 
+Important architecture note:
+
+- The Matching Agent services (``matcher``, ``assetsync``, ``csafsync``) do **not**
+  implement native TLS listeners.
+- TLS is provided **only** at the reverse-proxy layer (``gateway`` in this stack).
+- Without a reverse proxy, there is no TLS support for connections leaving the system.
+
+This separation is intentional: keeping TLS termination in the edge proxy keeps the
+application services lean and focused on business logic, while transport security is
+handled in one dedicated component.
+
 The compose stack runs the following services:
 
 - PostgreSQL 16 (``postgres``) — shared cache DB used by all components
@@ -134,6 +145,55 @@ To regenerate a new self‑signed certificate (e.g., after changing ``TLS_CN``):
 
 Alternatively, customize the NGINX image to use your organization's TLS cert/key
 by extending ``docker/nginx``.
+
+Using SSL/TLS in professional deployments
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The built-in gateway certificate is self-signed and intended for local/test use.
+For professional deployments, use a trusted certificate (public CA or internal PKI)
+and manage TLS at your reverse proxy.
+
+The core Matching Agent services are HTTP services behind the proxy. They do not
+provide native TLS endpoints. If you deploy without a reverse proxy in front, all
+external traffic is unencrypted.
+
+Recommended reverse proxy: NGINX
+""""""""""""""""""""""""""""""""
+
+NGINX is a good default reverse proxy for this setup because the APIs are already
+published on path prefixes (``/matcher``, ``/assetsync``, ``/csafsync``) and the
+provided Docker stack already uses it.
+
+Relevant NGINX documentation chapters:
+
+- HTTPS server setup: https://nginx.org/en/docs/http/configuring_https_servers.html
+- Reverse proxy module reference: https://nginx.org/en/docs/http/ngx_http_proxy_module.html
+- Core directives (timeouts/body size/listen): https://nginx.org/en/docs/http/ngx_http_core_module.html
+
+What to pay attention to
+""""""""""""""""""""""""
+
+- Use CA-signed certificates in production; do not use self-signed certs for clients you do not fully control.
+- Keep private keys out of images and git repositories (mount as secrets/volumes, or use a secret manager).
+- Keep backend services internal (only the gateway should be exposed publicly).
+- Redirect HTTP to HTTPS (port 80 to 443) and disable weak TLS versions/ciphers.
+- Pass forwarding headers consistently: ``Host``, ``X-Forwarded-For``, ``X-Forwarded-Proto``, ``X-Forwarded-Prefix``.
+- Automate certificate renewal and reload NGINX after renewal.
+- Enable HSTS only after HTTPS is reliably enforced on your domain.
+- Set conservative proxy/body timeouts and request size limits according to your expected API usage.
+
+Example NGINX configuration (default baseline)
+""""""""""""""""""""""""""""""""""""""""""""""
+
+If your environment does not yet provide a standardized proxy template, you can
+use the sample config provided in ``docker/nginx/nginx.conf`` and adapt it appropriately.
+
+Notes for this example:
+
+- ``matcher``, ``assetsync``, and ``csafsync`` are Docker service names from
+  ``docker/docker-compose.yml``. Replace them when deploying outside Docker.
+- If your backend services are not in the same network namespace, update
+  ``proxy_pass`` targets accordingly.
 
 Health checks and logs
 ^^^^^^^^^^^^^^^^^^^^^^

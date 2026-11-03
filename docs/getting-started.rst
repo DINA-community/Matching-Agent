@@ -18,8 +18,8 @@ This section provides an overview of the project’s directory and package struc
 
 
 - ``assets/``: Configuration files for plugins and the matching logic
-- ``dev/``: Docker Compose setup for Postgres, ISDUBA, and NetBox
-- ``docker/``: Docker files to build and run the project in containers
+- ``dev/``: Docker Compose setup for development purposes comprising a Postgres, ISDUBA, and NetBox instance
+- ``docker/``: Docker files to build and run the project in containers for production
 - ``docs/``: Project documentation (Sphinx sources)
 
 - ``plugins/``: Extensions implemented as plugins
@@ -33,25 +33,27 @@ This section provides an overview of the project’s directory and package struc
   - ``preprocessing/``: Preprocessing (normalization, text cleanup)
 
     - ``default/``: Default preprocessing implementation
-    - ``identify/``: Example for additional preprocessing modules
+    - ``identity/``: A preprocessing plugin that does nothing to the data. Used as an example.
 
 - ``src/dina/``: Main package (production code)
 
   - ``assetsync/``: Entry point and logic for the asset synchronizer
-  - ``cacheddb/``: Database access and data model (schema, repositories/queries)
+  - ``cachedb/``: Database access and data model (schema, repositories/queries)
   - ``cli/``: CLI for user management (Cache DB) and for controlling the matcher/synchronizer APIs
   - ``common/``: Shared utilities (e.g., logging, configuration, auth helpers)
   - ``csafsync/``: Entry point and logic for the CSAF synchronizer
   - ``matcher/``: Matching run and matching logic
 
-    - ``main.py``: Starts the matching run
+    - ``main.py``: The core components of the matcher
     - ``matching.py``: Implements the matching logic
     - ``calculate_score.py``: Calculates scores and evaluates results
 
-  - ``netbox_api/``: NetBox API client/adapter
   - ``synchronizer/``: Plugin interfaces for fetching, preprocessing, relationship mapping, and cleanup, as well as reporting newly found matches back to the data source
 
 - ``tests/``: Tests (pytest), fixtures, and test data
+
+
+.. _quick-start:
 
 Quick start
 -----------
@@ -62,6 +64,14 @@ Quick start
       git clone --recurse-submodules https://github.com/DINA-community/Matching-Agent.git
 
       cd Matching-Agent
+
+   .. note::
+      If you already have an existing clone, fetch newly added submodules (e.g. the
+      NetBox plugin sources under ``dev/plugins/``) with:
+
+      .. code-block:: bash
+
+         git submodule update --init --recursive
 
 2) Create the Python environment and install dependencies
     - Base package only:
@@ -96,9 +106,11 @@ Quick start
 
         ./dev/start-local-env.sh                       # start services in background
         ./dev/start-local-env.sh --recreate            # recreate containers
+        ./dev/start-local-env.sh --stop                # stop
         ./dev/start-local-env.sh --down                # stop and remove services
         ./dev/start-local-env.sh --down --volumes      # stop and remove services AND named volumes
         ./dev/start-local-env.sh --recreate --volumes  # full reset: down -v, then up
+        ./dev/start-local-env.sh --clean               # remove local images + local env/toml/plugins.py
 
     - Alternative: run Docker Compose directly
 
@@ -121,22 +133,67 @@ Quick start
 
         docker compose -f dev/docker-compose.yml logs netbox-setup
 
+   .. note::
+      The NetBox plugins ``csaf`` and ``d3c`` are included as git submodules at ``dev/plugins/csaf`` and ``dev/plugins/d3c``.
+      The directories are bind-mounted into the containers ``netbox`` and ``netbox-worker`` and installed in editable mode.
+      After making changes to the backend code of netbox modules, either restart the affected containers:
+
+      .. code-block:: bash
+
+         docker compose -f dev/docker-compose.yml restart netbox netbox-worker
+
+      Or, for faster feedback, you can reload only the NetBox application:
+
+      .. code-block:: bash
+
+         ./dev/netbox-reload-plugins.sh
+
+      However, this only covers the ``netbox`` service itself, not ``netbox-worker``.
+
+      Changes to frontend code (HTML, JS, CSSS) don't need a restart and only a reload in the browser.
+
+   .. note::
+      The CSAF documents in ``documents_dir`` are uploaded in ISDuBA upon startup, ensuring there is CSAF data available without manual setup.
+
+      The setup runs as part of ``./dev/start-local-env.sh``. It can also be run on its own:
+
+      .. code-block:: bash
+
+        ./dev/isduba-set-sources.py
+
+      Additionally, some CSAF providers can be automatically configured too:
+
+      .. code-block:: bash
+
+        ./dev/isduba-set-sources.py  --configure-sources
+
+      The default providers are small vendor providers to keep the data modest in size.
+
+      The sources are defined in ``dev/configuration/isduba-sources.json``, which is created from the template ``dev/configuration/isduba-sources.example.json`` on first run.
+
 4) Configure plugins
 
    Copy and adapt sample configuration files from ``assets/plugin_configs`` to enable data sources:
 
+   .. note::
+      Datasource plugins are expected to fetch valid source data. For CSAF sources, this means the
+      fetched CSAF documents must already be valid at the upstream source system.
+
    - NetBox fetcher (asset source):
 
      - Copy: ``assets/plugin_configs/data_source/asset/sample/netbox.toml``
-       to a new file in ``assets/plugin_configs/data_source/asset/`` (e.g. ``netbox_local.toml``)
+       to a new file in ``assets/plugin_configs/data_source/asset/`` (e.g. ``netbox-local.toml``)
      - Set ``url`` (e.g. http://netbox.localhost/) and ``api_token`` (see token from setup logs)
 
    - ISDuBA fetcher (CSAF source):
 
      - Copy: ``assets/plugin_configs/data_source/csaf/sample/isduba.toml``
-       to a new file in ``assets/plugin_configs/data_source/csaf/`` (e.g. ``isduba_local.toml``)
+       to a new file in ``assets/plugin_configs/data_source/csaf/`` (e.g. ``isduba-local.toml``)
      - Set ``url`` (e.g. http://isduba.localhost/), ``username``/``password`` (default user/user), and
        ``keycloak_url`` (e.g. http://keycloak.localhost/)
+
+
+.. _running-services:
 
 Running the services
 --------------------
@@ -241,5 +298,48 @@ Plugin-specific tests
 ^^^^^^^^^^^^^^^^^^^^^
 
 Plugin tests are included automatically when the corresponding plugin is installed
-(e.g. via ``uv sync --extra <plugin>``).  
+(e.g. via ``uv sync --extra <plugin>``).
 If a plugin is not installed, its tests will be skipped.
+
+
+Integration tests
+^^^^^^^^^^^^^^^^^
+
+ISDuBA
+~~~~~~
+
+The integration tests require services to be running in the background and are not executed by default.
+They are marked with ``integration``. To run them:
+
+.. code-block:: bash
+
+    ./dev/start-local-env.sh
+    ./dev/isduba-set-sources.py
+    uv run pytest -m integration
+
+They have these requirements and fail if these are not met:
+
+These tests are included in the CI workflow ``.github/workflows/integration.yml``.
+
+NetBox
+~~~~~~
+
+NetBox integration tests (``plugins/asset_source/netbox/tests/``) start their own NetBox with Docker Compose.
+
+Testing with Coverage
+^^^^^^^^^^^^^^^^^^^^^
+
+To run tests with coverage reporting using ``pytest-cov``:
+
+.. code-block:: bash
+
+    uv run pytest --cov=dina --cov-report=html --cov-report=term
+
+This generates an HTML coverage report in ``htmlcov/`` and prints a summary to the terminal.
+
+**TL;DR**: Use ``--cov=<package>`` to measure coverage, and ``--cov-report=html`` or ``--cov-report=term`` to generate reports.
+
+For more information:
+
+- pytest documentation: https://docs.pytest.org/
+- pytest-cov documentation: https://pytest-cov.readthedocs.io/

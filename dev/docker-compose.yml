@@ -3,13 +3,13 @@ services:
     image: postgres:17-alpine
     container_name: cachedb-postgres
     environment:
-      POSTGRES_DB: ${CACHEDB_POSTGRES_DB:-cachedb}
-      POSTGRES_USER: ${CACHEDB_POSTGRES_USER:-admin}
-      POSTGRES_PASSWORD: ${CACHEDB_POSTGRES_PASSWORD:-secret}
+      POSTGRES_DB: ${CACHEDB_POSTGRES_DB}
+      POSTGRES_USER: ${CACHEDB_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${CACHEDB_POSTGRES_PASSWORD}
     ports:
       - "2345:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - cachedb_postgres:/var/lib/postgresql
       - ./init-scripts:/docker-entrypoint-initdb.d:z,ro
     restart: unless-stopped
     shm_size: 1G
@@ -23,13 +23,13 @@ services:
       KC_DB_SCHEMA: public
       KC_DB_URL: jdbc:postgresql://isduba-db/keycloak
 
-      KC_DB_USERNAME: ${KC_DB_USERNAME:-keycloak}
-      KC_DB_PASSWORD: ${KC_DB_PASSWORD:-keycloak}
+      KC_DB_USERNAME: ${KC_DB_USERNAME}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD}
 
-      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}
-      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:-secret}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
 
-      KC_HOSTNAME: http://keycloak.localhost
+      KC_HOSTNAME: ${KC_HOSTNAME}
       # Optional, reduce memory usage
       JAVA_OPTS: >
         -XX:MaxHeapFreeRatio=10
@@ -63,9 +63,9 @@ services:
     networks:
       - isduba
     environment:
-      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}
-      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:-secret}
-      CLIENT_HOSTNAME_URL: http://isduba.localhost
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
+      CLIENT_HOSTNAME_URL: ${ISDUBA_CLIENT_HOSTNAME_URL}
     volumes:
       - ./isduba/docker/keycloak/init.sh:/opt/keycloak/init.sh
     depends_on:
@@ -77,7 +77,7 @@ services:
     image: library/postgres:16-alpine
     restart: always
     environment:
-      POSTGRES_PASSWORD: ${ISDUBA_POSTGRES_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${ISDUBA_POSTGRES_PASSWORD}
     networks:
       - isduba
     healthcheck:
@@ -87,7 +87,7 @@ services:
       retries: 100
     volumes:
       - ./isduba/docker/db/init.sh:/docker-entrypoint-initdb.d/init.sh
-      - postgres_volume:/var/lib/postgresql/data
+      - isduba_postgres:/var/lib/postgresql
 
   isduba-server:
     container_name: "isduba-server"
@@ -95,14 +95,14 @@ services:
       context: ./isduba
       dockerfile: ../isduba/docker/server/Dockerfile
       args:
-        BUILD_VERSION: v0.0.0
+        BUILD_VERSION: ${BUILD_VERSION}
     networks:
       - isduba
     environment:
-      ISDUBA_CLIENT_KEYCLOAK_URL: http://keycloak.localhost
-      ISDUBA_CLIENT_KEYCLOAK_REALM: "isduba"
-      ISDUBA_CLIENT_KEYCLOAK_CLIENT_ID: "auth"
-      ISDUBA_CLIENT_IDLE_TIMEOUT: "30m"
+      ISDUBA_CLIENT_KEYCLOAK_URL: ${ISDUBA_CLIENT_KEYCLOAK_URL}
+      ISDUBA_CLIENT_KEYCLOAK_REALM: ${ISDUBA_CLIENT_KEYCLOAK_REALM}
+      ISDUBA_CLIENT_KEYCLOAK_CLIENT_ID: ${ISDUBA_CLIENT_KEYCLOAK_CLIENT_ID}
+      ISDUBA_CLIENT_IDLE_TIMEOUT: ${ISDUBA_CLIENT_IDLE_TIMEOUT}
     depends_on:
       isduba-db:
         condition: service_healthy
@@ -115,7 +115,7 @@ services:
 
   # redis
   redis:
-    image: docker.io/valkey/valkey:8.1-alpine
+    image: docker.io/valkey/valkey:9.1-alpine
     command:
       - sh
       - -c # this is to evaluate the $REDIS_PASSWORD from the env
@@ -133,7 +133,7 @@ services:
       - netbox-redis-data:/data
 
   redis-cache:
-    image: docker.io/valkey/valkey:8.1-alpine
+    image: docker.io/valkey/valkey:9.1-alpine
     command:
       - sh
       - -c # this is to evaluate the $REDIS_PASSWORD from the env
@@ -150,17 +150,21 @@ services:
       context: ./
       dockerfile: netbox.Dockerfile
       args:
-        BUILD_VERSION: v0.0.0
+        BUILD_VERSION: ${BUILD_VERSION}
     ports:
-      - "8800:8800"
+      - "8800:8080"
     depends_on:
       - postgres
       - redis
       - redis-cache
     env_file: netbox/env/netbox.env
-    user: "unit:root"
+    environment: &netbox-environment
+      API_TOKEN_PEPPER_1: ${API_TOKEN_PEPPER_1:-matching-agent-development-only-pepper-change-in-production}
+    user: "netbox:root"
+    entrypoint: ["/usr/bin/tini", "--", "/opt/netbox/docker-entrypoint-plugins.sh", "/opt/netbox/docker-entrypoint.sh"]
+    command: ["/opt/netbox/launch-netbox.sh"]
     healthcheck:
-      test: curl -f http://localhost:8800/login/ || exit 1
+      test: /opt/netbox/health.sh
       start_period: 180s
       timeout: 5s
       interval: 15s
@@ -173,12 +177,14 @@ services:
       - netbox-media-files:/opt/netbox/netbox/media:rw
       - netbox-reports-files:/opt/netbox/netbox/reports:rw
       - netbox-scripts-files:/opt/netbox/netbox/scripts:rw
+      - ./plugins/d3c:/opt/netbox-plugins/d3c:z
+      - ./plugins/csaf:/opt/netbox-plugins/csaf:z
     extra_hosts:
       - "host.local:host-gateway"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.netbox.rule=Host(`netbox.localhost`)"
-      - "traefik.http.services.netbox.loadbalancer.server.port=8800"
+      - "traefik.http.services.netbox.loadbalancer.server.port=8080"
 
   netbox-worker:
     <<: *netbox
@@ -201,25 +207,6 @@ services:
     labels:
       - "traefik.enable=false"
 
-  netbox-housekeeping:
-    <<: *netbox
-    depends_on:
-      netbox:
-        condition: service_healthy
-    command:
-      - /opt/netbox/housekeeping.sh
-    ports: []
-    healthcheck:
-      test: ps -aux | grep -v grep | grep -q housekeeping || exit 1
-      start_period: 20s
-      timeout: 5s
-      interval: 15s
-      retries: 100
-    networks:
-      - netbox
-    labels:
-      - "traefik.enable=false"
-
   netbox-setup:
     <<: *netbox
     container_name: netbox-setup
@@ -228,11 +215,12 @@ services:
     depends_on:
       netbox:
         condition: service_healthy
-    entrypoint: ["bash", "/opt/netbox/init-scripts/netbox-token.sh"]
+    entrypoint: ["/opt/netbox/docker-entrypoint-plugins.sh", "bash", "/opt/netbox/init-scripts/netbox-token.sh"]
     environment:
-      DJANGO_SUPERUSER_PASSWORD: ${NETBOX_SUPERUSER_PASSWORD:-admin}
-      NETBOX_SUPERUSER_NAME: ${NETBOX_SUPERUSER_NAME:-admin}
-      NETBOX_SUPERUSER_EMAIL: ${NETBOX_SUPERUSER_EMAIL:-admin@example.com}
+      <<: *netbox-environment
+      DJANGO_SUPERUSER_PASSWORD: ${NETBOX_SUPERUSER_PASSWORD}
+      NETBOX_SUPERUSER_NAME: ${NETBOX_SUPERUSER_NAME}
+      NETBOX_SUPERUSER_EMAIL: ${NETBOX_SUPERUSER_EMAIL}
     networks:
       - netbox
     labels:
@@ -240,7 +228,7 @@ services:
 
   # postgres
   postgres:
-    image: docker.io/postgres:17-alpine
+    image: docker.io/postgres:18-alpine
     healthcheck:
       test: pg_isready -q -t 2 -d $$POSTGRES_DB -U $$POSTGRES_USER
       start_period: 20s
@@ -251,10 +239,10 @@ services:
       - netbox
     env_file: netbox/env/postgres.env
     volumes:
-      - netbox-postgres-data:/var/lib/postgresql/data
+      - netbox-postgres:/var/lib/postgresql
 
   traefik:
-    image: traefik:latest
+    image: traefik:v3
     command:
       - --api=true
       - --api.insecure=true
@@ -269,18 +257,21 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
-      - netbox
-      - isduba
+      netbox:
+        aliases:
+          - isduba.localhost
+          - keycloak.localhost
+      isduba:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.traefik.rule=Host(`traefik.localhost`)"
       - "traefik.http.services.traefik.loadbalancer.server.port=8080"
 
 volumes:
-  postgres_data:
+  cachedb_postgres:
   netbox-media-files:
     driver: local
-  netbox-postgres-data:
+  netbox-postgres:
     driver: local
   netbox-redis-cache-data:
     driver: local
@@ -290,9 +281,7 @@ volumes:
     driver: local
   netbox-scripts-files:
     driver: local
-  postgres_volume:
-
-
+  isduba_postgres:
 
 networks:
   isduba:

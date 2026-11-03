@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
+from sphinx.application import Sphinx
 
 # -- Path setup --------------------------------------------------------------
 # Add the project src directory to sys.path so autodoc can import the code.
@@ -18,11 +19,6 @@ sys.path.insert(0, str(SRC))
 
 # -- Project information -----------------------------------------------------
 project = "dina.matcher"
-
-# Try to determine version from pyproject.toml, falling back to package/distribution metadata.
-# We keep this resilient to allow local docs builds without installing the package.
-release = "0.1.0"
-version = release
 
 try:
     import tomllib  # Python 3.11+
@@ -37,7 +33,7 @@ if tomllib and pyproject_toml.exists():
         rel = project_table.get("version")
         if isinstance(rel, str):
             release = rel
-            version = rel
+            version = ".".join(release.split(".")[:2])
         name = project_table.get("name")
         if isinstance(name, str):
             project = name
@@ -47,9 +43,8 @@ else:
     # Last resort: try importlib.metadata if the package is installed
     try:
         from importlib.metadata import version as _dist_version
-
         release = _dist_version(project)
-        version = release
+        version = ".".join(release.split(".")[:2])
     except Exception:
         pass
 
@@ -59,7 +54,24 @@ extensions = [
     "sphinx.ext.autosummary",
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
+    "sphinx.ext.intersphinx",
+    "sphinxcontrib.programoutput",
 ]
+
+# Allow using :paramref: roles for SQLAlchemy
+
+
+def setup(app: Sphinx):
+    app.add_role(
+        "paramref",
+        lambda name, rawtext, text, lineno, inliner, options={}, content=[]: ([], []),
+    )
+
+
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+    "sqlalchemy": ("https://docs.sqlalchemy.org/en/20/", None),
+}
 
 autosummary_generate = True
 napoleon_google_docstring = True

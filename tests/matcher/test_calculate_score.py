@@ -3,6 +3,17 @@ import pytest
 import polars as pl
 
 from dina.matcher.calculate_score import Score
+from dina.common.log import configure_logging
+
+configure_logging()
+
+
+@pytest.fixture(autouse=True)
+def add_trace_to_logger(monkeypatch):
+    def trace(self, msg, *args, **kwargs):
+        return self.debug(msg, *args, **kwargs)
+
+    monkeypatch.setattr(logging.Logger, "trace", trace, raising=False)
 
 
 @pytest.fixture(autouse=True)

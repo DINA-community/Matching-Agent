@@ -1,10 +1,12 @@
+from types import SimpleNamespace
+
 import httpx
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 from pydantic import HttpUrl
 import pytest
 
-from dina.cachedb.database import Asset, Match, Product, CsafProduct
+from dina.cachedb.database import Asset, Product, CsafProduct
 from dina.cachedb.fetcher_view import FetcherView
 from dina.cachedb.model import ProductType
 from dina.synchronizer.plugin_base.data_source import (
@@ -32,7 +34,7 @@ def mock_config():
     """Creates a fake plugin configuration for tests."""
     plugin_data = NetboxDataSource.Config(
         api_url=HttpUrl("https://fake.netbox"),
-        api_token="fake-token",
+        api_token="nbt_0123456789ab.0123456789abcdef0123456789abcdef01234567",
     )
     ds_cfg = DataSourceConfig(
         plugin_name="netbox",
@@ -66,6 +68,7 @@ def test_find_cachedb_type():
     from dina.plugins.datasource.netbox.netbox import find_cachedb_type, ProductType
 
     assert find_cachedb_type("dcim.device") == ProductType.Device
+    assert find_cachedb_type("dcim.module") == ProductType.Module
     assert find_cachedb_type("d3c.software") == ProductType.Software
     assert find_cachedb_type("unknown") == ProductType.Undefined
 
@@ -74,7 +77,10 @@ def test_find_cachedb_type():
     "origin_info,expected",
     [
         ({"device_id": 42}, "/api/dcim/devices/42/"),
-        ({"software_id": 99}, "/api/plugins/d3c/software/99/"),
+        ({"module_id": 77}, "/api/dcim/modules/77/"),
+        ({"software_id": 99}, "/api/plugins/d3c/software-list/99/"),
+        ({"software_id": "99"}, "/api/plugins/d3c/software-list/99/"),
+        ({"software_id": "not_a_number"}, ""),
         ({"relation_id": 123}, "/api/plugins/d3c/productrelationship-list/123/"),
         ({}, ""),
         ({"device_id": "not_a_number"}, ""),
@@ -134,6 +140,14 @@ async def test_fetch_products(monkeypatch, mock_config):
         AsyncMock(return_value=DummyListResult([DummyDeviceType])),
     )
     monkeypatch.setattr(
+        "dina.plugins.datasource.netbox.netbox.dcim_modules_list.asyncio",
+        AsyncMock(return_value=DummyListResult([])),
+    )
+    monkeypatch.setattr(
+        "dina.plugins.datasource.netbox.netbox.dcim_module_types_list.asyncio",
+        AsyncMock(return_value=DummyListResult([])),
+    )
+    monkeypatch.setattr(
         "dina.plugins.datasource.netbox.netbox.dcim_manufacturers_list.asyncio",
         AsyncMock(return_value=DummyListResult([DummyManufacturer])),
     )
@@ -175,6 +189,10 @@ async def test_cleanup_products_returns_delete(monkeypatch, mock_config):
         "dina.plugins.datasource.netbox.netbox.plugins_d3c_software_list_list.asyncio",
         AsyncMock(return_value=DummyListResult([])),
     )
+    monkeypatch.setattr(
+        "dina.plugins.datasource.netbox.netbox.dcim_modules_list.asyncio",
+        AsyncMock(return_value=DummyListResult([])),
+    )
 
     dummy_asset = MagicMock()
     dummy_asset.id = 1
@@ -194,17 +212,38 @@ async def test_cleanup_products_returns_delete(monkeypatch, mock_config):
 
 @pytest.mark.asyncio
 async def test_notify_new_matches_success(monkeypatch, mock_config):
-    """Verifies that notify_new_matches triggers the async API call once."""
     fake_async_create = AsyncMock()
+
+    class FakeCsafMatchRequest(dict):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+
+        def to_dict(self):
+            return dict(self)
+
     monkeypatch.setattr(
         "dina.plugins.datasource.netbox.netbox.plugins_csaf_csafmatch_list_create.asyncio",
         fake_async_create,
     )
+    monkeypatch.setattr(
+        "dina.plugins.datasource.netbox.netbox.CsafMatchRequest",
+        FakeCsafMatchRequest,
+    )
 
     fake_asset = Asset(product=Product(), origin_info={"device_id": 42})
-    fake_csaf = CsafProduct(uri="https://example.com/csaf.json")
+    fake_csaf = CsafProduct(
+        uri="https://example.com/",
+        origin_info={"product_name_id": "prod-123", "path": "/api/documents/1"},
+    )
 
-    match = Match(asset=fake_asset, csaf_product=fake_csaf)
+    match = SimpleNamespace(
+        asset=fake_asset,
+        csaf_product=fake_csaf,
+        score=None,
+        status=None,
+        timestamp=None,
+    )
+
     await mock_config.notify_new_matches([match])
 
     fake_async_create.assert_awaited_once()
@@ -213,16 +252,39 @@ async def test_notify_new_matches_success(monkeypatch, mock_config):
 @pytest.mark.asyncio
 async def test_notify_new_matches_http_error(monkeypatch, mock_config, caplog):
     """Ensures notify_new_matches logs an error if an HTTPError occurs."""
+
+    class FakeCsafMatchRequest(dict):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+
+        def to_dict(self):
+            return dict(self)
+
     fake_async_create = AsyncMock(side_effect=httpx.HTTPError("network fail"))
+
     monkeypatch.setattr(
         "dina.plugins.datasource.netbox.netbox.plugins_csaf_csafmatch_list_create.asyncio",
         fake_async_create,
     )
+    monkeypatch.setattr(
+        "dina.plugins.datasource.netbox.netbox.CsafMatchRequest",
+        FakeCsafMatchRequest,
+    )
 
     fake_asset = Asset(product=Product(), origin_info={"device_id": 123})
-    fake_csaf = CsafProduct(uri="https://fake.doc/csaf.json")
+    fake_csaf = CsafProduct(
+        uri="https://fake.doc/csaf.json",
+        origin_info={"product_name_id": "prod-123", "path": "/api/documents/1"},
+    )
 
-    match = Match(asset=fake_asset, csaf_product=fake_csaf)
+    match = SimpleNamespace(
+        asset=fake_asset,
+        csaf_product=fake_csaf,
+        score=None,
+        status=None,
+        timestamp=None,
+    )
+
     await mock_config.notify_new_matches([match])
 
     assert "Failed to notify new matches" in caplog.text
@@ -289,7 +351,7 @@ async def test_map_relationships_basic(monkeypatch, mock_config):
         MagicMock(id=300, origin_info={"software_id": 10}),
         MagicMock(id=400, origin_info={"software_id": 20}),
     ]
-    fetcher_view.get_existing = AsyncMock(side_effect=[fake_devices, fake_software])
+    fetcher_view.get_existing = AsyncMock(side_effect=[fake_devices, [], fake_software])
 
     relations = [
         Relationship(
@@ -351,3 +413,32 @@ async def test_cleanup_relationships_keeps_and_deletes(monkeypatch, mock_config)
 
     deleted = next(r for r in result if r.origin_info["relation_id"] == 20)
     assert deleted.can_delete is True
+
+
+@pytest.mark.asyncio
+async def test_v2_authorization_on_requests(mock_config):
+    """Checks that requests use NetBox v2 token authentication."""
+    sent_requests: list[httpx.Request] = []
+
+    def handle_request(request: httpx.Request) -> httpx.Response:
+        sent_requests.append(request)
+        # cleanup_products uses paginated list endpoints whose generated response
+        # models require count and results.
+        return httpx.Response(200, json={"count": 0, "results": []})
+
+    mock_config.client._httpx_args["transport"] = httpx.MockTransport(handle_request)
+
+    asset = Asset(
+        id=1,
+        product=Product(product_type=ProductType.Device),
+        origin_info={"device_id": 1},
+    )
+
+    async with mock_config.client:
+        await mock_config.cleanup_products([asset])
+
+    assert sent_requests
+    assert all(
+        request.headers["Authorization"] == f"Bearer {mock_config.config.DataSource.Plugin.api_token}"
+        for request in sent_requests
+    )

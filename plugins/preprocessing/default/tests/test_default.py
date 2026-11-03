@@ -78,20 +78,22 @@ async def test_preprocess_ordered_field_model_json_dump(plugin):
 
     val = result[0].product.model
     assert isinstance(val, str)
-    assert json.loads(val) == {
-        "schema": "freetext",
-        "raw": "x200",
-        "package": None,
-        "release_prefix": None,
-        "release_number": None,
-        "release_branch": None,
-        "build_number": None,
-        "qualifier": None,
-        "architecture": None,
-        "date": None,
-        "epoch": None,
-        "min_max_version": None,
-    }
+    assert json.loads(val) == [
+        {
+            "schema": "freetext",
+            "raw": "x200",
+            "package": None,
+            "release_prefix": None,
+            "release_number": None,
+            "release_branch": None,
+            "build_number": None,
+            "qualifier": None,
+            "architecture": None,
+            "date": None,
+            "epoch": None,
+            "min_max_version": None,
+        }
+    ]
 
 
 @pytest.mark.asyncio

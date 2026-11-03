@@ -1,0 +1,133 @@
+[Cachedb]
+host = "localhost"
+port = 2345
+database = "cachedb"
+username = "admin"
+password = "secret"
+
+[Assetsync]
+# Assetsync specific configuration
+
+[Assetsync.Synchronizer]
+# Synchronization interval in seconds.
+# The synchronizer will perform a fetching task every X seconds.
+# Mutually exclusive with fixed_time_of_day.
+sync_interval = 86400
+# OR: Run at a fixed time of day (mutually exclusive with sync_interval)
+# fixed_time_of_day = "03:00"  # Format: "HH:MM" in 24-hour format
+# Path to the directory containing asset data source plugin configuration TOML files
+plugin_configs_path = "./assets/plugin_configs/data_source/asset/"
+# When false, do not trigger the matcher after a successful sync batch is stored
+# This is true by default.
+# trigger_matcher_on_sync = false
+# Number of seconds before last successful run; entries older than (last_run - cleanup_grace_period)
+cleanup_grace_period = 86400
+cleanup_interval = 60
+
+# A list of preprocessor plugins. The order in which they are provided
+# here is the order in which they are executed on the data.
+preprocessor_plugins = ["identity", "default"]
+
+[Assetsync.Api]
+# The address to serve on
+# 0.0.0.0 means all interfaces
+host = "0.0.0.0"
+
+# The port to serve on.
+port = 8992
+
+access_token_expire_minutes = 120
+
+# Optional logging configuration for the assetsync component
+# If omitted, logs go to console with INFO level (or LOG_LEVEL env).
+[Assetsync.Logging]
+# File log level (console level is controlled via LOG_LEVEL env):
+# Accepted: "TRACE", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
+level = "TRACE"
+# When set, logs will also be written to this file with rotation
+file = "./logs/assetsync/assetsync.log"
+# Rotate when the file exceeds this many bytes (10 MiB default)
+max_bytes = 10485760
+# How many rotated files to keep
+backup_count = 5
+
+
+[Csafsync]
+# Csaf specific configuration
+
+[Csafsync.Synchronizer]
+# Synchronization interval in seconds.
+# The synchronizer will perform a fetching task every X seconds.
+# Mutually exclusive with fixed_time_of_day.
+sync_interval = 86400
+# OR: Run at a fixed time of day (mutually exclusive with sync_interval)
+# fixed_time_of_day = "03:00"  # Format: "HH:MM" in 24-hour format
+# Path to the directory containing CSAF data source plugin configuration TOML files
+plugin_configs_path = "./assets/plugin_configs/data_source/csaf"
+# When false, do not trigger the matcher after a successful sync batch is stored
+# This is true by default.
+# trigger_matcher_on_sync = false
+# Number of seconds before last successful run; entries older than (last_run - cleanup_grace_period)
+cleanup_grace_period = 86400
+cleanup_interval = 60
+
+# A list of preprocessor plugins. The order in which they are provided
+# here is the order in which they are executed on the data.
+preprocessor_plugins = ["identity", "default"]
+
+[Csafsync.Api]
+# The address to serve on
+# 0.0.0.0 means all interfaces
+host = "0.0.0.0"
+
+# The port to serve on.
+port = 8991
+
+access_token_expire_minutes = 120
+
+# Optional logging configuration for the csafsync component
+# If omitted, logs go to console with INFO level (or LOG_LEVEL env).
+[Csafsync.Logging]
+# File log level (console level is controlled via LOG_LEVEL env):
+# Accepted: "TRACE", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
+level = "TRACE"
+# When set, logs will also be written to this file with rotation
+file = "./logs/csafsync/csafsync.log"
+# Rotate when the file exceeds this many bytes (10 MiB default)
+max_bytes = 10485760
+# How many rotated files to keep
+backup_count = 5
+
+
+[Matcher]
+# Seconds between matching runs (mutually exclusive with fixed_time_of_day)
+sync_interval = 86400
+# OR: Run at a fixed time of day (mutually exclusive with sync_interval)
+# fixed_time_of_day = "02:30"  # Format: "HH:MM" in 24-hour format
+# Maximum duration in seconds for a matching run (optional)
+# If set, matching will gracefully stop after this duration, preserving all matches found.
+# max_duration = 3600  # Stop matching after 1 hour
+# Threshold for showing matches
+match_threshold = 70
+# Path to asset data source plugin configs used for the assetsync
+asset_plugins_path = "./assets/plugin_configs/data_source/asset"
+# Path to CSAF data source plugin configs used for the csafsync
+csaf_plugins_path = "./assets/plugin_configs/data_source/csaf"
+
+[Matcher.Api]
+host = "0.0.0.0"
+port = 8998
+access_token_expire_minutes = 120
+
+# Optional logging configuration for the matcher component
+# If omitted, logs go to console with INFO level (or LOG_LEVEL env).
+[Matcher.Logging]
+# File log level (console level is controlled via LOG_LEVEL env):
+# Accepted: "TRACE", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
+level = "TRACE"
+# When set, logs will also be written to this file with rotation
+file = "./logs/matcher/matcher.log"
+# Rotate when the file exceeds this many bytes (10 MiB default)
+max_bytes = 10485760
+# How many rotated files to keep
+backup_count = 5

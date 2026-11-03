@@ -1,0 +1,73 @@
+# Only run the integration tests
+name: Integration tests
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Installation is identical to ci.yml, then starts ISDuBA from dev/docker-compose.yml
+# The NetBox integration tests have their own compose stack
+# can't use dev/start-local-env.sh here as that is interactive
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Run minimal dev stack
+        run: |
+          cp dev/configuration/.env.example dev/.env
+          cp dev/configuration/.env.isduba.example dev/isduba/docker/.env
+          cat > assets/plugin_configs/data_source/csaf/isduba-local.toml <<'EOF'
+          [DataSource]
+          plugin_name = "isduba_fetcher"
+
+          [DataSource.Plugin]
+          url = "http://isduba.localhost"
+          keycloak_url = "http://keycloak.localhost"
+          keycloak_realm = "isduba"
+          username = "user"
+          password = "user"
+          verify_ssl = true
+          EOF
+          # Maybe needed
+          #echo "127.0.0.1 isduba.localhost keycloak.localhost netbox.localhost" | sudo tee -a /etc/hosts
+
+      - name: Start ISDuBA
+        run: |
+          docker compose -f dev/docker-compose.yml up -d --build traefik isduba-server keycloak-setup
+          # wait until keycloak-setup has run and exited
+          docker compose -f dev/docker-compose.yml wait keycloak-setup
+
+      - name: Upload test data (advisories)
+        run: |
+          cp dev/configuration/isduba-sources.example.json dev/configuration/isduba-sources.json
+          dev/isduba-set-sources.py
+
+      - name: Run the integration tests
+        env:
+          JWT_SECRET_KEY: dummy_secret_key_for_testing
+        run: uv run pytest -m integration
+
+      - name: Show container logs
+        if: failure()
+        run: docker compose -f dev/docker-compose.yml logs --no-color --tail 200 traefik keycloak keycloak-setup isduba-server
+
+      - name: Stop ISDuBA
+        if: always()
+        run: docker compose -f dev/docker-compose.yml down --volumes

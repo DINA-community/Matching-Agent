@@ -2,7 +2,7 @@
 
 PLUGINS = ["csaf", "d3c"]
 
-# # Configuration for local use of synchronisers and isduba'
+# Configuration for local use of synchronisers and isduba'
 # PLUGINS_CONFIG = {
 #   "d3c": {
 #     'top_level_menu': True
@@ -16,7 +16,7 @@ PLUGINS = ["csaf", "d3c"]
 #     },
 #     'synchronisers': {
 #         'username': 'admin',
-#         'password': '<password>',
+#         'password': 'admin',
 #         'verify_ssl': False,
 #         'urls': [
 #             {
