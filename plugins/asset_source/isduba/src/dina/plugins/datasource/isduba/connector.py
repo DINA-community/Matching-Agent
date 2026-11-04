@@ -75,6 +75,7 @@ def get_product_identification_helper(
         model_numbers=data.get("model_numbers"),
         skus=data.get("skus"),
         sbom_urls=data.get("sbom_urls"),
+        x_generic_uris=data.get("x_generic_uris"),
         serial_numbers=data.get("serial_numbers"),
     )
 

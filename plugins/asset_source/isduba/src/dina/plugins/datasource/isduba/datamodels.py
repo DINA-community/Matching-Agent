@@ -12,6 +12,7 @@ class ProductIdentificationHelper:
     model_numbers: Optional[List[str]] = None
     skus: Optional[List[str]] = None
     sbom_urls: Optional[List[str]] = None
+    x_generic_uris: Optional[List[dict[str, str]]] = None
     serial_numbers: Optional[List[str]] = None
 
 

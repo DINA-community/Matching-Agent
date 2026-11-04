@@ -175,7 +175,7 @@ class Score:
         )
 
         if cpe_score == 1.0 or purl_score == 1.0:
-            score_percent = 1.0
+            score_percent = 100.0
         else:
             scores = np.array(scores, dtype=float)
             weights = np.array(weights, dtype=float)

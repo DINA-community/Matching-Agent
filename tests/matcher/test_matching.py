@@ -541,3 +541,34 @@ def test_match_other_fields_various(matcher, df_data):
     result = matcher._match_other_fields(df, "csaf_cpe", "csaf_purl")
     assert isinstance(result, pl.DataFrame)
     assert result is not None
+
+
+# -------------------------------
+# PRODUCT IDENTIFICATION HELPER FIELDS
+# -------------------------------
+
+
+@pytest.mark.parametrize(
+    "field,csaf,asset,expected",
+    [
+        ("serial_numbers", ["SN-1"], ["sn-1 "], 1.0),
+        ("serial_numbers", ["SN-1"], ["SN-2"], 0.0),
+        ("serial_numbers", ["SN-1"], [], None),
+        ("model_numbers", ["1", "2"], ["2"], 1.0),
+        ("part_numbers", ["A"], ["B"], 0.0),
+        ("hashes", ["sha256:abc"], ["sha256:abc"], 1.0),
+        ("hashes", ["sha256:abc"], ["md5:abc"], 0.0),
+        ("sbom_urls", ["https://x.org/a.json"], ["https://x.org/a.json"], 1.0),
+        ("sbom_urls", ["https://x.org/A.json"], ["https://x.org/a.json"], 0.0),
+    ],
+)
+def test_match_identifier_fields(field, csaf, asset, expected):
+    matcher = Matching({"database": {"other_fields": {field: 1.0}}})
+    csaf_col, asset_col = f"csaf_{field}", f"asset_{field}"
+    df = pl.DataFrame(
+        {csaf_col: [csaf], asset_col: [asset]},
+        schema={csaf_col: pl.List(pl.String), asset_col: pl.List(pl.String)},
+    )
+    result = matcher._match_other_fields(df, "csaf_cpe", "csaf_purl")
+    assert result[f"{field}_match"].item() == expected
+    

@@ -69,6 +69,9 @@ The data originates either from **NetBox** (assets) or from **CSAF documents** (
    * - ``sbom_urls``
      - ``dict``
      - URLs of SBOM documents related to the product. NetBox: ``D3C:Software:{Software}:SBOM URLs``. ISDuBA: ``$.product_tree.full_product_names[*].product_identification_helper.sbom_urls``.
+   * - ``x_generic_uris``
+     - ``list[dict]``
+     - Generic identifiers as ``namespace``/``uri`` pairs. NetBox: D3C ``XGenericUri`` records attached to software or device types. ISDuBA: ``$.product_tree..product_identification_helper.x_generic_uris``. Matching requires an exact, case-sensitive pair.
    * - ``serial_numbers``
      - ``dict``
      - Serial numbers of the product. NetBox: ``Devices:{Device}:Serial Number``. ISDuBA: ``$.product_tree..product_identification_helper.serial_number[*]``.
