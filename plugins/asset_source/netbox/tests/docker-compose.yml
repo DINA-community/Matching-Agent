@@ -52,7 +52,7 @@ services:
     volumes:
       - ../../../../dev/configuration/configuration.py:/etc/netbox/config/configuration.py:ro
       - ../../../../dev/configuration/plugins.py.example:/etc/netbox/config/plugins.py:ro
-      - ../../../../dev/init-scripts:/opt/netbox/init-scripts:ro
+      - ../../../../dev/scripts-install:/opt/netbox/scripts-install:ro
       - ./netbox-entrypoint.sh:/opt/netbox/test-entrypoint.sh:ro
       - ../../../../dev/plugins/d3c:/test-plugins/d3c:ro
       - ../../../../dev/plugins/csaf:/test-plugins/csaf:ro

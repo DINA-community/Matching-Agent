@@ -12,7 +12,9 @@ from dina.synchronizer.plugin_base.data_source import DataSourceConfig, DataSour
 
 @pytest.mark.integration
 @pytest.mark.parametrize("string_id", [False, True], ids=["integer-id", "string-id"])
-def test_software_resource_url_retrieves_real_record(netbox_client: httpx.Client, string_id: bool) -> None:
+def test_software_resource_url_retrieves_real_record(
+    netbox_client: httpx.Client, string_id: bool
+) -> None:
     """Create software through D3C and retrieve it using the connector's URL."""
     client = netbox_client
     base_url = str(client.base_url)
@@ -23,12 +25,16 @@ def test_software_resource_url_retrieves_real_record(netbox_client: httpx.Client
             DataSource=DataSourceConfig(
                 plugin_name="netbox",
                 publish_matches=False,
-                Plugin=NetboxDataSource.Config(api_url=HttpUrl(base_url), api_token=token),
+                Plugin=NetboxDataSource.Config(
+                    api_url=HttpUrl(base_url), api_token=token
+                ),
             )
         )
     )
     name = f"url-test-{uuid4().hex}"
-    manufacturer_response = client.post("/api/dcim/manufacturers/", json={"name": name, "slug": name})
+    manufacturer_response = client.post(
+        "/api/dcim/manufacturers/", json={"name": name, "slug": name}
+    )
     print(manufacturer_response.status_code, manufacturer_response.text)
     assert manufacturer_response.status_code == 201, manufacturer_response.text
     manufacturer = manufacturer_response.json()
