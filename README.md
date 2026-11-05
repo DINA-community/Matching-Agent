@@ -10,17 +10,15 @@ It includes two concrete implementations:
 Furthermore, it includes the matcher implementation that uses the data from the synchronizers to match assets.
 The matches can be retrieved via a REST API, and alternatively, a hook can be set up to be notified of new matches (WIP).
 
-## Feature Matrix
+## Open Feature Matrix
 
-| Feature                | Status  | Notes                                                                        |
-|------------------------|-------- |------------------------------------------------------------------------------|
-| Asset Synchronization  | ✅ Done | Basic asset data syncing implemented                                         |
-| CSAF Synchronization   | ✅ Done | CSAF advisory data syncing implemented                                       |
-| Asset-CSAF Matching    | ✅ Done | A simple Matcher that matches everything with maximum score.                 |
-| Useable Matching       | 🚧 WIP  | A reliable matching algorithm that properly assigns match probabilities.     |
-| REST API               | 🚧 WIP  | Groundwork has been done. Need to specify API                                |
-| Webhook Notifications  | 🚧 WIP  | Notification system being developed                                          |
-| Plugin System          | ✅ Done | Extensible plugin architecture ready                                         |
+| Feature                | Milestone | Notes                                                                        |
+|------------------------|---------- |------------------------------------------------------------------------------|
+| Useable Matching       | algorithm | A reliable matching algorithm that properly assigns match probabilities.     |
+| REST API               | backlog   | Groundwork has been done. Need to specify API                                |
+| Webhook Notifications  | backlog   | Notification system being developed                                          |
+| Vulnerability Handling | workflow  | The workflow has to be more intuitive and correct                            |
+| Production side        | production| Installation in productive environment                                       |
 
 ## Project Structure
 
@@ -30,7 +28,7 @@ The matches can be retrieved via a REST API, and alternatively, a hook can be se
 - `src/dina/matcher/`: Main package.
 - `plugins/`: Plugin implementations for extending functionality.
 
-For more details about the synchronizer infrastructure, see the Synchronizer Infrastructure README. (TODO)
+For more details about the synchronizer infrastructure, see the Synchronizer Infrastructure in docs.
 
 ## Documentation
 
@@ -41,7 +39,8 @@ Read the [documentation](https://dina-community.github.io/Matching-Agent/) onlin
 
 ### Requirements
 
-Make sure you have the following requirements installed:
+Make sure you have the following requirements installed, In case of a [fully local setup](#fully-local-setup-for-netbox-plugin) the
+requirements can be installed on the system by the script:
 
 - [uv](https://docs.astral.sh/uv/) (0.9 or newer)
 - git
@@ -77,7 +76,7 @@ To set up a development environment, follow the steps below.
 
 ### Fully Local Setup for Netbox-Plugin
 
-Using the helper script `./dev/start-local-env.sh`, a full local development stack with the asset source plugins `isduba` and `netbox` can e set up using the provided sample files.
+Using the helper script `./dev/start-local-env.sh`, a full local development stack with the asset source plugins `isduba` and `netbox` is set up using the provided sample files. Also, the requirements can be installed by it at the beginning.
 
 To configure the environment variables, modify the values as needed in the `.env.example` file. After startup, the API token is printed. This information is needed for the [configuration of the NetBox plugin](#configure-plugins). You can retrieve the NetBox API token any time from the setup container logs:
 

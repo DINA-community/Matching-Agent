@@ -57,6 +57,16 @@ This section provides an overview of the project’s directory and package struc
 
 Quick start
 -----------
+
+If you want to get started as quickly as possible, run the install script. It will install requirements,
+set up the tutorial data for assets and csaf documents:
+
+.. code-block:: bash
+
+   bash dev/start-local-env.sh
+
+If you want to get familiar with the project, follow these steps to set up a local development environment:
+
 1) Clone the repository:
 
    .. code-block:: bash
@@ -97,23 +107,30 @@ Quick start
        your system ``PATH`` (or set ``JAVA_HOME``) before running the above command. Without Java, installation of the
        ISDuBA plugin will fail.
 
-3) Start local supporting services
-    You can use the helper script (recommended) or run Docker Compose directly.
+3) Configure plugins
 
-    - Recommended: use the dev helper script to start/stop/recreate the local stack
+   Copy and adapt sample configuration files from ``assets/plugin_configs`` to enable data sources:
 
-    .. code-block:: bash
+   .. note::
+      Datasource plugins are expected to fetch valid source data. For CSAF sources, this means the
+      fetched CSAF documents must already be valid at the upstream source system.
 
-        ./dev/start-local-env.sh                   # Default: equals --up
-        ./dev/start-local-env.sh  -c, --clean      # Remove local images and configs.
-        ./dev/start-local-env.sh  -d, --down       # Stop and remove services.
-        ./dev/start-local-env.sh  -n, --new        # Full reset -d -v -u
-        ./dev/start-local-env.sh  -r, --recreate   # Recreate containers. (up -d --force-recreate --remove-orphans))
-        ./dev/start-local-env.sh  -s, --stop       # Stop services.
-        ./dev/start-local-env.sh  -u, --up         # Start services. (default)
-        ./dev/start-local-env.sh  -v, --volumes    # Remove named volumes (with --down or --recreate).
+   - NetBox fetcher (asset source):
 
-    - Alternative: run Docker Compose directly
+     - Copy: ``assets/plugin_configs/data_source/asset/sample/netbox.toml``
+       to a new file in ``assets/plugin_configs/data_source/asset/`` (e.g. ``netbox-local.toml``)
+     - Set ``url`` (e.g. http://netbox.localhost/) and ``api_token`` (see token from setup logs)
+
+   - ISDuBA fetcher (CSAF source):
+
+     - Copy: ``assets/plugin_configs/data_source/csaf/sample/isduba.toml``
+       to a new file in ``assets/plugin_configs/data_source/csaf/`` (e.g. ``isduba-local.toml``)
+     - Set ``url`` (e.g. http://isduba.localhost/), ``username``/``password`` (default user/user), and
+       ``keycloak_url`` (e.g. http://keycloak.localhost/)
+
+4) Start local supporting services
+
+    run Docker Compose directly
 
     .. code-block:: bash
 
@@ -154,45 +171,37 @@ Quick start
       Changes to frontend code (HTML, JS, CSSS) don't need a restart and only a reload in the browser.
 
    .. note::
-      The CSAF documents in ``documents_dir`` are uploaded in ISDuBA upon startup, ensuring there is CSAF data available without manual setup.
-
-      The setup runs as part of ``./dev/start-local-env.sh``. It can also be run on its own:
+      The CSAF documents in ``./dev/test-cases/csaf_files`` can be uploaded in ISDuBA upon startup, 
+      ensuring there is CSAF data available without manual setup. It can be run by:
 
       .. code-block:: bash
 
-        ./dev/isduba-set-sources.py
+        uv run python3 ./dev/isduba-set-sources.py
 
       Additionally, some CSAF providers can be automatically configured too:
 
       .. code-block:: bash
 
-        ./dev/isduba-set-sources.py  --configure-sources
+        uv run python3 ./dev/isduba-set-sources.py  --configure-sources
 
       The default providers are small vendor providers to keep the data modest in size.
 
       The sources are defined in ``dev/configuration/isduba-sources.json``, which is created from the template ``dev/configuration/isduba-sources.example.json`` on first run.
 
-4) Configure plugins
+5) set the default password for the matcher API user (admin/admin) in the local environment for API access:
 
-   Copy and adapt sample configuration files from ``assets/plugin_configs`` to enable data sources:
+   .. code-block:: bash
 
-   .. note::
-      Datasource plugins are expected to fetch valid source data. For CSAF sources, this means the
-      fetched CSAF documents must already be valid at the upstream source system.
+      uv run csaf_matcher_cli user create -u admin
 
-   - NetBox fetcher (asset source):
+6) Load default data (optional)
 
-     - Copy: ``assets/plugin_configs/data_source/asset/sample/netbox.toml``
-       to a new file in ``assets/plugin_configs/data_source/asset/`` (e.g. ``netbox-local.toml``)
-     - Set ``url`` (e.g. http://netbox.localhost/) and ``api_token`` (see token from setup logs)
+   The project includes a small set of sample data for testing and development purposes. You can load it into the local database with:
 
-   - ISDuBA fetcher (CSAF source):
+   .. code-block:: bash
 
-     - Copy: ``assets/plugin_configs/data_source/csaf/sample/isduba.toml``
-       to a new file in ``assets/plugin_configs/data_source/csaf/`` (e.g. ``isduba-local.toml``)
-     - Set ``url`` (e.g. http://isduba.localhost/), ``username``/``password`` (default user/user), and
-       ``keycloak_url`` (e.g. http://keycloak.localhost/)
-
+      uv run python3 ./dev/isduba-set-sources.py
+      uv run python3 ./dev/test-cases/load-test-data.py
 
 .. _running-services:
 
@@ -315,7 +324,7 @@ They are marked with ``integration``. To run them:
 .. code-block:: bash
 
     ./dev/start-local-env.sh
-    ./dev/isduba-set-sources.py
+    uv run python3 ./dev/isduba-set-sources.py
     uv run pytest -m integration
 
 They have these requirements and fail if these are not met:

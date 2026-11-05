@@ -452,10 +452,9 @@ checks() {
 		need_cmd docker
 		COMPOSE_CMD=$(ensure_compose)
 	else # Skipping unnecessary checks for cleaning
-		## INSTALL DEPENDENCIES
+		need_dep
 		need_env
 		need_plugins
-		need_dep
 		need_cmd docker
 		COMPOSE_CMD=$(ensure_compose)
 		need_cmd git
@@ -516,8 +515,8 @@ execute() {
 		remove_local_configs
 		remove_plugins_config
 		info "--[EXE] New installation"
-		need_env
     	need_dep
+		need_env
 		ensure_local_configs
 		$COMPOSE_CMD -f "$COMPOSE_FILE" up -d --build --force-recreate --remove-orphans
 		;;
@@ -689,8 +688,8 @@ cleanup() {
 		# Start API
 		set_api_matcher	
 		local excess
-		if check_response "Do you want to start the apis right away? [y/N]" "N"; then
-			if check_response "Do you execute the APIs in separate windows each (Y) or all in this terminal (N) [y/N]" "N"; then
+		if check_response "Do you want to start the apis right away? [Y/n]" "Y"; then
+			if check_response "Do you execute the APIs in separate windows each (Y) or all in this terminal (N) [Y/n]" "Y"; then
 				excess="separate"
 			else
 				excess="terminal"

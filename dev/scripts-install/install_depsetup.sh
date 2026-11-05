@@ -75,6 +75,38 @@ aur_install() {
 	return 1
 }
 
+# Check for uv
+dep "Checking for uv..."
+if ! command -v uv >/dev/null 2>&1; then
+	dep "Installing uv via pipx..."
+	pipx install uv
+else
+	dep "Found a uv installation"
+fi
+
+# Check for docker
+dep "Checking for docker.."
+if ! command -v docker >/dev/null 2>&1; then
+	dep "Installing docker.."
+
+	if [[ "$package_manager" == "apt" ]]; then
+		source ./dev/scripts-install/install_dockerrepo.sh
+		pkg_update
+	fi
+
+	pkg_install "${docker_packages[@]}"
+else
+	dep "Found a docker installation"
+fi
+
+if id -nG "$suser" | grep -qw docker; then
+  :
+else
+  sudo usermod -aG docker "$suser" || { echo "usermod failed" >&2; exit 1; }
+  echo "--[DOCKER] added user $suser to docker group; re-login (or: newgrp docker) required"
+  exit 1
+fi
+
 # Install git, curl, certificate-keyring and pipx
 dep "Installing the Basics.."
 pkg_update
@@ -110,37 +142,7 @@ if check_response "Do you want to install xdg-terminal-exec? [y/N] " "N"; then
 	fi
 fi
 
-# Check for uv
-dep "Checking for uv..."
-if ! command -v uv >/dev/null 2>&1; then
-	dep "Installing uv via pipx..."
-	pipx install uv
-else
-	dep "Found a uv installation"
-fi
 
-# Check for docker
-dep "Checking for docker.."
-if ! command -v docker >/dev/null 2>&1; then
-	dep "Installing docker.."
-
-	if [[ "$package_manager" == "apt" ]]; then
-		source ./dev/scripts-install/install_dockerrepo.sh
-		pkg_update
-	fi
-
-	pkg_install "${docker_packages[@]}"
-else
-	dep "Found a docker installation"
-fi
-
-if id -nG "$suser" | grep -qw docker; then
-  :
-else
-  sudo usermod -aG docker "$suser" || { echo "usermod failed" >&2; exit 1; }
-  echo "--[DOCKER] added user $suser to docker group; re-login (or: newgrp docker) required"
-  exit 1
-fi
 
 dep "All Dependencies installed"
 }
