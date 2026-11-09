@@ -75,6 +75,7 @@ aur_install() {
 	return 1
 }
 
+
 # Check for uv
 dep "Checking for uv..."
 if ! command -v uv >/dev/null 2>&1; then
@@ -141,7 +142,6 @@ if check_response "Do you want to install xdg-terminal-exec? [y/N] " "N"; then
 		pkg_install xdg-terminal-exec
 	fi
 fi
-
 
 
 dep "All Dependencies installed"

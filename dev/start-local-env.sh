@@ -231,11 +231,9 @@ remove_files() {
 
 remove_local_configs() {
 	# Ask for confirmation at the beginning for a full cleanup
-	local confirm_all=true
 	local removed=false
-	if $clean_full; then
-		confirm_all=true
-	else
+	local confirm_all="${1:-false}"
+	if [[ "$confirm_all" != true ]]; then
 		if check_response "--[EXE] Remove all local files directly? [Y/n]" "Y"; then
 			confirm_all=true
 		else
@@ -284,6 +282,7 @@ remove_local_configs() {
 
 remove_plugins_config() {
 	local plugins_file=$PLUGINS_FILE
+	local clean_full="${1:-false}"
 	if [[ $clean_full == true && -f "$plugins_file" ]]; then
 		rm -f "$plugins_file"
 	elif [[ -f "$plugins_file" ]]; then	
@@ -452,8 +451,8 @@ checks() {
 		need_cmd docker
 		COMPOSE_CMD=$(ensure_compose)
 	else # Skipping unnecessary checks for cleaning
-		need_dep
 		need_env
+		need_dep
 		need_plugins
 		need_cmd docker
 		COMPOSE_CMD=$(ensure_compose)
@@ -485,13 +484,15 @@ execute() {
 	info "## Execute Action $ACTION"
 	case "$ACTION" in
 	clean)
+		local clean_full=false
+		stop_apis
 		info "--[EXE] Cleaning local development environment..."
 		if check_response "Do you want to delete all settings? [Y/n]" "Y"; then
-			$clean_full=true
+			local clean_full=true
 		fi
 		prune_project_images "$COMPOSE_FILE"
-		remove_local_configs
-		remove_plugins_config
+		remove_local_configs $clean_full
+		remove_plugins_config $clean_full
 		info "--[EXE] Clean complete."
 		exit 0
 		;;
@@ -510,13 +511,12 @@ execute() {
 		stop_apis
 		info "--[EXE] Remove everything"
 		$COMPOSE_CMD -f "$COMPOSE_FILE" down -v
-		clean_full=true
 		prune_project_images "$COMPOSE_FILE"
-		remove_local_configs
-		remove_plugins_config
+		remove_local_configs true
+		remove_plugins_config true
 		info "--[EXE] New installation"
-    	need_dep
 		need_env
+    	need_dep
 		ensure_local_configs
 		$COMPOSE_CMD -f "$COMPOSE_FILE" up -d --build --force-recreate --remove-orphans
 		;;
