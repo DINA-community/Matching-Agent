@@ -21,6 +21,7 @@ Contents
    production-setup
    troubleshooting
    tutorial
+   workflow/indexs
 
 
 Indices and tables

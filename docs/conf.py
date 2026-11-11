@@ -56,6 +56,7 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
+    "sphinx.ext.todo",
     "sphinxcontrib.programoutput",
 ]
 
@@ -79,6 +80,7 @@ napoleon_google_docstring = True
 napoleon_numpy_docstring = True
 napoleon_include_init_with_doc = True
 napoleon_attr_annotations = True
+todo_include_todos= True
 
 # Make autodoc include members by default
 autodoc_default_options = {
