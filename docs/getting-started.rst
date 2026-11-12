@@ -152,6 +152,16 @@ If you want to get familiar with the project, follow these steps to set up a loc
         docker compose -f dev/docker-compose.yml logs netbox-setup
 
    .. note::
+      By default the services listen on all addresses.
+      Set ``BIND_IP`` in ``dev/.env`` to listen on specific addresses only.
+      Note that ``*.localhost`` resolves to ``127.0.0.1``,
+      so you need to add the hostname the ``/etc/hosts``:
+
+      .. code-block:: text
+
+         127.30.0.1  netbox.localhost isduba.localhost keycloak.localhost traefik.localhost
+
+   .. note::
       The NetBox plugins ``csaf`` and ``d3c`` are included as git submodules at ``dev/plugins/csaf`` and ``dev/plugins/d3c``.
       The directories are bind-mounted into the containers ``netbox`` and ``netbox-worker`` and installed in editable mode.
       After making changes to the backend code of netbox modules, either restart the affected containers:
@@ -171,7 +181,7 @@ If you want to get familiar with the project, follow these steps to set up a loc
       Changes to frontend code (HTML, JS, CSSS) don't need a restart and only a reload in the browser.
 
    .. note::
-      The CSAF documents in ``./dev/test-cases/csaf_files`` can be uploaded in ISDuBA upon startup, 
+      The CSAF documents in ``./dev/test-cases/csaf_files`` can be uploaded in ISDuBA upon startup,
       ensuring there is CSAF data available without manual setup. It can be run by:
 
       .. code-block:: bash
