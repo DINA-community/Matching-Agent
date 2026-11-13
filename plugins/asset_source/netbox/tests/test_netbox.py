@@ -439,6 +439,7 @@ async def test_v2_authorization_on_requests(mock_config):
 
     assert sent_requests
     assert all(
-        request.headers["Authorization"] == f"Bearer {mock_config.config.DataSource.Plugin.api_token}"
+        request.headers["Authorization"]
+        == f"Bearer {mock_config.config.DataSource.Plugin.api_token}"
         for request in sent_requests
     )

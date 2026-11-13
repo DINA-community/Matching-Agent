@@ -32,7 +32,7 @@ Use this option only if you have your own asset database and want to check it ag
 
    List of aggregators. 
 
-In the settings for this :ref:`csaf-aggregator`, delete the IT feed since we focuses on the OT part. 
+In the settings for this :ref:`figure below <csaf-aggregator>`, delete the IT feed since we focuses on the OT part. 
 
 .. figure:: images/tutorial-isduba-setup-3.png
    :width: 600px
@@ -40,7 +40,7 @@ In the settings for this :ref:`csaf-aggregator`, delete the IT feed since we foc
    :name: csaf-aggregator
    :alt: Save Source
 
-   Save a selected source. Here the IT feed of CISA was delisted.
+   Save a selected source. Here, the IT feed of CISA was delisted.
 
 After this, the source is not active yet. Here, the :ref:`checkbox <csaf-cisa-active>` has to be selected.
 

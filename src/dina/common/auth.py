@@ -26,7 +26,7 @@ load_dotenv(find_dotenv(usecwd=True))
 SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 if SECRET_KEY is None:
     exit(
-        "JWT_SECRET_KEY not set. Please set the envrionment variable to a securely generated random value.\n"
+        "JWT_SECRET_KEY not set. Please set the environment variable to a securely generated random value.\n"
         'Use for example `echo "export JWT_SECRET_KEY=$(openssl rand -hex 32)" >> .env` to generate a random key.\n'
         "The key is added to a local .env file which is loaded by the executable."
     )

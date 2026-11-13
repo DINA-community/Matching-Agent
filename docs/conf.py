@@ -43,6 +43,7 @@ else:
     # Last resort: try importlib.metadata if the package is installed
     try:
         from importlib.metadata import version as _dist_version
+
         release = _dist_version(project)
         version = ".".join(release.split(".")[:2])
     except Exception:
