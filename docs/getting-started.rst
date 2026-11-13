@@ -154,8 +154,8 @@ If you want to get familiar with the project, follow these steps to set up a loc
    .. note::
       By default the services listen on all addresses.
       Set ``BIND_IP`` in ``dev/.env`` to listen on specific addresses only.
-      Note that ``*.localhost`` resolves to ``127.0.0.1``,
-      so you need to add the hostname the ``/etc/hosts``:
+      Note that ``*.localhost`` resolves to ``127.0.0.1`` by default.
+      It can be changed by adding the ``/etc/hosts``:
 
       .. code-block:: text
 
