@@ -143,3 +143,9 @@ algorithm is at place. There, score and description have to be revised.
    * - ``Description``
      - N/A
      - .. deprecated:: v2.0.0-alpha
+
+
+D3C Filter
+----------
+
+All filters and edit should be revised, also for d3c plugin in the same manner

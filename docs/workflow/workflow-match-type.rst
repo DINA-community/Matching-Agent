@@ -35,6 +35,12 @@ Combine views
 - http://netbox.localhost/dcim/modules/withmatches/
 - http://netbox.localhost/dcim/modules/
 
+Check ...
+
+- duplicates
+- matches
+- match on device
+
 
 Data Model
 ^^^^^^^^^^
