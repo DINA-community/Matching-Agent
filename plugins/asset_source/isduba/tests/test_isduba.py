@@ -41,7 +41,10 @@ def mock_config():
 
 
 # Assumes it was written by dev/start-local-env.sh, CI, or some other automation
-LIVE_CONFIG = Path(__file__).parents[4] / "assets/plugin_configs/data_source/csaf/isduba-local.toml"
+LIVE_CONFIG = (
+    Path(__file__).parents[4]
+    / "assets/plugin_configs/data_source/csaf/isduba-local.toml"
+)
 
 
 @pytest.fixture(params=["mock", pytest.param("live", marks=pytest.mark.integration)])
@@ -63,17 +66,25 @@ def plugin_config(backend, mock_config):
         with LIVE_CONFIG.open("rb") as file:
             plugin_data = tomllib.load(file)["DataSource"]["Plugin"]
     except (OSError, KeyError, tomllib.TOMLDecodeError) as e:
-        pytest.fail(f"Integation tests: cannot load {LIVE_CONFIG}: {e!s}", pytrace=False)
+        pytest.fail(
+            f"Integation tests: cannot load {LIVE_CONFIG}: {e!s}", pytrace=False
+        )
     try:
-        httpx.get(plugin_data["url"], verify=plugin_data["verify_ssl"]).raise_for_status()
+        httpx.get(
+            plugin_data["url"], verify=plugin_data["verify_ssl"]
+        ).raise_for_status()
     except httpx.HTTPError as e:
-        pytest.fail(f"Integration tests: ISDuBA at {plugin_data['url']} is unreachable: {e!s}",
-                    pytrace=False)
+        pytest.fail(
+            f"Integration tests: ISDuBA at {plugin_data['url']} is unreachable: {e!s}",
+            pytrace=False,
+        )
     return SimpleNamespace(DataSource=SimpleNamespace(Plugin=plugin_data))
 
 
 # The query fetch_products sends, ISDuBA filters the documents by it
-QUERY = re.compile(r"\$current_release_date (\S+) timestamp >= \$current_release_date (\S+) timestamp <=")
+QUERY = re.compile(
+    r"\$current_release_date (\S+) timestamp >= \$current_release_date (\S+) timestamp <="
+)
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
 
@@ -85,7 +96,9 @@ class FakeIsdubaApi:
 
     def _authorize(self):
         if self.api_client.configuration.api_key["bearerAuth"] != "fake-token":
-            raise isduba_api_client.exceptions.UnauthorizedException(status=401, reason="Unauthorized")
+            raise isduba_api_client.exceptions.UnauthorizedException(
+                status=401, reason="Unauthorized"
+            )
 
     async def documents_get(self, limit=None, offset=0, query=None, orders=None):
         self._authorize()
@@ -94,7 +107,13 @@ class FakeIsdubaApi:
         documents = [
             meta
             for meta in DOCS_META  # already ordered by descending `critical` value
-            if since <= datetime.fromisoformat(ISDUBA_DOCUMENTS[meta["id"]]["document"]["tracking"]["current_release_date"]) <= until
+            if since
+            <= datetime.fromisoformat(
+                ISDUBA_DOCUMENTS[meta["id"]]["document"]["tracking"][
+                    "current_release_date"
+                ]
+            )
+            <= until
         ][offset : offset + limit]
         # ISDuBA returns no list instead of an empty one
         return SimpleNamespace(documents=documents or None)
@@ -102,7 +121,9 @@ class FakeIsdubaApi:
     async def documents_id_get(self, doc_id):
         self._authorize()
         if doc_id not in ISDUBA_DOCUMENTS:
-            raise isduba_api_client.exceptions.NotFoundException(status=404, reason="Not Found")
+            raise isduba_api_client.exceptions.NotFoundException(
+                status=404, reason="Not Found"
+            )
         return ISDUBA_DOCUMENTS[doc_id]
 
 
@@ -138,9 +159,13 @@ async def test_fetch_products_with_docs(monkeypatch, backend, plugin_config):
 
     assert result.again is True
     assert isinstance(result.data, list)
-    assert {p.origin_info["path"] for p in result.data} == {f"/api/documents/{doc_id}" for doc_id in ISDUBA_DOCUMENTS}
+    assert {p.origin_info["path"] for p in result.data} == {
+        f"/api/documents/{doc_id}" for doc_id in ISDUBA_DOCUMENTS
+    }
     # The products of the most critical document come first
-    assert result.data[0].uri.startswith(f"{plugin.origin_uri}api/documents/{DOCS_META[0]['id']}#")
+    assert result.data[0].uri.startswith(
+        f"{plugin.origin_uri}api/documents/{DOCS_META[0]['id']}#"
+    )
 
 
 @pytest.mark.asyncio
@@ -171,7 +196,9 @@ async def test_fetch_products_invalid_token(monkeypatch, backend, plugin_config)
 
 
 @pytest.mark.asyncio
-async def test_cleanup_products_returns_expected_decisions(monkeypatch, backend, plugin_config):
+async def test_cleanup_products_returns_expected_decisions(
+    monkeypatch, backend, plugin_config
+):
     """Tests that cleanup_products correctly returns CleanUpDecision objects."""
 
     plugin = IsdubaDataSource(plugin_config)

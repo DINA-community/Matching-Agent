@@ -60,22 +60,22 @@
     {
       "manufacturer": "Unspecified",
       "model": "unspecified  unspecified",
-      "slug": "unspecified  unspecified",
+      "slug": "unspecified-unspecified",
       "part_number": "",
       "description": "",
       "comments": "",
       "custom_fields": {
         "model_number": "unspecified",
         "device_family": "unspecified",
-        "hardware_name": "",
-        "hardware_version": "",
+        "hardware_name": "-",
+        "hardware_version": "-",
         "device_description": ""
       }
     },
     {
       "manufacturer": "Siemens",
       "model": "SCALANCE Hardware SC622-2C 6GK5622-2GS00-2AC2 1.2",
-      "slug": "SCALANCE Hardware SC622-2C 6GK5622-2GS00-2AC2 1.2",
+      "slug": "scalance-hardware-sc622-2c-6gk5622-2gs00-2ac2-1-2",
       "part_number": "6GK5622-2GS00-2AC2",
       "description": "",
       "comments": "",
@@ -89,23 +89,23 @@
     },
     {
       "manufacturer": "Siemens",
-      "model": "SIMATIC  ",
-      "slug": "SIMATIC  ",
+      "model": "SIMATIC",
+      "slug": "simatic",
       "part_number": "",
       "description": "",
       "comments": "",
       "custom_fields": {
-        "model_number": "",
+        "model_number": "-",
         "device_family": "SIMATIC",
-        "hardware_name": "",
-        "hardware_version": "",
+        "hardware_name": "-",
+        "hardware_version": "-",
         "device_description": ""
       }
     },
     {
       "manufacturer": "ABB",
       "model": "NEXUS Series NEX-2 3.08.01",
-      "slug": "NEXUS-Series-NEX-2-3-08-01",
+      "slug": "nexus-series-nex-2-3-08-01",
       "part_number": "",
       "description": "NEXUS Series",
       "comments": "Data for icsa-25-007-01 matching CSAFID 7, 9, 13",
@@ -121,7 +121,7 @@
     {
       "manufacturer": "ABB",
       "model": "NEXUS Series NEX-2 3.08.00",
-      "slug": "NEXUS-Series-NEX-2-3-08-00",
+      "slug": "nexus-series-nex-2-3-08-00",
       "part_number": "",
       "description": "",
       "comments": "Matchting icsa-25-007-01 CSAFID 7 , 9 ,11 12, 13",
@@ -137,7 +137,7 @@
     {
       "manufacturer": "Siemens",
       "model": "SIPLUS ET 200MP 6AG1155-5AA00-2AC0",
-      "slug": "SIPLUS-ET-200MP-6AG1155-5AA00-2AC0",
+      "slug": "siplus-et-200mp-6ag1155-5aa00-2ac0",
       "part_number": "6AG1155-5AA00-2AC0",
       "description": "",
       "comments": "",
@@ -146,14 +146,14 @@
         "model_number": "ET",
         "device_family": "SIPLUS",
         "hardware_name": "200MP",
-        "hardware_version": "",
+        "hardware_version": "-",
         "device_description": ""
       }
     },
     {
       "manufacturer": "Siemens",
       "model": "SIPLUS ET 200MP",
-      "slug": "SIPLUS-ET-200MP",
+      "slug": "siplus-et-200mp",
       "part_number": "",
       "description": "",
       "comments": "",
@@ -162,14 +162,14 @@
         "model_number": "ET 200MP",
         "device_family": "SIPLUS",
         "hardware_name": "-",
-        "hardware_version": "",
+        "hardware_version": "-",
         "device_description": ""
       }
     },
     {
       "manufacturer": "Siemens",
       "model": "SIPLUS ET 200SP",
-      "slug": "SIPLUS-ET-200SP",
+      "slug": "siplus-et-200sp",
       "part_number": "",
       "description": "",
       "comments": "",
@@ -178,14 +178,14 @@
         "model_number": "ET",
         "device_family": "SIPLUS",
         "hardware_name": "200SP",
-        "hardware_version": "",
+        "hardware_version": "-",
         "device_description": ""
       }
     },
     {
       "manufacturer": "Schneider Electric",
       "model": "Modicon Controllers M241 5.2.11.29",
-      "slug": "Modicon-Controllers-M241-5-2-11-29",
+      "slug": "modicon-controllers-m241-5-2-11-29",
       "part_number": "",
       "description": "",
       "comments": "",
@@ -201,7 +201,7 @@
     {
       "manufacturer": "Schneider Electric",
       "model": "Modicon Controllers M251 5.0.0.0",
-      "slug": "Modicon-Controllers-M251-5-0-0-0",
+      "slug": "modicon-controllers-m251-5-0-0-0",
       "part_number": "",
       "description": "",
       "comments": "",
@@ -210,14 +210,14 @@
         "model_number": "M251",
         "device_family": "Modicon Controllers",
         "hardware_name": "5.0.0.0",
-        "hardware_version": "",
+        "hardware_version": "-",
         "device_description": ""
       }
     },
     {
       "manufacturer": "Schneider Electric",
       "model": "Modicon Controllers LMC058 5.0.4.19",
-      "slug": "Modicon-Controllers-LMC058-5-0-4-19",
+      "slug": "modicon-controllers-lmc058-5-0-4-19",
       "part_number": "",
       "description": "",
       "comments": "",
