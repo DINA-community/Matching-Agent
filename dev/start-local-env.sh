@@ -676,6 +676,7 @@ cleanup() {
 		if [ "$LOCAL_SETTING_VAL" == "true" ]; then
 			# Sets token always new in case it changes.
 			sed -i "s|^\(api_token = \).*|\1\"$token\"|" "$NETBOX_FILE"
+			info "--[CLE] NetBox API token set."
 		fi
 		# set JWT secret key
 		local JWT_KEY=$(grep -E "^$JWT=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2-)
