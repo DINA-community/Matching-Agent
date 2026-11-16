@@ -16,7 +16,7 @@ The user access ``/plugins/csaf/csafvulnerability/`` and get :ref:`the overview 
 This view shows all vulnerabilities from all CSAF documents that have at least a possible match. The user can get more information about
 
 - a specific :ref:`CVE<cve>` 
-- .. warning:: linking missing
+- .. warning:: linking missing to CVE (and CWE?)
 - a CWE: 
 - .. todo:: Are there information available to display?
 - the corresponding :ref:`CSAF Documents<csafdocuments>`
