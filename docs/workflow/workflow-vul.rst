@@ -21,7 +21,7 @@ This view shows all vulnerabilities from all CSAF documents that have at least a
 - .. todo:: Are there information available to display?
 - the corresponding :ref:`CSAF Documents<csafdocuments>`
 
-The user can filter the vulnerabilities by using the :ref:`filter options <filter-vul-startpage>`.
+The user can filter the vulnerabilities by using the :ref:`filter options<filter-vul-startpage>`.
 
 Optimization
 ------------

@@ -17,3 +17,11 @@ Besides the tutorial, this section describes the intended workflow of the Matchi
    workflow-match-type
    workflow-filter
    
+This workflow also reflects the user feedback of
+
+- `#72 Link product IDs to isduba`_ (see :ref:`vulnerability`)
+- `#73`_ (open)
+
+
+.. _#72 Link product IDs to isduba: https://github.com/DINA-community/CSAF-Netbox-Plugin/issues/72
+.. _#73: https://github.com/DINA-community/CSAF-Netbox-Plugin/issues/73 
