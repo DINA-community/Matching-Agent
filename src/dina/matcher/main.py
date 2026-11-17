@@ -1373,6 +1373,18 @@ class Matcher:
             await asyncio.sleep(0.1)
 
 
+def _product_columns(product: Any) -> dict[str, Any]:
+    """Flatten `files` into a list of hashes for matching and return as a dict."""
+    columns = product.to_dict()
+    files = columns.pop("files", None)
+    columns["hashes"] = [
+        f"{f.hash_algorithm.lower()}:{f.file_hash.lower()}"
+        for f in getattr(files, "files", [])
+        if f.hash_algorithm and f.file_hash
+    ]
+    return columns
+
+
 def match_pairs(
     task_id: int,
     matches: queue.Queue[tuple[int, list[tuple[int, int]], list[Match]]],
@@ -1413,8 +1425,8 @@ def match_pairs(
                 continue
             processed_pairs.append((csaf.id, asset.id))
 
-            csaf_dict = {f"csaf_{k}": v for k, v in csaf.product.to_dict().items()}
-            asset_dict = {f"asset_{k}": v for k, v in asset.product.to_dict().items()}
+            csaf_dict = {f"csaf_{k}": v for k, v in _product_columns(csaf.product).items()}
+            asset_dict = {f"asset_{k}": v for k, v in _product_columns(asset.product).items()}
 
             df = pl.DataFrame([{**csaf_dict, **asset_dict}], strict=False)
 

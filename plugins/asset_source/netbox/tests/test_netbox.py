@@ -155,6 +155,14 @@ async def test_fetch_products(monkeypatch, mock_config):
         "dina.plugins.datasource.netbox.netbox.plugins_d3c_software_list_list.asyncio",
         AsyncMock(return_value=DummyListResult([])),
     )
+    for endpoint in (
+        "plugins_d3c_filehash_list_list",
+        "plugins_d3c_xgenericuri_list_list",
+    ):
+        monkeypatch.setattr(
+            f"dina.plugins.datasource.netbox.netbox.{endpoint}.asyncio",
+            AsyncMock(return_value=DummyListResult([])),
+        )
 
     result: FetchProductsResult = await mock_config.fetch_products(fetcher_view)
 
