@@ -1,4 +1,4 @@
-FROM netboxcommunity/netbox:v4.7-5.1.1
+FROM netboxcommunity/netbox:v4.7-5.1.2
 
 COPY ./docker-entrypoint-plugins.sh /opt/netbox/docker-entrypoint-plugins.sh
 RUN chmod +x /opt/netbox/docker-entrypoint-plugins.sh \
