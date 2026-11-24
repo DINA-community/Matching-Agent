@@ -90,7 +90,7 @@ git submodules status
    $git submodules --update --remote
    $git submodules status
    +e4b0c6ab7afaaf5153e4b48aab61f52c6c60d909 dev/isduba (v.0.17.0-114-ge4b0c6ab)
-   7689fec7a70717f7e72feecb383e7a3f55538b5f dev/netbox (5.1.1)
+   43db6086490e3914816f33ecccd318416a34bfb6 dev/netbox (5.1.2)
    +4ebde51fdb3f839330b0b8ec1f60e3b69d05052d dev/plugins/csaf (v1.0-rc1-103-g4ebde51)
    e3c278baef2d9cd6045057f1bb8293d0e6d1970e dev/plugins/d3c (v1.0-rc1-114-ge3c278b)
 

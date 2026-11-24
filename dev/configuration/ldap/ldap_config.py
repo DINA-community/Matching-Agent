@@ -31,6 +31,17 @@ AUTH_LDAP_SERVER_URI = environ.get("AUTH_LDAP_SERVER_URI", "")
 # The following may be needed if you are binding to Active Directory.
 AUTH_LDAP_CONNECTION_OPTIONS = {ldap.OPT_REFERRALS: 0}
 
+# Optionally set LDAP operation and network timeouts (in seconds).
+AUTH_LDAP_OPT_TIMEOUT = environ.get("AUTH_LDAP_OPT_TIMEOUT", None)
+if AUTH_LDAP_OPT_TIMEOUT is not None:
+    AUTH_LDAP_CONNECTION_OPTIONS[ldap.OPT_TIMEOUT] = float(AUTH_LDAP_OPT_TIMEOUT)
+
+AUTH_LDAP_OPT_NETWORK_TIMEOUT = environ.get("AUTH_LDAP_OPT_NETWORK_TIMEOUT", None)
+if AUTH_LDAP_OPT_NETWORK_TIMEOUT is not None:
+    AUTH_LDAP_CONNECTION_OPTIONS[ldap.OPT_NETWORK_TIMEOUT] = float(
+        AUTH_LDAP_OPT_NETWORK_TIMEOUT
+    )
+
 AUTH_LDAP_BIND_AS_AUTHENTICATING_USER = (
     environ.get("AUTH_LDAP_BIND_AS_AUTHENTICATING_USER", "False").lower() == "true"
 )
@@ -119,3 +130,8 @@ AUTH_LDAP_USER_ATTR_MAP = {
     "last_name": environ.get("AUTH_LDAP_ATTR_LASTNAME", "sn"),
     "email": environ.get("AUTH_LDAP_ATTR_MAIL", "mail"),
 }
+
+# Update user object with the latest values from the LDAP directory every time the user logs in.
+AUTH_LDAP_ALWAYS_UPDATE_USER = (
+    environ.get("AUTH_LDAP_ALWAYS_UPDATE_USER", "True").lower() == "true"
+)
