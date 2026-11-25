@@ -15,7 +15,7 @@
         },
         "version": "1.0"
     },
-    "host": "https://<host:port>",
+    "host": "",
     "basePath": "/api",
     "paths": {
         "/about": {
@@ -730,13 +730,19 @@
                         "description": "Offset",
                         "name": "offset",
                         "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Return search results",
+                        "name": "results",
+                        "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/web.overviewDocuments.documentResult"
+                            "$ref": "#/definitions/web.flatResults.documentResult"
                         }
                     },
                     "400": {
@@ -888,6 +894,62 @@
                 }
             }
         },
+        "/documents/texts/{id}": {
+            "get": {
+                "description": "Returns List of JSON paths with highlighting positions inside text matches found by the search query.",
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Returns List of JSON paths with highlighting positions.",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Document ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Document query",
+                        "name": "query",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Include the texts in the result",
+                        "name": "include",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.TextPath"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/documents/{id}": {
             "get": {
                 "description": "Returns the document in its original format.",
@@ -968,6 +1030,50 @@
                         "schema": {
                             "$ref": "#/definitions/models.Error"
                         }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/documents/{id}/cve_related": {
+            "get": {
+                "description": "Returns the documents related to this document by CVE.",
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Returns CVE related documents.",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Document ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.RelatedDocument"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized"
                     },
                     "500": {
                         "description": "Internal Server Error",
@@ -1179,6 +1285,11 @@
                         "in": "formData"
                     },
                     {
+                        "type": "boolean",
+                        "name": "default_query",
+                        "in": "formData"
+                    },
+                    {
                         "type": "string",
                         "name": "definer",
                         "in": "formData"
@@ -1255,6 +1366,14 @@
                             "Reviewer": "Reviewer role",
                             "SourceManager": "Source Manager role"
                         },
+                        "x-enum-descriptions": [
+                            "Admin role",
+                            "Importer role",
+                            "Editor role",
+                            "Reviewer role",
+                            "Auditor role",
+                            "Source Manager role"
+                        ],
                         "x-enum-varnames": [
                             "Admin",
                             "Importer",
@@ -1540,6 +1659,11 @@
                         "in": "formData"
                     },
                     {
+                        "type": "boolean",
+                        "name": "default_query",
+                        "in": "formData"
+                    },
+                    {
                         "type": "string",
                         "name": "definer",
                         "in": "formData"
@@ -1616,6 +1740,14 @@
                             "Reviewer": "Reviewer role",
                             "SourceManager": "Source Manager role"
                         },
+                        "x-enum-descriptions": [
+                            "Admin role",
+                            "Importer role",
+                            "Editor role",
+                            "Reviewer role",
+                            "Auditor role",
+                            "Source Manager role"
+                        ],
                         "x-enum-varnames": [
                             "Admin",
                             "Importer",
@@ -1720,6 +1852,12 @@
                         "description": "Enable statistic",
                         "name": "stats",
                         "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Enable health indicator",
+                        "name": "health",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1756,6 +1894,11 @@
                         "in": "formData"
                     },
                     {
+                        "type": "integer",
+                        "name": "age",
+                        "in": "formData"
+                    },
+                    {
                         "type": "boolean",
                         "name": "attention",
                         "in": "formData"
@@ -1782,6 +1925,11 @@
                         },
                         "collectionFormat": "csv",
                         "name": "headers",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "boolean",
+                        "name": "healthy",
                         "in": "formData"
                     },
                     {
@@ -2000,6 +2148,12 @@
                         "description": "Enable statistic",
                         "name": "stats",
                         "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Enable health indicator",
+                        "name": "health",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -2044,6 +2198,11 @@
                         "required": true
                     },
                     {
+                        "type": "boolean",
+                        "name": "healthy",
+                        "in": "formData"
+                    },
+                    {
                         "type": "integer",
                         "name": "id",
                         "in": "formData"
@@ -2055,19 +2214,20 @@
                     },
                     {
                         "enum": [
-                            1,
                             0,
                             1,
                             2,
-                            3
+                            3,
+                            1
                         ],
                         "type": "integer",
+                        "format": "int32",
                         "x-enum-varnames": [
-                            "defaultSourcesFeedLogLevel",
                             "DebugFeedLogLevel",
                             "InfoFeedLogLevel",
                             "WarnFeedLogLevel",
-                            "ErrorFeedLogLevel"
+                            "ErrorFeedLogLevel",
+                            "defaultSourcesFeedLogLevel"
                         ],
                         "name": "log_level",
                         "in": "formData"
@@ -2220,66 +2380,6 @@
                 }
             }
         },
-        "/sources/{document}": {
-            "delete": {
-                "description": "This updates the SSVC of the specified document.",
-                "produces": [
-                    "application/json"
-                ],
-                "summary": "Changes the SSVC.",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Document ID",
-                        "name": "document",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "SSVC vector",
-                        "name": "vector",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.Success"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/models.Error"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized"
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/models.Error"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/models.Error"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/models.Error"
-                        }
-                    }
-                }
-            }
-        },
         "/sources/{id}": {
             "get": {
                 "description": "Returns the source configuration and metadata.",
@@ -2299,6 +2399,12 @@
                         "type": "boolean",
                         "description": "Enable statistic",
                         "name": "stats",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Enable health indicator",
+                        "name": "health",
                         "in": "query"
                     }
                 ],
@@ -2349,6 +2455,11 @@
                         "in": "formData"
                     },
                     {
+                        "type": "integer",
+                        "name": "age",
+                        "in": "formData"
+                    },
+                    {
                         "type": "boolean",
                         "name": "attention",
                         "in": "formData"
@@ -2375,6 +2486,11 @@
                         },
                         "collectionFormat": "csv",
                         "name": "headers",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "boolean",
+                        "name": "healthy",
                         "in": "formData"
                     },
                     {
@@ -2534,9 +2650,22 @@
                         "required": true
                     },
                     {
+                        "type": "integer",
+                        "description": "Source ID",
+                        "name": "health",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
                         "type": "boolean",
                         "description": "Enable statistic",
                         "name": "stats",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Enable health indicator",
+                        "name": "health",
                         "in": "query"
                     }
                 ],
@@ -2633,6 +2762,173 @@
                     },
                     "401": {
                         "description": "Unauthorized"
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/ssvc/documents/{document}": {
+            "get": {
+                "description": "Fetches the most recent SSVC for a specific document.",
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Returns the latest SSVC.",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Document ID",
+                        "name": "document",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/models.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/ssvc/history/{publisher}/{trackingid}": {
+            "get": {
+                "description": "Returns a list of all SSVC changes for the specified advisory, ordered by changedate.",
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "View the SSVC History.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Advisory publisher",
+                        "name": "publisher",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Advisory tracking ID",
+                        "name": "trackingid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/definitions/models.SSVCChange"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/models.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/ssvc/{document}": {
+            "put": {
+                "description": "This updates the SSVC of the specified document.",
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Changes the SSVC.",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Document ID",
+                        "name": "document",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "SSVC vector",
+                        "name": "vector",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Success"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/models.Error"
+                        }
                     },
                     "404": {
                         "description": "Not Found",
@@ -3435,7 +3731,7 @@
             "type": "object",
             "properties": {
                 "idle_timeout": {
-                    "$ref": "#/definitions/time.Duration"
+                    "type": "integer"
                 },
                 "keycloak_client_id": {
                     "type": "string"
@@ -3447,25 +3743,26 @@
                     "type": "string"
                 },
                 "update_interval": {
-                    "$ref": "#/definitions/time.Duration"
+                    "type": "integer"
                 }
             }
         },
         "config.FeedLogLevel": {
             "type": "integer",
+            "format": "int32",
             "enum": [
-                1,
                 0,
                 1,
                 2,
-                3
+                3,
+                1
             ],
             "x-enum-varnames": [
-                "defaultSourcesFeedLogLevel",
                 "DebugFeedLogLevel",
                 "InfoFeedLogLevel",
                 "WarnFeedLogLevel",
-                "ErrorFeedLogLevel"
+                "ErrorFeedLogLevel",
+                "defaultSourcesFeedLogLevel"
             ]
         },
         "forwarder.ForwardTarget": {
@@ -3536,6 +3833,17 @@
                 "ImportDocumentEvent": "ImportDocumentEvent represents a document import.",
                 "StateChangeEvent": "StateChangeEvent represents changing the advisory state."
             },
+            "x-enum-descriptions": [
+                "ImportDocumentEvent represents a document import.",
+                "DeleteDocumentEvent represents a document deletion.",
+                "StateChangeEvent represents changing the advisory state.",
+                "AddSSVCEvent represents the addtion of a SSVC score.",
+                "ChangeSSVCEvent represents the change of a SSVC score.",
+                "DeleteSSVCEvent represents the deletion of a SSVC score.",
+                "AddCommentEvent represents the addition of a comment.",
+                "ChangeCommentEvent represents the change of a comment.",
+                "DeleteCommentEvent represents the deletion of a comment."
+            ],
             "x-enum-varnames": [
                 "ImportDocumentEvent",
                 "DeleteDocumentEvent",
@@ -3565,6 +3873,64 @@
                 }
             }
         },
+        "models.RelatedDocument": {
+            "type": "object",
+            "properties": {
+                "cve": {
+                    "type": "string"
+                },
+                "document_id": {
+                    "type": "integer"
+                },
+                "publisher": {
+                    "type": "string"
+                },
+                "ssvc": {
+                    "type": "string"
+                },
+                "state": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "tracking_id": {
+                    "type": "string"
+                },
+                "tracking_status": {
+                    "type": "string"
+                },
+                "tracking_version": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.SSVCChange": {
+            "type": "object",
+            "properties": {
+                "actor": {
+                    "type": "string"
+                },
+                "change_number": {
+                    "type": "integer"
+                },
+                "changedate": {
+                    "type": "string"
+                },
+                "documents_id": {
+                    "type": "integer"
+                },
+                "documents_version": {
+                    "type": "string"
+                },
+                "ssvc": {
+                    "type": "string"
+                },
+                "ssvc_prev": {
+                    "type": "string"
+                }
+            }
+        },
         "models.StoredQuery": {
             "type": "object",
             "properties": {
@@ -3575,6 +3941,9 @@
                     }
                 },
                 "dashboard": {
+                    "type": "boolean"
+                },
+                "default_query": {
                     "type": "boolean"
                 },
                 "definer": {
@@ -3634,12 +4003,38 @@
                 "TLPRed": "TLPRed   represents TLP:RED",
                 "TLPWhite": "TLPWhite represents TLP:WHITE"
             },
+            "x-enum-descriptions": [
+                "TLPWhite represents TLP:WHITE",
+                "TLPGreen represents TLP:GREEN",
+                "TLPAmber represents TLP:AMBER",
+                "TLPRed   represents TLP:RED"
+            ],
             "x-enum-varnames": [
                 "TLPWhite",
                 "TLPGreen",
                 "TLPAmber",
                 "TLPRed"
             ]
+        },
+        "models.TextPath": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string"
+                },
+                "positions": {
+                    "type": "array",
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "text": {
+                    "type": "string"
+                }
+            }
         },
         "models.Workflow": {
             "type": "string",
@@ -3659,6 +4054,14 @@
                 "ReadWorkflow": "ReadWorkflow represents 'read'.",
                 "ReviewWorkflow": "ReviewWorkflow represents 'review'."
             },
+            "x-enum-descriptions": [
+                "NewWorkflow represents 'new'.",
+                "ReadWorkflow represents 'read'.",
+                "AssessingWorkflow represents 'assessing',",
+                "ReviewWorkflow represents 'review'.",
+                "ArchivedWorkflow represents 'archived'.",
+                "DeleteWorkflow represents 'delete'."
+            ],
             "x-enum-varnames": [
                 "NewWorkflow",
                 "ReadWorkflow",
@@ -3686,6 +4089,14 @@
                 "Reviewer": "Reviewer role",
                 "SourceManager": "Source Manager role"
             },
+            "x-enum-descriptions": [
+                "Admin role",
+                "Importer role",
+                "Editor role",
+                "Reviewer role",
+                "Auditor role",
+                "Source Manager role"
+            ],
             "x-enum-varnames": [
                 "Admin",
                 "Importer",
@@ -3779,6 +4190,9 @@
                 "downloading": {
                     "type": "integer"
                 },
+                "healthy": {
+                    "type": "boolean"
+                },
                 "waiting": {
                     "type": "integer"
                 }
@@ -3815,29 +4229,6 @@
                     "type": "integer"
                 }
             }
-        },
-        "time.Duration": {
-            "type": "integer",
-            "enum": [
-                -9223372036854775808,
-                9223372036854775807,
-                1,
-                1000,
-                1000000,
-                1000000000,
-                60000000000,
-                3600000000000
-            ],
-            "x-enum-varnames": [
-                "minDuration",
-                "maxDuration",
-                "Nanosecond",
-                "Microsecond",
-                "Millisecond",
-                "Second",
-                "Minute",
-                "Hour"
-            ]
         },
         "web.about.info": {
             "type": "object",
@@ -3946,7 +4337,7 @@
             "type": "object",
             "properties": {
                 "age": {
-                    "$ref": "#/definitions/web.sourceAge"
+                    "type": "integer"
                 },
                 "log_level": {
                     "$ref": "#/definitions/config.FeedLogLevel"
@@ -3971,6 +4362,9 @@
         "web.feed": {
             "type": "object",
             "properties": {
+                "healthy": {
+                    "type": "boolean"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -4016,6 +4410,21 @@
                 }
             }
         },
+        "web.flatResults.documentResult": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "documents": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": true
+                    }
+                }
+            }
+        },
         "web.insertDefaultQueryExclusion.createResult": {
             "type": "object",
             "properties": {
@@ -4031,22 +4440,7 @@
             "type": "object",
             "properties": {
                 "keep_feed_time": {
-                    "$ref": "#/definitions/time.Duration"
-                }
-            }
-        },
-        "web.overviewDocuments.documentResult": {
-            "type": "object",
-            "properties": {
-                "count": {
                     "type": "integer"
-                },
-                "documents": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "additionalProperties": true
-                    }
                 }
             }
         },
@@ -4101,7 +4495,7 @@
                     "type": "boolean"
                 },
                 "age": {
-                    "$ref": "#/definitions/web.sourceAge"
+                    "type": "integer"
                 },
                 "attention": {
                     "type": "boolean"
@@ -4120,6 +4514,9 @@
                     "items": {
                         "type": "string"
                     }
+                },
+                "healthy": {
+                    "type": "boolean"
                 },
                 "id": {
                     "type": "integer"
@@ -4163,34 +4560,6 @@
                 "url": {
                     "type": "string",
                     "minLength": 1
-                }
-            }
-        },
-        "web.sourceAge": {
-            "type": "object",
-            "properties": {
-                "time.Duration": {
-                    "type": "integer",
-                    "enum": [
-                        -9223372036854775808,
-                        9223372036854775807,
-                        1,
-                        1000,
-                        1000000,
-                        1000000000,
-                        60000000000,
-                        3600000000000
-                    ],
-                    "x-enum-varnames": [
-                        "minDuration",
-                        "maxDuration",
-                        "Nanosecond",
-                        "Microsecond",
-                        "Millisecond",
-                        "Second",
-                        "Minute",
-                        "Hour"
-                    ]
                 }
             }
         },
@@ -4260,13 +4629,13 @@
             }
         }
     },
-    "securityDefinitions": {
-        "bearerAuth": {
-            "name": "Authorization",
-            "in": "header",
-            "type": "apiKey",
-            "description": "JWT Authorization header"
-        }
-    },
-    "security": [ { "bearerAuth": [] } ]
+"securityDefinitions": {
+    "bearerAuth": {
+        "name": "Authorization",
+        "in": "header",
+        "type": "apiKey",
+        "description": "JWT Authorization header"
+    }
+},
+"security": [ { "bearerAuth": [] } ]
 }

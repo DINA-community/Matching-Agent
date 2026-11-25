@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 from dina.plugins.datasource.isduba.datamodels import (
     CsafProductTree,
     Product,
@@ -8,28 +11,44 @@ from dina.plugins.datasource.isduba.datamodels import (
     CsafDocument,
 )
 
+# Load CSAF documents uploaded by dev/isduba-set-sources.py to ISDuBA
+# sorted by file name
+CSAF_FILES = sorted(
+    (Path(__file__).parents[4] / "dev/test-cases/csaf_files").rglob("*.json")
+)
+ISDUBA_DOCUMENTS = {
+    document_id: json.loads(path.read_text(encoding="utf-8"))
+    for document_id, path in enumerate(CSAF_FILES, start=1)
+}
+
+
+def highest_criticality(document: dict) -> float:
+    """Highest CVSS base score of a document
+    ISDuBA orders documents by descending `critical` field"""
+    return max(
+        (
+            score[version]["baseScore"]
+            for vulnerability in document.get("vulnerabilities", [])
+            for score in vulnerability.get("scores", [])
+            for version in ("cvss_v3", "cvss_v2")
+            if version in score
+        ),
+        default=0,
+    )
+
+
+# GET /api/documents?orders=-critical
 DOCS_META = [
     {
-        "id": 1,
-        "publisher": "Siemens ProductCERT",
-        "title": "SSA-187636: Multiple Vulnerabilities in SENTRON 7KT PAC1260 Data Manager",
-        "tracking_id": "SSA-187636",
-        "version": "1",
-    },
-    {
-        "id": 2,
-        "publisher": "CISA",
-        "title": "Dover Fueling Solutions ProGauge MAGLINK LX CONSOLE",
-        "tracking_id": "ICSA-24-268-04",
-        "version": "1",
-    },
-    {
-        "id": 3,
-        "publisher": "Siemens ProductCERT",
-        "title": "SSA-454789: Deserialization Vulnerability in TeleControl Server Basic V3.1",
-        "tracking_id": "SSA-454789",
-        "version": "1",
-    },
+        "id": document_id,
+        "publisher": document["document"]["publisher"]["name"],
+        "title": document["document"]["title"],
+        "tracking_id": document["document"]["tracking"]["id"],
+        "version": document["document"]["tracking"]["version"],
+    }
+    for document_id, document in sorted(
+        ISDUBA_DOCUMENTS.items(), key=lambda item: -highest_criticality(item[1])
+    )
 ]
 
 DOCUMENTS_FULL = [

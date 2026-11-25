@@ -32,7 +32,7 @@ Use this option only if you have your own asset database and want to check it ag
 
    List of aggregators. 
 
-In the settings for this :ref:`csaf-aggregator`, delete the IT feed since we focuses on the OT part. 
+In the settings for this :ref:`figure below <csaf-aggregator>`, delete the IT feed since we focuses on the OT part. 
 
 .. figure:: images/tutorial-isduba-setup-3.png
    :width: 600px
@@ -40,7 +40,7 @@ In the settings for this :ref:`csaf-aggregator`, delete the IT feed since we foc
    :name: csaf-aggregator
    :alt: Save Source
 
-   Save a selected source. Here the IT feed of CISA was delisted.
+   Save a selected source. Here, the IT feed of CISA was delisted.
 
 After this, the source is not active yet. Here, the :ref:`checkbox <csaf-cisa-active>` has to be selected.
 
@@ -56,11 +56,15 @@ After this, the source is not active yet. Here, the :ref:`checkbox <csaf-cisa-ac
 Provide NetBox Test Data
 ------------------------
 
-Load the sample assets through the NetBox API using the token printed by the ``netbox-setup`` container (``docker logs netbox-setup``):
+Load the sample assets into NetBox:
 
 .. code-block:: bash
 
-   NETBOX_TOKEN='<token>' uv run dev/test-cases/load_tutorial_fixture.py --url http://netbox.localhost
+   uv run dev/test-cases/load_tutorial_fixture.py
+
+By default, the script uses the API token and NetBox URL from the configuration file
+``assets/plugin_configs/data_source/asset/netbox-local.toml`` (see :ref:`quick-start`, step *Configure plugins*).
+See ``--help`` for more options.
 
 The loader reads ``dev/test-cases/tutorial-1.fixture.json`` and creates or updates the device types, devices, modules, and software used below.
 

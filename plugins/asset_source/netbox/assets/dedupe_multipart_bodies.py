@@ -72,10 +72,17 @@ def dedupe(spec_text: str) -> tuple[str, int]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("spec", type=Path, help="Path to the OpenAPI spec YAML file")
-    parser.add_argument("-o", "--output", type=Path, default=None, help="Write result here instead of modifying in place")
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=Path,
+        default=None,
+        help="Write result here instead of modifying in place",
+    )
     args = parser.parse_args()
 
     original = args.spec.read_text(encoding="utf-8")
@@ -84,7 +91,10 @@ def main() -> int:
     if removed == 0:
         print("Nothing to do.", file=sys.stderr)
     else:
-        print(f"Removed {removed} duplicate multipart/form-data block(s).", file=sys.stderr)
+        print(
+            f"Removed {removed} duplicate multipart/form-data block(s).",
+            file=sys.stderr,
+        )
 
     out_path = args.output if args.output else args.spec
     out_path.write_text(updated, encoding="utf-8")

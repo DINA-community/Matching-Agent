@@ -227,6 +227,8 @@ def import_documents(client: httpx.Client, api: str, config: dict[str, Any]):
 
 
 def main() -> int:
+    if "ISDUBA_WORKSHOP=true" in open(ENV_FILE).read():
+        sys.exit(0)
     parser = ArgumentParser('isduba-set-sources',
                             description=__doc__)
     parser.add_argument('--configure-sources', action='store_true',
@@ -255,7 +257,10 @@ def main() -> int:
             create_sources(client, isduba_api, config)
         import_documents(client, isduba_api, config)
 
-    info("--ISDuBA provider setup finished")
+    info("--[DOC] ISDuBA provider setup finished")
+    p = Path(ENV_FILE)
+    raw = p.read_text(encoding="utf-8", newline="")      # keep CRLF as-is
+    p.write_text(raw.replace("ISDUBA_WORKSHOP=false", "ISDUBA_WORKSHOP=true", 1), encoding="utf-8", newline="")
     return 0
 
 

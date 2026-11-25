@@ -1,23 +1,40 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["httpx", "python-dotenv"]
+# ///
+
 """Create or update tutorial data through NetBox's REST API.
 
 Run with:
-    NETBOX_TOKEN='<token>' uv run dev/test-cases/load_tutorial_fixture.py
+    uv run dev/test-cases/load_tutorial_fixture.py
+
+Or pass the NetBox authentication token and URL:
+    uv run dev/test-cases/load_tutorial_fixture.py --token '<token>' --url http://netbox.localhost
+
+Without --token and --url, the token and URL of the NetBox fetcher plugin configuration are used
+(by default: assets/plugin_configs/data_source/asset/netbox-local.toml, see --config).
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
+import tomllib
 from pathlib import Path
 from typing import Any
 
 import httpx
 
 Record = dict[str, Any]
+REPO_ROOT = Path(__file__).resolve().parent.parent
+ENV_FILE =  Path(__file__).parents[1] / ".env"
 FIXTURE = Path(__file__).with_name("tutorial-1.fixture.json")
+NETBOX_CONFIG = Path(__file__).parents[2] / "assets/plugin_configs/data_source/asset/netbox-local.toml"
 
+def info(*args):
+    print("[INFO] ", *args, file=sys.stderr)
 
 class ImportFailure(RuntimeError):
     """Raised when the fixture cannot be loaded."""
@@ -280,18 +297,45 @@ def load_fixture(api: NetBoxApi, fixture: Record) -> None:
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--url", default=os.environ.get("NETBOX_URL", "http://localhost:8800")
+        "--url",
+        help="NetBox URL (default: api_url of the configuration, or http://netbox.localhost/)",
+    )
+    parser.add_argument("--token", help="NetBox API token (default: api_token of the configuration)")
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=NETBOX_CONFIG,
+        help=f"NetBox fetcher plugin configuration to read the URL and token from (default: {NETBOX_CONFIG})",
     )
     return parser.parse_args()
 
 
+def get_url_and_token(url: str | None, token: str | None, config: Path) -> tuple[str, str | None]:
+    """
+    Command line parameters take precedence over the configuration file
+    """
+    if not url or not token:
+        try:
+            with config.open("rb") as file:
+                plugin_config = tomllib.load(file)["DataSource"]["Plugin"]
+            url = url or plugin_config.get("api_url")
+            token = token or plugin_config.get("api_token")
+        except (OSError, KeyError, tomllib.TOMLDecodeError) as e:
+            print(f'Failed to load the configuration {config}: {e!s}', file=sys.stderr)
+    return url or "http://netbox.localhost/", token
+
+
 def main() -> int:
-    token = os.environ.get("NETBOX_TOKEN")
+    if "NETBOX_WORKSHOP=true" in open(ENV_FILE).read():
+        sys.exit(0)
+    arguments = parse_arguments()
+    url, token = get_url_and_token(arguments.url, arguments.token, arguments.config)
     if not token:
-        print("ERROR: Set NETBOX_TOKEN to a NetBox API token.", file=sys.stderr)
+        print(f"ERROR: Pass --token, or configure api_token in {arguments.config}.",
+              file=sys.stderr)
         return 2
 
-    api = NetBoxApi(parse_arguments().url, token)
+    api = NetBoxApi(url, token)
     try:
         fixture = json.loads(FIXTURE.read_text(encoding="utf-8"))
         load_fixture(api, fixture)
@@ -301,7 +345,10 @@ def main() -> int:
     finally:
         api.close()
 
-    print("Tutorial fixture loaded.")
+    info("--[DOC] Tutorial fixture loaded.")
+    p = Path(ENV_FILE)
+    raw = p.read_text(encoding="utf-8", newline="")      # keep CRLF as-is
+    p.write_text(raw.replace("NETBOX_WORKSHOP=false", "NETBOX_WORKSHOP=true", 1), encoding="utf-8", newline="")
     return 0
 
 

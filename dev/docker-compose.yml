@@ -1,16 +1,16 @@
 services:
   postgres-cachedb:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     container_name: cachedb-postgres
     environment:
       POSTGRES_DB: ${CACHEDB_POSTGRES_DB}
       POSTGRES_USER: ${CACHEDB_POSTGRES_USER}
       POSTGRES_PASSWORD: ${CACHEDB_POSTGRES_PASSWORD}
     ports:
-      - "2345:5432"
+      - "${BIND_IP:-0.0.0.0}:2345:5432"
     volumes:
       - cachedb_postgres:/var/lib/postgresql
-      - ./init-scripts:/docker-entrypoint-initdb.d:z,ro
+      - ./scripts-install:/docker-entrypoint-initdb.d:z,ro
     restart: unless-stopped
     shm_size: 1G
 
@@ -76,7 +76,7 @@ services:
 
   isduba-db:
     container_name: "isduba-db"
-    image: library/postgres:16-alpine
+    image: library/postgres:17-alpine
     restart: always
     environment:
       POSTGRES_PASSWORD: ${ISDUBA_POSTGRES_PASSWORD}
@@ -86,10 +86,10 @@ services:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
-      retries: 100
+      retries: 5
     volumes:
       - ./isduba/docker/db/init.sh:/docker-entrypoint-initdb.d/init.sh
-      - isduba_postgres:/var/lib/postgresql
+      - isduba_postgres:/var/lib/postgresql/data
 
   isduba-server:
     container_name: "isduba-server"
@@ -156,7 +156,7 @@ services:
       args:
         BUILD_VERSION: ${BUILD_VERSION}
     ports:
-      - "8800:8080"
+      - "${BIND_IP:-0.0.0.0}:8800:8080"
     depends_on:
       - postgres
       - redis
@@ -177,7 +177,7 @@ services:
       - netbox
     volumes:
       - ./configuration:/etc/netbox/config:z,ro
-      - ./init-scripts:/opt/netbox/init-scripts:z,ro
+      - ./scripts-install:/opt/netbox/scripts-install:z,ro
       - netbox-media-files:/opt/netbox/netbox/media:rw
       - netbox-reports-files:/opt/netbox/netbox/reports:rw
       - netbox-scripts-files:/opt/netbox/netbox/scripts:rw
@@ -221,7 +221,7 @@ services:
     depends_on:
       netbox:
         condition: service_healthy
-    entrypoint: ["/opt/netbox/docker-entrypoint-plugins.sh", "bash", "/opt/netbox/init-scripts/netbox-token.sh"]
+    entrypoint: ["/opt/netbox/docker-entrypoint-plugins.sh", "bash", "/opt/netbox/scripts-install/netbox-token.sh"]
     environment:
       <<: *netbox-environment
       DJANGO_SUPERUSER_PASSWORD: ${NETBOX_SUPERUSER_PASSWORD}
@@ -259,13 +259,16 @@ services:
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
     ports:
-      - "80:80"
-      - "443:443"
+      - "${BIND_IP:-0.0.0.0}:80:80"
+      - "${BIND_IP:-0.0.0.0}:443:443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
-      - netbox
-      - isduba
+      netbox:
+        aliases:
+          - isduba.localhost
+          - keycloak.localhost
+      isduba:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.traefik.rule=Host(`traefik.${DEV_DOMAIN:-localhost}`)"
