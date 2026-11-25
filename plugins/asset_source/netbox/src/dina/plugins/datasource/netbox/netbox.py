@@ -85,6 +85,7 @@ class NetboxDataSource(DataSourcePlugin):
 
         api_url: HttpUrl
         api_token: str
+        verify_ssl: bool = True
 
     def __init__(self, config: DataSourcePlugin.Config):
         """
@@ -109,6 +110,7 @@ class NetboxDataSource(DataSourcePlugin):
                 prefix="Bearer",
                 token=netbox.api_token,
                 raise_on_unexpected_status=True,
+                verify_ssl=netbox.verify_ssl,
             )
         except KeyError:
             raise KeyError("Missing Netbox configuration parameter")

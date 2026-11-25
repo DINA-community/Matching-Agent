@@ -12,3 +12,5 @@ publish_matches = true
 api_url = "http://netbox.example.org/"
 # Full NetBox v2 credential (nbt_<key>.<secret>), without the Bearer prefix.
 api_token = "nbt_<key>.<secret>"
+# Verify certificate validity if HTTPS is in use
+verify_ssl = true

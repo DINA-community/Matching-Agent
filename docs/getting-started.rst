@@ -163,6 +163,15 @@ If you want to get familiar with the project, follow these steps to set up a loc
       With a ``DEV_DOMAIN`` other than the default ``localhost``, the services are served over HTTPS,
       using Traefik's auto-generated self-signed default certificate.
 
+      Browsers will show a certificate warning that need to be accepted for **each service**.
+      Additionally, the login in ISDuBA will fail if the browser did not previously accept Keycloak's certificate.
+      Fist, open ``https://keycloak.$DEV_DOMAIN/`` and accept the certificate, before logging in to ISDuBA.
+
+      Also, the certificate validation neds to be turned off for the daemons.
+      Set ``verify_ssl = false`` in:
+      - ``assets/plugin_configs/data_source/csaf/isduba-local.toml``
+      - ``assets/plugin_configs/data_source/asset/netbox-local.toml``
+
    .. note::
       By default the services listen on all addresses.
       Set ``BIND_ADDRESS`` in ``dev/.env`` to listen on one specific address only, e.g. if port 80 is already used:
