@@ -165,11 +165,11 @@ If you want to get familiar with the project, follow these steps to set up a loc
 
    .. note::
       By default the services listen on all addresses.
-      Set ``BIND_IP`` in ``dev/.env`` to listen on one specific address only, e.g. if port 80 is already used:
+      Set ``BIND_ADDRESS`` in ``dev/.env`` to listen on one specific address only, e.g. if port 80 is already used:
 
       .. code-block:: text
 
-         BIND_IP=127.30.0.1
+         BIND_ADDRESS=127.30.0.1
 
       A few things need to be taken care of:
 
@@ -183,7 +183,7 @@ If you want to get familiar with the project, follow these steps to set up a loc
            127.30.0.1  netbox.dina.example isduba.dina.example keycloak.dina.example traefik.dina.example
 
       - The three service daemons ``assetsync``, ``csafsync`` and ``csaf_matcher`` connect to the CacheDB at ``localhost`` by default.
-        When the listening address is changed, set the same address as ``host`` in the section ``[Cachedb]`` of ``assets/config.toml``:
+        ``./dev/start-local-env.sh`` automatically sets the ``Cachedb.host`` in ``assets/config.toml`` if necessary:
 
         .. code-block:: toml
 

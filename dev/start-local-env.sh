@@ -410,7 +410,7 @@ Services are starting. Useful info:
 - ISDuBA UI:     $scheme://isduba.$domain/  (user / user)
 - Keycloak UI:   $scheme://keycloak.$domain/
 
-If BIND_IP is set in in dev/.env, the host names must resolve to it (/etc/hosts). See docs/getting-started.rst
+If BIND_ADDRESS is set in dev/.env, the host names must resolve to it (/etc/hosts). See docs/getting-started.rst
 
 To get the NetBox API token printed by the setup container:
   $COMPOSE_CMD -f $COMPOSE_FILE logs netbox-setup

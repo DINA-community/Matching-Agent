@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: ${CACHEDB_POSTGRES_USER}
       POSTGRES_PASSWORD: ${CACHEDB_POSTGRES_PASSWORD}
     ports:
-      - "${BIND_IP:-0.0.0.0}:2345:5432"
+      - "${BIND_ADDRESS:-0.0.0.0}:2345:5432"
     volumes:
       - cachedb_postgres:/var/lib/postgresql
       - ./scripts-install:/docker-entrypoint-initdb.d:z,ro
@@ -160,7 +160,7 @@ services:
       args:
         BUILD_VERSION: ${BUILD_VERSION}
     ports:
-      - "${BIND_IP:-0.0.0.0}:8800:8080"
+      - "${BIND_ADDRESS:-0.0.0.0}:8800:8080"
     depends_on:
       - postgres
       - redis
@@ -263,8 +263,8 @@ services:
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
     ports:
-      - "${BIND_IP:-0.0.0.0}:80:80"
-      - "${BIND_IP:-0.0.0.0}:443:443"
+      - "${BIND_ADDRESS:-0.0.0.0}:80:80"
+      - "${BIND_ADDRESS:-0.0.0.0}:443:443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
