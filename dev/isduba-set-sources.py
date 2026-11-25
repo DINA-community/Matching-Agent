@@ -61,8 +61,14 @@ def get_env(key: str, default: str = "") -> str:
 
 
 def service_for_url(subdomain: str) -> str:
-    """URL according to env DEV_DOMAIN"""
-    return f"http://{subdomain}.{get_env('DEV_DOMAIN', 'localhost')}"
+    """URL according to env DEV_DOMAIN
+
+    Domain other than localhost are always served over HTTPS,
+    because the ISDuBA requires a secure context, see https://github.com/ISDuBA/ISDuBA/issues/954
+    """
+    domain = get_env("DEV_DOMAIN", "localhost")
+    scheme = "http" if domain == "localhost" else "https"
+    return f"{scheme}://{subdomain}.{domain}"
 
 
 def get_token(client: httpx.Client) -> str:

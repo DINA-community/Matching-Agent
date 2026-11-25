@@ -30,6 +30,10 @@ services:
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
 
       KC_HOSTNAME: ${KC_HOSTNAME}
+      # When Traefik terminates TLS, Keycloak receives HTTP and
+      # needs to use https:// urls and trust the forwarding headers
+      KC_PROXY_HEADERS: xforwarded
+      KC_HTTP_ENABLED: "true"
       # Optional, reduce memory usage
       JAVA_OPTS: >
         -XX:MaxHeapFreeRatio=10
@@ -266,8 +270,9 @@ services:
     networks:
       netbox:
         aliases:
-          - isduba.localhost
-          - keycloak.localhost
+          # Resolve the Traefik-routed domains in the container network
+          - isduba.${DEV_DOMAIN:-localhost}
+          - keycloak.${DEV_DOMAIN:-localhost}
       isduba:
     labels:
       - "traefik.enable=true"

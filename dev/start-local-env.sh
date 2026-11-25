@@ -273,7 +273,7 @@ get_env_value() {
     fi
     printf '%s\n' "$value"
 	# Load everything approach
-	#set -a            
+	#set -a
 	#source $ENV_FILE
 	#set +a
 
@@ -361,7 +361,7 @@ remove_plugins_config() {
 	local plugins_file=$PLUGINS_FILE
 	if [[ $clean_full == true && -f "$plugins_file" ]]; then
 		rm -f "$plugins_file"
-	elif [[ -f "$plugins_file" ]]; then	
+	elif [[ -f "$plugins_file" ]]; then
 		if check_response "Remove $plugins_file? [Y/n]" "Y"; then
 			info "--[EXE] Removing local plugins configuration: $plugins_file"
 			rm -f "$plugins_file"
@@ -411,6 +411,8 @@ Services are starting. Useful info:
 - ISDuBA UI:     $scheme://isduba.$domain/  (user / user)
 - Keycloak UI:   $scheme://keycloak.$domain/
 
+If BIND_IP is set in in dev/.env, the host names must resolve to it (/etc/hosts). See docs/getting-started.rst
+
 To get the NetBox API token printed by the setup container:
   $COMPOSE_CMD -f $COMPOSE_FILE logs netbox-setup
 EOF
@@ -454,7 +456,7 @@ USAGE
 				case "$1" in
 				--clean) ACTION="clean" ;;
 				--down) ACTION="down" ;;
-				--new) ACTION="new" 
+				--new) ACTION="new"
 					   WITH_VOLUMES=true;;
 				--recreate) ACTION="recreate" ;;
 				--stop) ACTION="stop" ;;
@@ -482,7 +484,7 @@ USAGE
 					case "$arg" in
 					c) ACTION="clean" ;;
 					d) ACTION="down" ;;
-					n) ACTION="new" 
+					n) ACTION="new"
 					   WITH_VOLUMES=true;;
 					r) ACTION="recreate" ;;
 					s) ACTION="stop" ;;
@@ -605,7 +607,7 @@ execute() {
 			info "-- [EXE] Recreating dev environment with volume reset (down -v; up)..."
 			$COMPOSE_CMD -f "$COMPOSE_FILE" down -v || true
 		else
-			info "-- [EXE] Starting dev environment (recreate containers)..."	
+			info "-- [EXE] Starting dev environment (recreate containers)..."
 		fi
 		$COMPOSE_CMD -f "$COMPOSE_FILE" up -d --build --force-recreate --remove-orphans
 		;;
@@ -738,7 +740,7 @@ set_api_matcher() {
 	out=$(uv run csaf_matcher_cli user create --username=admin --password="$ADMIN_PASSWORD" 2>&1)\
   	|| { printf 'csaf_matcher_cli failed:\n%s\n' "$out" >&2; exit 1; }
 
-	
+
 	if grep -qi 'already exists' <<<"$out"; then
 			info "--[POP] Overwrite password for csaf_matcher api with default"
 	fi
@@ -764,7 +766,7 @@ cleanup() {
 		fi
 		set_workshop
 		# Start API
-		set_api_matcher	
+		set_api_matcher
 		local excess
 		if check_response "Do you want to start the apis right away? [Y/n]" "Y"; then
 			if check_response "Do you execute the APIs in separate windows each (Y) or all in this terminal (N) [Y/n]" "Y"; then

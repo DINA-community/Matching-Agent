@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+from dotenv import dotenv_values
 
 Record = dict[str, Any]
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -322,7 +323,18 @@ def get_url_and_token(url: str | None, token: str | None, config: Path) -> tuple
             token = token or plugin_config.get("api_token")
         except (OSError, KeyError, tomllib.TOMLDecodeError) as e:
             print(f'Failed to load the configuration {config}: {e!s}', file=sys.stderr)
-    return url or "http://netbox.localhost/", token
+    return url or default_netbox_url(), token
+
+
+def default_netbox_url() -> str:
+    """URL according to env DEV_DOMAIN
+
+    Domain other than localhost are always served over HTTPS,
+    because the ISDuBA requires a secure context, see https://github.com/ISDuBA/ISDuBA/issues/954
+    """
+    domain = dotenv_values(ENV_FILE).get("DEV_DOMAIN") or "localhost"
+    scheme = "http" if domain == "localhost" else "https"
+    return f"{scheme}://netbox.{domain}/"
 
 
 def main() -> int:

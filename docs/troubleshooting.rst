@@ -74,7 +74,7 @@ If you see CSAF documents with title ``Loading...``, the background job cannot r
 The job uses the URL from setting ``keycloak_url`` (in ``isduba-local.toml``) to connect to Keycloak/ISDuBA.
 If these are not reachable from inside the NetBox containers, the documents cannot be fetched.
 
-In the local development environment, the docker compose setup adds internal aliases for ``*.localhost``, so the URLs work internally as they do in the browser.
+In the local development environment, the docker compose setup adds internal network aliases for the routed host names (using ``DEV_DOMAIN``), so the URLs work inside the containers as they do in the browser.
 In other setups make sure the ISDuBA document URLs and ``keycloak_url`` are reachable from within the NetBox worker container.
 
 All errors of the background job are printed to the ``netbox-worker`` docker container log.
@@ -96,5 +96,5 @@ git submodules status
 
 The + sign indicate a update in the submodule. In order to apply on the
 repository use `git add dev/isduba` for instance, since a new version is
-available. 
+available.
 

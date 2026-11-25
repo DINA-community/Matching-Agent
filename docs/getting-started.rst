@@ -140,7 +140,8 @@ If you want to get familiar with the project, follow these steps to set up a loc
         # Or run a fully local stack (NetBox, ISDuBA, DB)
         docker compose -f dev/docker-compose.yml up -d
 
-    When using the fully local development environment, the URLs and default credentials are as follows:
+    When using the fully local development environment, the URLs and default credentials are as follows
+    (with the default ``DEV_DOMAIN=localhost``, see the note below):
 
     - NetBox UI: http://netbox.localhost/ (default: admin/admin)
     - NetBox Keycloak instance: http://keycloak.localhost/
@@ -154,22 +155,40 @@ If you want to get familiar with the project, follow these steps to set up a loc
    .. note::
       All services use the ``.localhost`` domain by default.
       The domain is set by the parameter ``DEV_DOMAIN`` in ``dev/.env``.
-      Changing it in an existing development environment is not possible.
-      To recreate it, run ``./dev/start-local-env.sh --recreate --volumes``.
+      Changing it in an existing development environment is not possible, because Keycloak persists its host name.
+      To recreate the environment, run ``./dev/start-local-env.sh --recreate --volumes``.
 
    .. warning::
-      The ISDuBA login process requires either a localhost-domain, or HTTPS.
-      If ``DEV_DOMAIN`` is set to a non-localhost domain, it is served over **HTTPS**.
-      Self-signed certificates are generated automatically.
+      The ISDuBA login process requires a secure context, either under ``*.localhost`` or via HTTPS.
+      With a ``DEV_DOMAIN`` other than the default ``localhost``, the services are served over HTTPS,
+      using Traefik's auto-generated self-signed default certificate.
 
+   .. note::
       By default the services listen on all addresses.
-      Set ``BIND_IP`` in ``dev/.env`` to listen on specific addresses only.
-      Note that ``*.localhost`` resolves to ``127.0.0.1``,
-      so you need to add the hostname the ``/etc/hosts``:
+      Set ``BIND_IP`` in ``dev/.env`` to listen on one specific address only, e.g. if port 80 is already used:
 
       .. code-block:: text
 
-         127.30.0.1  netbox.localhost isduba.localhost keycloak.localhost traefik.localhost
+         BIND_IP=127.30.0.1
+
+      A few things need to be taken care of:
+
+      - The host names must resolve to this address.
+        With the default ``localhost``, this is not possible with browsers, they will always resolve it to ``127.0.0.1`` internally and ignore local resolution.
+
+        Thus, ``DEV_DOMAIN`` needs also be set to non-``.localhost``-domain, and they need to be mapped in ``/etc/hosts``:
+
+        .. code-block:: text
+
+           127.30.0.1  netbox.dina.example isduba.dina.example keycloak.dina.example traefik.dina.example
+
+      - The three service daemons ``assetsync``, ``csafsync`` and ``csaf_matcher`` connect to the CacheDB at ``localhost`` by default.
+        When the listening address is changed, set the same address as ``host`` in the section ``[Cachedb]`` of ``assets/config.toml``:
+
+        .. code-block:: toml
+
+           [Cachedb]
+           host = "127.30.0.1"
 
    .. note::
       The NetBox plugins ``csaf`` and ``d3c`` are included as git submodules at ``dev/plugins/csaf`` and ``dev/plugins/d3c``.
