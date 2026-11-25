@@ -13,6 +13,7 @@ NETBOX_ASSET_SCRIPT="dev/test-cases/load_tutorial_fixture.py"
 NETBOX_SAMPLE="assets/plugin_configs/data_source/asset/sample/netbox.toml"
 NETBOX_FILE="assets/plugin_configs/data_source/asset/netbox-local.toml"
 ISDUBA_FILE="assets/plugin_configs/data_source/csaf/isduba-local.toml"
+CACHEDB_CONFIG="assets/config.toml"
 PLUGINS_FILE="dev/configuration/plugins.py"
 PLUGINS_SAMPLE="dev/configuration/plugins.py.example"
 API_START="dev/scripts-install/script_api.sh"
@@ -193,6 +194,28 @@ set_local_toml() {
 		sed -i "s|^\($pattern\).*|\1\"$value\"|" "$ISDUBA_FILE"
 	done
 	info "--[ENV] Set local toml files done"
+}
+
+set_cachedb_host() {
+	# Set CacheDB.host in assets/config.toml according to BIND_ADDRESS.
+	local expected_address current_address
+	expected_address=$(read_env_value "BIND_ADDRESS")
+	# if the bind address is missing, no need for a change
+	if [ -z "$expected_address" ]; then
+		return 0
+	fi
+	[ -f "$CACHEDB_CONFIG" ] || {
+		# unlikely, but just a safeguard
+		error "--[ENV] $CACHEDB_CONFIG is missing, cannot set the CacheDB host for BIND_ADDRESS='$expected_address'"
+		exit 1
+	}
+	current_address=$(sed -n '/^\[Cachedb\]/,/^\[/{s/^host *= *"\(.*\)"/\1/p}' "$CACHEDB_CONFIG")
+	if [ "$current_address" == "$expected_address" ]; then
+		return 0
+	fi
+	info "--[ENV] Setting [Cachedb] host in $CACHEDB_CONFIG to BIND_ADDRESS='$expected_address'"
+	# Only within the [Cachedb] section, other sections have a host too
+	sed -i "/^\[Cachedb\]/,/^\[/{s|^\(host *= *\).*|\1\"$expected_address\"|}" "$CACHEDB_CONFIG"
 }
 
 set_plugin_keycloak_url() {
@@ -384,6 +407,12 @@ ensure_local_configs() {
 			cp -fp "$example_file" "$target_file"
 		fi
 	done
+	# ensure settings DEV_DOMAIN and BIND_ADDRESS are in sync
+	set_domain_urls
+	set_local_toml
+	set_cachedb_host
+	set_plugin_keycloak_url
+	return 0
 }
 
 prune_project_images() {
@@ -603,6 +632,7 @@ execute() {
 	recreate)
 		stop_apis
 		sleep 2
+		ensure_local_configs
 		if [[ "$WITH_VOLUMES" == true ]]; then
 			info "-- [EXE] Recreating dev environment with volume reset (down -v; up)..."
 			$COMPOSE_CMD -f "$COMPOSE_FILE" down -v || true

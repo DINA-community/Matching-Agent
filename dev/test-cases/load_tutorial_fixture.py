@@ -79,9 +79,9 @@ class NetBoxApi:
         except httpx.HTTPError as error:
             detail = ""
             if isinstance(error, httpx.HTTPStatusError):
-                detail = f"with status code {error.reponse.status_code}: {error.response.text}"
+                detail = f" with status code {error.response.status_code}: {error.response.text}"
             else:
-                detail = str(error)
+                detail = f": {error}"
             raise ImportFailure(f"{method} {url} failed{detail}") from error
 
 
