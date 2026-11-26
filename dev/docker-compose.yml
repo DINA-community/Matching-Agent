@@ -1,16 +1,16 @@
 services:
   postgres-cachedb:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     container_name: cachedb-postgres
     environment:
       POSTGRES_DB: ${CACHEDB_POSTGRES_DB}
       POSTGRES_USER: ${CACHEDB_POSTGRES_USER}
       POSTGRES_PASSWORD: ${CACHEDB_POSTGRES_PASSWORD}
     ports:
-      - "2345:5432"
+      - "${BIND_ADDRESS:-0.0.0.0}:2345:5432"
     volumes:
       - cachedb_postgres:/var/lib/postgresql
-      - ./init-scripts:/docker-entrypoint-initdb.d:z,ro
+      - ./scripts-install:/docker-entrypoint-initdb.d:z,ro
     restart: unless-stopped
     shm_size: 1G
 
@@ -30,6 +30,10 @@ services:
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
 
       KC_HOSTNAME: ${KC_HOSTNAME}
+      # When Traefik terminates TLS, Keycloak receives HTTP and
+      # needs to use https:// urls and trust the forwarding headers
+      KC_PROXY_HEADERS: xforwarded
+      KC_HTTP_ENABLED: "true"
       # Optional, reduce memory usage
       JAVA_OPTS: >
         -XX:MaxHeapFreeRatio=10
@@ -52,7 +56,11 @@ services:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.keycloak.rule=Host(`keycloak.localhost`)"
+      - "traefik.http.routers.keycloak.rule=Host(`keycloak.${DEV_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.keycloak.entrypoints=web"
+      - "traefik.http.routers.keycloak-tls.rule=Host(`keycloak.${DEV_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.keycloak-tls.entrypoints=websecure"
+      - "traefik.http.routers.keycloak-tls.tls=true"
       - "traefik.http.services.keycloak.loadbalancer.server.port=8080"
 
   keycloak-setup:
@@ -74,7 +82,7 @@ services:
 
   isduba-db:
     container_name: "isduba-db"
-    image: library/postgres:16-alpine
+    image: library/postgres:17-alpine
     restart: always
     environment:
       POSTGRES_PASSWORD: ${ISDUBA_POSTGRES_PASSWORD}
@@ -84,10 +92,10 @@ services:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
-      retries: 100
+      retries: 5
     volumes:
       - ./isduba/docker/db/init.sh:/docker-entrypoint-initdb.d/init.sh
-      - isduba_postgres:/var/lib/postgresql
+      - isduba_postgres:/var/lib/postgresql/data
 
   isduba-server:
     container_name: "isduba-server"
@@ -110,7 +118,11 @@ services:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.isduba.rule=Host(`isduba.localhost`)"
+      - "traefik.http.routers.isduba.rule=Host(`isduba.${DEV_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.isduba.entrypoints=web"
+      - "traefik.http.routers.isduba-tls.rule=Host(`isduba.${DEV_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.isduba-tls.entrypoints=websecure"
+      - "traefik.http.routers.isduba-tls.tls=true"
       - "traefik.http.services.isduba.loadbalancer.server.port=8081"
 
   # redis
@@ -152,7 +164,7 @@ services:
       args:
         BUILD_VERSION: ${BUILD_VERSION}
     ports:
-      - "8800:8080"
+      - "${BIND_ADDRESS:-0.0.0.0}:8800:8080"
     depends_on:
       - postgres
       - redis
@@ -173,7 +185,7 @@ services:
       - netbox
     volumes:
       - ./configuration:/etc/netbox/config:z,ro
-      - ./init-scripts:/opt/netbox/init-scripts:z,ro
+      - ./scripts-install:/opt/netbox/scripts-install:z,ro
       - netbox-media-files:/opt/netbox/netbox/media:rw
       - netbox-reports-files:/opt/netbox/netbox/reports:rw
       - netbox-scripts-files:/opt/netbox/netbox/scripts:rw
@@ -183,7 +195,11 @@ services:
       - "host.local:host-gateway"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.netbox.rule=Host(`netbox.localhost`)"
+      - "traefik.http.routers.netbox.rule=Host(`netbox.${DEV_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.netbox.entrypoints=web"
+      - "traefik.http.routers.netbox-tls.rule=Host(`netbox.${DEV_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.netbox-tls.entrypoints=websecure"
+      - "traefik.http.routers.netbox-tls.tls=true"
       - "traefik.http.services.netbox.loadbalancer.server.port=8080"
 
   netbox-worker:
@@ -215,7 +231,7 @@ services:
     depends_on:
       netbox:
         condition: service_healthy
-    entrypoint: ["/opt/netbox/docker-entrypoint-plugins.sh", "bash", "/opt/netbox/init-scripts/netbox-token.sh"]
+    entrypoint: ["/opt/netbox/docker-entrypoint-plugins.sh", "bash", "/opt/netbox/scripts-install/netbox-token.sh"]
     environment:
       <<: *netbox-environment
       DJANGO_SUPERUSER_PASSWORD: ${NETBOX_SUPERUSER_PASSWORD}
@@ -253,18 +269,24 @@ services:
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
     ports:
-      - "80:80"
+      - "${BIND_ADDRESS:-0.0.0.0}:80:80"
+      - "${BIND_ADDRESS:-0.0.0.0}:443:443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
       netbox:
         aliases:
-          - isduba.localhost
-          - keycloak.localhost
+          # Resolve the Traefik-routed domains in the container network
+          - isduba.${DEV_DOMAIN:-localhost}
+          - keycloak.${DEV_DOMAIN:-localhost}
       isduba:
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.traefik.rule=Host(`traefik.localhost`)"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.${DEV_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.traefik.entrypoints=web"
+      - "traefik.http.routers.traefik-tls.rule=Host(`traefik.${DEV_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.traefik-tls.entrypoints=websecure"
+      - "traefik.http.routers.traefik-tls.tls=true"
       - "traefik.http.services.traefik.loadbalancer.server.port=8080"
 
 volumes:

@@ -11,4 +11,5 @@ keycloak_url = "http://keycloak.example.org/"
 keycloak_realm = "isduba"
 username = "username"
 password = "password"
+# Verify certificate validity if HTTPS is in use
 verify_ssl = true

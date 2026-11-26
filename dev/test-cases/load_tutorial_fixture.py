@@ -1,3 +1,9 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.13"
+# dependencies = ["httpx", "python-dotenv"]
+# ///
+
 """Create or update tutorial data through NetBox's REST API.
 
 Run with:
@@ -20,11 +26,16 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+from dotenv import dotenv_values
 
 Record = dict[str, Any]
+REPO_ROOT = Path(__file__).resolve().parent.parent
+ENV_FILE =  Path(__file__).parents[1] / ".env"
 FIXTURE = Path(__file__).with_name("tutorial-1.fixture.json")
 NETBOX_CONFIG = Path(__file__).parents[2] / "assets/plugin_configs/data_source/asset/netbox-local.toml"
 
+def info(*args):
+    print("[INFO] ", *args, file=sys.stderr)
 
 class ImportFailure(RuntimeError):
     """Raised when the fixture cannot be loaded."""
@@ -38,6 +49,7 @@ class NetBoxApi:
             base_url=f"{url.rstrip('/')}/api/",
             headers={"Authorization": f"Bearer {token}"},
             timeout=30.0,
+            verify=False,
         )
 
     def close(self) -> None:
@@ -67,7 +79,9 @@ class NetBoxApi:
         except httpx.HTTPError as error:
             detail = ""
             if isinstance(error, httpx.HTTPStatusError):
-                detail = f": {error.response.text}"
+                detail = f" with status code {error.response.status_code}: {error.response.text}"
+            else:
+                detail = f": {error}"
             raise ImportFailure(f"{method} {url} failed{detail}") from error
 
 
@@ -309,10 +323,23 @@ def get_url_and_token(url: str | None, token: str | None, config: Path) -> tuple
             token = token or plugin_config.get("api_token")
         except (OSError, KeyError, tomllib.TOMLDecodeError) as e:
             print(f'Failed to load the configuration {config}: {e!s}', file=sys.stderr)
-    return url or "http://netbox.localhost/", token
+    return url or default_netbox_url(), token
+
+
+def default_netbox_url() -> str:
+    """URL according to env DEV_DOMAIN
+
+    Domain other than localhost are always served over HTTPS,
+    because the ISDuBA requires a secure context, see https://github.com/ISDuBA/ISDuBA/issues/954
+    """
+    domain = dotenv_values(ENV_FILE).get("DEV_DOMAIN") or "localhost"
+    scheme = "http" if domain == "localhost" else "https"
+    return f"{scheme}://netbox.{domain}/"
 
 
 def main() -> int:
+    if "NETBOX_WORKSHOP=true" in open(ENV_FILE).read():
+        sys.exit(0)
     arguments = parse_arguments()
     url, token = get_url_and_token(arguments.url, arguments.token, arguments.config)
     if not token:
@@ -330,7 +357,10 @@ def main() -> int:
     finally:
         api.close()
 
-    print("Tutorial fixture loaded.")
+    info("--[DOC] Tutorial fixture loaded.")
+    p = Path(ENV_FILE)
+    raw = p.read_text(encoding="utf-8", newline="")      # keep CRLF as-is
+    p.write_text(raw.replace("NETBOX_WORKSHOP=false", "NETBOX_WORKSHOP=true", 1), encoding="utf-8", newline="")
     return 0
 
 

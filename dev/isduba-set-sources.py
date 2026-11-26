@@ -60,9 +60,20 @@ def get_env(key: str, default: str = "") -> str:
     return default if value is None else value
 
 
+def service_for_url(subdomain: str) -> str:
+    """URL according to env DEV_DOMAIN
+
+    Domain other than localhost are always served over HTTPS,
+    because the ISDuBA requires a secure context, see https://github.com/ISDuBA/ISDuBA/issues/954
+    """
+    domain = get_env("DEV_DOMAIN", "localhost")
+    scheme = "http" if domain == "localhost" else "https"
+    return f"{scheme}://{subdomain}.{domain}"
+
+
 def get_token(client: httpx.Client) -> str:
     """Wait for Keycloak and get a token"""
-    keycloak_url = get_env("ISDUBA_CLIENT_KEYCLOAK_URL", "http://keycloak.localhost")
+    keycloak_url = get_env("ISDUBA_CLIENT_KEYCLOAK_URL", service_for_url("keycloak"))
     realm = get_env("ISDUBA_CLIENT_KEYCLOAK_REALM", "isduba")
     url = f"{keycloak_url.rstrip('/')}/realms/{realm}/protocol/openid-connect/token"
     login_data = {
@@ -74,14 +85,18 @@ def get_token(client: httpx.Client) -> str:
 
     deadline = time.monotonic() + KEYCLOAK_TIMEOUT
     while True:
+        last_exc = None
         try:
             response = client.post(url, data=login_data)
             if response.is_success and (token := response.json().get("access_token")):
                 return token
-        except httpx.HTTPError:
+        except httpx.HTTPError as exc:
+            last_exc = exc
             pass  # not up yet
         if time.monotonic() >= deadline:
-            error("Could not obtain an access token from Keycloak within the timeout")
+            error(f"Could not obtain an access token from Keycloak ({url}) within the timeout")
+            if last_exc:
+                warning(f"Exception: {last_exc!s}")
             sys.exit(1)
         time.sleep(2)
 
@@ -218,6 +233,8 @@ def import_documents(client: httpx.Client, api: str, config: dict[str, Any]):
 
 
 def main() -> int:
+    if "ISDUBA_WORKSHOP=true" in open(ENV_FILE).read():
+        sys.exit(0)
     parser = ArgumentParser('isduba-set-sources',
                             description=__doc__)
     parser.add_argument('--configure-sources', action='store_true',
@@ -234,10 +251,10 @@ def main() -> int:
     info("--Configuring ISDuBA providers.")
     config = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
 
-    isduba_url = get_env("ISDUBA_CLIENT_HOSTNAME_URL", "http://isduba.localhost")
+    isduba_url = get_env("ISDUBA_CLIENT_HOSTNAME_URL", service_for_url("isduba"))
     isduba_api = f"{isduba_url.rstrip('/')}/api"
 
-    with httpx.Client(timeout=TIMEOUT) as client:
+    with httpx.Client(timeout=TIMEOUT, verify=False) as client:
         token = get_token(client)
         client.headers["Authorization"] = f"Bearer {token}"
         wait_for_isduba(client, isduba_api)
@@ -246,7 +263,10 @@ def main() -> int:
             create_sources(client, isduba_api, config)
         import_documents(client, isduba_api, config)
 
-    info("--ISDuBA provider setup finished")
+    info("--[DOC] ISDuBA provider setup finished")
+    p = Path(ENV_FILE)
+    raw = p.read_text(encoding="utf-8", newline="")      # keep CRLF as-is
+    p.write_text(raw.replace("ISDUBA_WORKSHOP=false", "ISDUBA_WORKSHOP=true", 1), encoding="utf-8", newline="")
     return 0
 
 

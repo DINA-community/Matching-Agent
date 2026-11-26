@@ -35,7 +35,7 @@ class IsdubaDataSource(DataSourcePlugin):
     class Config(BaseModel):
         username: str
         password: str
-        verify_ssl: bool
+        verify_ssl: bool = True
         url: HttpUrl
         keycloak_url: HttpUrl
         keycloak_realm: str
@@ -215,7 +215,7 @@ class IsdubaDataSource(DataSourcePlugin):
             api_key_prefix={"bearerAuth": "Bearer"},
             debug=True,
         )
-        configuration.verify_ssl = self.config.DataSource.Plugin.verify_ssl or False
+        configuration.verify_ssl = self.config.DataSource.Plugin.verify_ssl
 
         return configuration
 

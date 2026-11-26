@@ -85,6 +85,7 @@ class NetboxDataSource(DataSourcePlugin):
 
         api_url: HttpUrl
         api_token: str
+        verify_ssl: bool = True
 
     def __init__(self, config: DataSourcePlugin.Config):
         """
@@ -109,6 +110,7 @@ class NetboxDataSource(DataSourcePlugin):
                 prefix="Bearer",
                 token=netbox.api_token,
                 raise_on_unexpected_status=True,
+                verify_ssl=netbox.verify_ssl,
             )
         except KeyError:
             raise KeyError("Missing Netbox configuration parameter")
@@ -919,12 +921,8 @@ class NetboxDataSource(DataSourcePlugin):
 
         logger.debug("Notifying NetBox of %i new matches", len(new_matches))
 
-        class BulkBody:
-            def __init__(self, items: List[Any]):
-                self.items = items
-
-            def to_dict(self):
-                return [item.to_dict() for item in self.items]
+        class BulkBody(List[Any]):
+            """Wrapper for Request body for a bulk create"""
 
         # Monkey patch the response parser to always return None.
         from dina.plugins.datasource.netbox.generated.api_client.models import CsafMatch
@@ -966,10 +964,12 @@ class NetboxDataSource(DataSourcePlugin):
             try:
                 await plugins_csaf_csafmatch_list_create.asyncio(
                     client=self.client,
-                    body=BulkBody([to_csaf_match_request(match) for match in batch]),  # type: ignore
+                    body=BulkBody(to_csaf_match_request(match) for match in batch),
                 )
             except (httpx.HTTPError, UnexpectedStatus) as e:
                 logger.error(f"Failed to notify new matches: {e}")
+            except Exception:
+                logger.exception("Unexpected error when notifying about new matches")
 
     @property
     def origin_uri(self):
@@ -1009,7 +1009,9 @@ class NetboxDataSource(DataSourcePlugin):
             if "module_id" in origin_info:
                 return f"/api/dcim/modules/{int(origin_info['module_id'])}/"
             if "software_id" in origin_info:
-                return f"/api/plugins/d3c/software-list/{int(origin_info['software_id'])}/"
+                return (
+                    f"/api/plugins/d3c/software-list/{int(origin_info['software_id'])}/"
+                )
             if "relation_id" in origin_info:
                 # List endpoint in generated client is productrelationship-list
                 return f"/api/plugins/d3c/productrelationship-list/{int(origin_info['relation_id'])}/"

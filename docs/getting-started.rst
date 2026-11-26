@@ -57,6 +57,16 @@ This section provides an overview of the project’s directory and package struc
 
 Quick start
 -----------
+
+If you want to get started as quickly as possible, run the install script. It will install requirements,
+set up the tutorial data for assets and csaf documents:
+
+.. code-block:: bash
+
+   bash dev/start-local-env.sh
+
+If you want to get familiar with the project, follow these steps to set up a local development environment:
+
 1) Clone the repository:
 
    .. code-block:: bash
@@ -97,22 +107,30 @@ Quick start
        your system ``PATH`` (or set ``JAVA_HOME``) before running the above command. Without Java, installation of the
        ISDuBA plugin will fail.
 
-3) Start local supporting services
-    You can use the helper script (recommended) or run Docker Compose directly.
+3) Configure plugins
 
-    - Recommended: use the dev helper script to start/stop/recreate the local stack
+   Copy and adapt sample configuration files from ``assets/plugin_configs`` to enable data sources:
 
-    .. code-block:: bash
+   .. note::
+      Datasource plugins are expected to fetch valid source data. For CSAF sources, this means the
+      fetched CSAF documents must already be valid at the upstream source system.
 
-        ./dev/start-local-env.sh                       # start services in background
-        ./dev/start-local-env.sh --recreate            # recreate containers
-        ./dev/start-local-env.sh --stop                # stop
-        ./dev/start-local-env.sh --down                # stop and remove services
-        ./dev/start-local-env.sh --down --volumes      # stop and remove services AND named volumes
-        ./dev/start-local-env.sh --recreate --volumes  # full reset: down -v, then up
-        ./dev/start-local-env.sh --clean               # remove local images + local env/toml/plugins.py
+   - NetBox fetcher (asset source):
 
-    - Alternative: run Docker Compose directly
+     - Copy: ``assets/plugin_configs/data_source/asset/sample/netbox.toml``
+       to a new file in ``assets/plugin_configs/data_source/asset/`` (e.g. ``netbox-local.toml``)
+     - Set ``url`` (e.g. http://netbox.localhost/) and ``api_token`` (see token from setup logs)
+
+   - ISDuBA fetcher (CSAF source):
+
+     - Copy: ``assets/plugin_configs/data_source/csaf/sample/isduba.toml``
+       to a new file in ``assets/plugin_configs/data_source/csaf/`` (e.g. ``isduba-local.toml``)
+     - Set ``url`` (e.g. http://isduba.localhost/), ``username``/``password`` (default user/user), and
+       ``keycloak_url`` (e.g. http://keycloak.localhost/)
+
+4) Start local supporting services
+
+    run Docker Compose directly
 
     .. code-block:: bash
 
@@ -122,7 +140,8 @@ Quick start
         # Or run a fully local stack (NetBox, ISDuBA, DB)
         docker compose -f dev/docker-compose.yml up -d
 
-    When using the fully local development environment, the URLs and default credentials are as follows:
+    When using the fully local development environment, the URLs and default credentials are as follows
+    (with the default ``DEV_DOMAIN=localhost``, see the note below):
 
     - NetBox UI: http://netbox.localhost/ (default: admin/admin)
     - NetBox Keycloak instance: http://keycloak.localhost/
@@ -132,6 +151,57 @@ Quick start
       .. code-block:: bash
 
         docker compose -f dev/docker-compose.yml logs netbox-setup
+
+   .. note::
+      All services use the ``.localhost`` domain by default.
+      The domain is set by the parameter ``DEV_DOMAIN`` in ``dev/.env``.
+      Changing it in an existing development environment is not possible, because Keycloak persists its host name.
+      To recreate the environment, run ``./dev/start-local-env.sh --recreate --volumes``.
+
+   .. warning::
+      The ISDuBA login process requires a secure context, either under ``*.localhost`` or via HTTPS.
+      With a ``DEV_DOMAIN`` other than the default ``localhost``, the services are served over HTTPS,
+      using Traefik's auto-generated self-signed default certificate.
+
+      Browsers will show a certificate warning that need to be accepted for **each service**.
+      Additionally, the login in ISDuBA will fail if the browser did not previously accept Keycloak's certificate.
+      Fist, open ``https://keycloak.$DEV_DOMAIN/`` and accept the certificate, before logging in to ISDuBA.
+
+      Certificate validation also needs to be turned off for the daemons.
+      Set ``verify_ssl = false`` in the sample files:
+
+      - ``assets/plugin_configs/data_source/csaf/sample/isduba.toml``
+      - ``assets/plugin_configs/data_source/asset/sample/netbox.toml``
+
+      The ``*-local.toml`` are overwritten with the samples by ``./dev/start-local-env.sh``,
+      see also :ref:`Daemons fail with CERTIFICATE_VERIFY_FAILED <daemons-certificate-verify-failed>`.
+
+   .. note::
+      By default the services listen on all addresses.
+      Set ``BIND_ADDRESS`` in ``dev/.env`` to listen on one specific address only, e.g. if port 80 is already used:
+
+      .. code-block:: text
+
+         BIND_ADDRESS=127.30.0.1
+
+      A few things need to be taken care of:
+
+      - The host names must resolve to this address.
+        With the default ``localhost``, this is not possible with browsers, they will always resolve it to ``127.0.0.1`` internally and ignore local resolution.
+
+        Thus, ``DEV_DOMAIN`` needs also be set to non-``.localhost``-domain, and they need to be mapped in ``/etc/hosts``:
+
+        .. code-block:: text
+
+           127.30.0.1  netbox.dina.example isduba.dina.example keycloak.dina.example traefik.dina.example
+
+      - The three service daemons ``assetsync``, ``csafsync`` and ``csaf_matcher`` connect to the CacheDB at ``localhost`` by default.
+        ``./dev/start-local-env.sh`` automatically sets the ``Cachedb.host`` in ``assets/config.toml`` if necessary:
+
+        .. code-block:: toml
+
+           [Cachedb]
+           host = "127.30.0.1"
 
    .. note::
       The NetBox plugins ``csaf`` and ``d3c`` are included as git submodules at ``dev/plugins/csaf`` and ``dev/plugins/d3c``.
@@ -153,45 +223,37 @@ Quick start
       Changes to frontend code (HTML, JS, CSSS) don't need a restart and only a reload in the browser.
 
    .. note::
-      The CSAF documents in ``documents_dir`` are uploaded in ISDuBA upon startup, ensuring there is CSAF data available without manual setup.
-
-      The setup runs as part of ``./dev/start-local-env.sh``. It can also be run on its own:
+      The CSAF documents in ``./dev/test-cases/csaf_files`` can be uploaded in ISDuBA upon startup,
+      ensuring there is CSAF data available without manual setup. It can be run by:
 
       .. code-block:: bash
 
-        ./dev/isduba-set-sources.py
+        uv run python3 ./dev/isduba-set-sources.py
 
       Additionally, some CSAF providers can be automatically configured too:
 
       .. code-block:: bash
 
-        ./dev/isduba-set-sources.py  --configure-sources
+        uv run python3 ./dev/isduba-set-sources.py  --configure-sources
 
       The default providers are small vendor providers to keep the data modest in size.
 
       The sources are defined in ``dev/configuration/isduba-sources.json``, which is created from the template ``dev/configuration/isduba-sources.example.json`` on first run.
 
-4) Configure plugins
+5) set the default password for the matcher API user (admin/admin) in the local environment for API access:
 
-   Copy and adapt sample configuration files from ``assets/plugin_configs`` to enable data sources:
+   .. code-block:: bash
 
-   .. note::
-      Datasource plugins are expected to fetch valid source data. For CSAF sources, this means the
-      fetched CSAF documents must already be valid at the upstream source system.
+      uv run csaf_matcher_cli user create -u admin
 
-   - NetBox fetcher (asset source):
+6) Load default data (optional)
 
-     - Copy: ``assets/plugin_configs/data_source/asset/sample/netbox.toml``
-       to a new file in ``assets/plugin_configs/data_source/asset/`` (e.g. ``netbox-local.toml``)
-     - Set ``url`` (e.g. http://netbox.localhost/) and ``api_token`` (see token from setup logs)
+   The project includes a small set of sample data for testing and development purposes. You can load it into the local database with:
 
-   - ISDuBA fetcher (CSAF source):
+   .. code-block:: bash
 
-     - Copy: ``assets/plugin_configs/data_source/csaf/sample/isduba.toml``
-       to a new file in ``assets/plugin_configs/data_source/csaf/`` (e.g. ``isduba-local.toml``)
-     - Set ``url`` (e.g. http://isduba.localhost/), ``username``/``password`` (default user/user), and
-       ``keycloak_url`` (e.g. http://keycloak.localhost/)
-
+      uv run python3 ./dev/isduba-set-sources.py
+      uv run python3 ./dev/test-cases/load-test-data.py
 
 .. _running-services:
 
@@ -314,7 +376,7 @@ They are marked with ``integration``. To run them:
 .. code-block:: bash
 
     ./dev/start-local-env.sh
-    ./dev/isduba-set-sources.py
+    uv run python3 ./dev/isduba-set-sources.py
     uv run pytest -m integration
 
 They have these requirements and fail if these are not met:

@@ -74,7 +74,88 @@ If you see CSAF documents with title ``Loading...``, the background job cannot r
 The job uses the URL from setting ``keycloak_url`` (in ``isduba-local.toml``) to connect to Keycloak/ISDuBA.
 If these are not reachable from inside the NetBox containers, the documents cannot be fetched.
 
-In the local development environment, the docker compose setup adds internal aliases for ``*.localhost``, so the URLs work internally as they do in the browser.
+In the local development environment, the docker compose setup adds internal network aliases for the routed host names (using ``DEV_DOMAIN``), so the URLs work inside the containers as they do in the browser.
 In other setups make sure the ISDuBA document URLs and ``keycloak_url`` are reachable from within the NetBox worker container.
 
 All errors of the background job are printed to the ``netbox-worker`` docker container log.
+
+Update Submodules
+------------------
+
+git submodules --update --remote
+git submodules status
+
+.. code-block:: bash
+
+   $git submodules --update --remote
+   $git submodules status
+   +e4b0c6ab7afaaf5153e4b48aab61f52c6c60d909 dev/isduba (v.0.17.0-114-ge4b0c6ab)
+   7689fec7a70717f7e72feecb383e7a3f55538b5f dev/netbox (5.1.1)
+   +4ebde51fdb3f839330b0b8ec1f60e3b69d05052d dev/plugins/csaf (v1.0-rc1-103-g4ebde51)
+   e3c278baef2d9cd6045057f1bb8293d0e6d1970e dev/plugins/d3c (v1.0-rc1-114-ge3c278b)
+
+The + sign indicate a update in the submodule. In order to apply on the
+repository use `git add dev/isduba` for instance, since a new version is
+available.
+
+ISDuBA login fails with NetworkError/CORS
+-----------------------------------------
+
+When the login page of ISDuBA shows this error message:
+
+.. code-block:: text
+
+   Could not load login information: NetworkError when attempting to fetch resource.
+
+And the browser console shows:
+
+.. code-block:: text
+
+   Cross-Origin Request Blocked: The Same Origin Policy disallows reading the remote resource
+   at https://keycloak.example.com/realms/isduba/.well-known/openid-configuration.
+   (Reason: CORS request did not succeed). Status code: (null).
+
+And with a HTTPS setup (``DEV_DOMAIN`` not the default ``localhost``) and self-signed certificates:
+
+Despite the message, this is not a CORS problem, but the self-signed certificate is not trusted by the browser.
+
+Traefik generates one certificate per service, and all of them need to be acepted by the browser.
+The ISDuBA web interface reads the Keycloak configuration in the background from ``keycloak.$DEV_DOMAIN``.
+If that certificate is still untrusted, this error message will appear.
+
+As workaround, open Keycloak directly and accept the certificate warning there: https://keycloak.$DEV_DOMAIN/
+
+.. _daemons-certificate-verify-failed:
+
+Daemons fail with CERTIFICATE_VERIFY_FAILED
+-------------------------------------------
+
+This also happens in HTTPS setups (``DEV_DOMAIN`` not the default ``localhost``) and self-signed certificates.
+
+.. code-block:: text
+
+   dina.synchronizer.base - ERROR - Error fetching data from plugin netbox_fetcher for endpoint
+   https://netbox.example.com/: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed:
+   self-signed certificate (_ssl.c:1032)
+
+Set ``verify_ssl`` to ``false`` in the configuration files.
+
+Change the **sample** files, not the ``*-local.toml`` files:
+
+.. code-block:: toml
+
+   # assets/plugin_configs/data_source/csaf/sample/isduba.toml
+   [DataSource.Plugin]
+   verify_ssl = false
+
+.. code-block:: toml
+
+   # assets/plugin_configs/data_source/asset/sample/netbox.toml
+   [DataSource.Plugin]
+   verify_ssl = false
+
+Then run ``./dev/start-local-env.sh`` to apply the samples, and start the daemons again.
+
+.. note::
+   Editing the ``*-local.toml`` files is not enough, as ``./dev/start-local-env.sh`` copies the sample files over them on every run with ``--recreate``, ``--new`` and ``--up``.
+   The sample files are therefore the only place where the setting survives.
