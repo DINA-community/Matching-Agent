@@ -57,8 +57,10 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.keycloak.rule=Host(`keycloak.${DEV_DOMAIN:-localhost}`)"
-      - "traefik.http.routers.keycloak.entrypoints=web,websecure"
-      - "traefik.http.routers.keycloak.tls=true"
+      - "traefik.http.routers.keycloak.entrypoints=web"
+      - "traefik.http.routers.keycloak-tls.rule=Host(`keycloak.${DEV_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.keycloak-tls.entrypoints=websecure"
+      - "traefik.http.routers.keycloak-tls.tls=true"
       - "traefik.http.services.keycloak.loadbalancer.server.port=8080"
 
   keycloak-setup:
@@ -117,8 +119,10 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.isduba.rule=Host(`isduba.${DEV_DOMAIN:-localhost}`)"
-      - "traefik.http.routers.isduba.entrypoints=web,websecure"
-      - "traefik.http.routers.isduba.tls=true"
+      - "traefik.http.routers.isduba.entrypoints=web"
+      - "traefik.http.routers.isduba-tls.rule=Host(`isduba.${DEV_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.isduba-tls.entrypoints=websecure"
+      - "traefik.http.routers.isduba-tls.tls=true"
       - "traefik.http.services.isduba.loadbalancer.server.port=8081"
 
   # redis
@@ -192,8 +196,10 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.netbox.rule=Host(`netbox.${DEV_DOMAIN:-localhost}`)"
-      - "traefik.http.routers.netbox.entrypoints=web,websecure"
-      - "traefik.http.routers.netbox.tls=true"
+      - "traefik.http.routers.netbox.entrypoints=web"
+      - "traefik.http.routers.netbox-tls.rule=Host(`netbox.${DEV_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.netbox-tls.entrypoints=websecure"
+      - "traefik.http.routers.netbox-tls.tls=true"
       - "traefik.http.services.netbox.loadbalancer.server.port=8080"
 
   netbox-worker:
@@ -277,8 +283,10 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.traefik.rule=Host(`traefik.${DEV_DOMAIN:-localhost}`)"
-      - "traefik.http.routers.traefik.entrypoints=web,websecure"
-      - "traefik.http.routers.traefik.tls=true"
+      - "traefik.http.routers.traefik.entrypoints=web"
+      - "traefik.http.routers.traefik-tls.rule=Host(`traefik.${DEV_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.traefik-tls.entrypoints=websecure"
+      - "traefik.http.routers.traefik-tls.tls=true"
       - "traefik.http.services.traefik.loadbalancer.server.port=8080"
 
 volumes:
