@@ -21,6 +21,7 @@ fi
 
 # Render nginx configuration from template with environment variables
 echo "[nginx] Rendering nginx config (HTTPS_PORT=${HTTPS_PORT})"
+# shellcheck disable=SC2016  # envsubst requires the literal as first parameter
 envsubst '${HTTPS_PORT}' < "$NGINX_CONF" > "$NGINX_CONF_RENDERED"
 
 # Test configuration before starting

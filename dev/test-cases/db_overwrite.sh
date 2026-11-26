@@ -35,11 +35,11 @@ get_csaf() {
 		echo "Downloading: $filename"
 		sleep 1
 		if wget -q "$url"; then
-			mv $filename $filepath
+			mv "$filename" "$filepath"
 			echo "  ✓ Success"
 		else
-			if [ -f $filename ] && ["$(wc -c < "$file")" -eq 0 ]; then
-  		  		rm $filename
+			if [ -f "$filename" ] && [ "$(wc -c < "$filename")" -eq 0 ]; then
+				rm "$filename"
 			fi
 			echo "  ✗ Failed to download"
 			((errors++))
@@ -105,12 +105,12 @@ docker exec "${prefix}-postgres-1" createdb -U netbox netbox
 # Check for custom binary dump first (magic bytes PGDMP)
 if head -c 5 "$1" 2>/dev/null | grep -q "PGDMP"; then
 	echo "Detected: pg_dump custom format → use pg_restore"
-	docker exec -i "${prefix}-postgres-1" pg_restore -v --clean -d netbox -U netbox <$1 2>"err_db_${1}.log"
+	docker exec -i "${prefix}-postgres-1" pg_restore -v --clean -d netbox -U netbox <"$1" 2>"err_db_${1}.log"
 else
 	# Check if it's a readable text file
 	if file "$1" | grep -q "ASCII text\|UTF-8 text"; then
 		echo "Detected: plain SQL text → use psql"
-		docker exec -i "${prefix}-postgres-1" psql -U netbox <$1 >/dev/null 2>"err_db_${1}.log"
+		docker exec -i "${prefix}-postgres-1" psql -U netbox <"$1" >/dev/null 2>"err_db_${1}.log"
 	else
 		echo "Unknown dump format!"
 		exit 1
