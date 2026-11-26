@@ -167,10 +167,14 @@ If you want to get familiar with the project, follow these steps to set up a loc
       Additionally, the login in ISDuBA will fail if the browser did not previously accept Keycloak's certificate.
       Fist, open ``https://keycloak.$DEV_DOMAIN/`` and accept the certificate, before logging in to ISDuBA.
 
-      Also, the certificate validation neds to be turned off for the daemons.
-      Set ``verify_ssl = false`` in:
-      - ``assets/plugin_configs/data_source/csaf/isduba-local.toml``
-      - ``assets/plugin_configs/data_source/asset/netbox-local.toml``
+      Certificate validation also needs to be turned off for the daemons.
+      Set ``verify_ssl = false`` in the sample files:
+
+      - ``assets/plugin_configs/data_source/csaf/sample/isduba.toml``
+      - ``assets/plugin_configs/data_source/asset/sample/netbox.toml``
+
+      The ``*-local.toml`` are overwritten with the samples by ``./dev/start-local-env.sh``,
+      see also :ref:`Daemons fail with CERTIFICATE_VERIFY_FAILED <daemons-certificate-verify-failed>`.
 
    .. note::
       By default the services listen on all addresses.

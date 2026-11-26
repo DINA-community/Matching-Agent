@@ -98,3 +98,64 @@ The + sign indicate a update in the submodule. In order to apply on the
 repository use `git add dev/isduba` for instance, since a new version is
 available.
 
+ISDuBA login fails with NetworkError/CORS
+-----------------------------------------
+
+When the login page of ISDuBA shows this error message:
+
+.. code-block:: text
+
+   Could not load login information: NetworkError when attempting to fetch resource.
+
+And the browser console shows:
+
+.. code-block:: text
+
+   Cross-Origin Request Blocked: The Same Origin Policy disallows reading the remote resource
+   at https://keycloak.example.com/realms/isduba/.well-known/openid-configuration.
+   (Reason: CORS request did not succeed). Status code: (null).
+
+And with a HTTPS setup (``DEV_DOMAIN`` not the default ``localhost``) and self-signed certificates:
+
+Despite the message, this is not a CORS problem, but the self-signed certificate is not trusted by the browser.
+
+Traefik generates one certificate per service, and all of them need to be acepted by the browser.
+The ISDuBA web interface reads the Keycloak configuration in the background from ``keycloak.$DEV_DOMAIN``.
+If that certificate is still untrusted, this error message will appear.
+
+As workaround, open Keycloak directly and accept the certificate warning there: https://keycloak.$DEV_DOMAIN/
+
+.. _daemons-certificate-verify-failed:
+
+Daemons fail with CERTIFICATE_VERIFY_FAILED
+-------------------------------------------
+
+This also happens in HTTPS setups (``DEV_DOMAIN`` not the default ``localhost``) and self-signed certificates.
+
+.. code-block:: text
+
+   dina.synchronizer.base - ERROR - Error fetching data from plugin netbox_fetcher for endpoint
+   https://netbox.example.com/: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed:
+   self-signed certificate (_ssl.c:1032)
+
+Set ``verify_ssl`` to ``false`` in the configuration files.
+
+Change the **sample** files, not the ``*-local.toml`` files:
+
+.. code-block:: toml
+
+   # assets/plugin_configs/data_source/csaf/sample/isduba.toml
+   [DataSource.Plugin]
+   verify_ssl = false
+
+.. code-block:: toml
+
+   # assets/plugin_configs/data_source/asset/sample/netbox.toml
+   [DataSource.Plugin]
+   verify_ssl = false
+
+Then run ``./dev/start-local-env.sh`` to apply the samples, and start the daemons again.
+
+.. note::
+   Editing the ``*-local.toml`` files is not enough, as ``./dev/start-local-env.sh`` copies the sample files over them on every run with ``--recreate``, ``--new`` and ``--up``.
+   The sample files are therefore the only place where the setting survives.
