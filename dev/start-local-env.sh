@@ -77,7 +77,10 @@ need_dep() {
 		exit 1
 	fi
 	if [ "$KEY" == "false" ]; then
-		local SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+		local dirname SCRIPT_DIR
+		dirname=$(dirname -- "${BASH_SOURCE[0]}")
+		SCRIPT_DIR="$(cd -- "$dirname" >/dev/null 2>&1 && pwd)"
+		# shellcheck source=dev/scripts-install/install_depsetup.sh
 		source "${SCRIPT_DIR}/scripts-install/install_depsetup.sh"
 		advise
 		if check_response "Do you want to check for missing dependencies and install them? [Y/n] " "Y"; then
@@ -198,7 +201,7 @@ get_env_value() {
     fi
     printf '%s\n' "$value"
 	# Load everything approach
-	#set -a            
+	#set -a
 	#source $ENV_FILE
 	#set +a
 
@@ -285,7 +288,7 @@ remove_plugins_config() {
 	local clean_full="${1:-false}"
 	if [[ $clean_full == true && -f "$plugins_file" ]]; then
 		rm -f "$plugins_file"
-	elif [[ -f "$plugins_file" ]]; then	
+	elif [[ -f "$plugins_file" ]]; then
 		if check_response "Remove $plugins_file? [Y/n]" "Y"; then
 			info "--[EXE] Removing local plugins configuration: $plugins_file"
 			rm -f "$plugins_file"
@@ -301,6 +304,7 @@ ensure_local_configs() {
 	# Set sample files in case file is missing
 	# Note that the dev/.env is already set by function need_env
 	for pair in "${FILE_PAIRS[@]}"; do
+		# shellcheck disable=SC2086  # word splitting is intended, globbing is not relevant with the fixed paths
 		set -- $pair
 		local target_file="$2"
 		local example_file="$1"
@@ -374,7 +378,7 @@ USAGE
 				case "$1" in
 				--clean) ACTION="clean" ;;
 				--down) ACTION="down" ;;
-				--new) ACTION="new" 
+				--new) ACTION="new"
 					   WITH_VOLUMES=true;;
 				--recreate) ACTION="recreate" ;;
 				--stop) ACTION="stop" ;;
@@ -395,6 +399,9 @@ USAGE
 			else
 				for ((i = 0; i < ${#flags}; i++)); do
 					arg="${flags:i:1}"
+					# Despite =~, it is not matched as regex, because of double quotes
+					# TODO: Rewrite this
+					# shellcheck disable=SC2076
 					if [[ ! " ${valid_flags[*]} " =~ " ${arg} " ]]; then
 						error "Invalid flag '$arg'"
 						print_help "$arg"
@@ -402,7 +409,7 @@ USAGE
 					case "$arg" in
 					c) ACTION="clean" ;;
 					d) ACTION="down" ;;
-					n) ACTION="new" 
+					n) ACTION="new"
 					   WITH_VOLUMES=true;;
 					r) ACTION="recreate" ;;
 					s) ACTION="stop" ;;
@@ -421,6 +428,9 @@ USAGE
 	done
 
 	# Validate action
+	# Despite =~, it is not matched as regex, because of double quotes
+	# TODO: Rewrite this
+	# shellcheck disable=SC2076
 	if [[ ! " ${valid_actions[*]} " =~ " ${ACTION} " ]]; then
 		print_help "$ACTION"
 	fi
@@ -527,7 +537,7 @@ execute() {
 			info "-- [EXE] Recreating dev environment with volume reset (down -v; up)..."
 			$COMPOSE_CMD -f "$COMPOSE_FILE" down -v || true
 		else
-			info "-- [EXE] Starting dev environment (recreate containers)..."	
+			info "-- [EXE] Starting dev environment (recreate containers)..."
 		fi
 		$COMPOSE_CMD -f "$COMPOSE_FILE" up -d --build --force-recreate --remove-orphans
 		;;
@@ -656,11 +666,12 @@ set_workshop() {
 set_api_matcher() {
 	info "--[PoP] Create user for API matcher..."
 	sleep 2
+	# shellcheck disable=SC2155  # get_env_value makes exit 1 on failure intentionally
 	local ADMIN_PASSWORD=$(get_env_value "API_MATCHER_PASSWORD")
 	out=$(uv run csaf_matcher_cli user create --username=admin --password="$ADMIN_PASSWORD" 2>&1)\
   	|| { printf 'csaf_matcher_cli failed:\n%s\n' "$out" >&2; exit 1; }
 
-	
+
 	if grep -qi 'already exists' <<<"$out"; then
 			info "--[POP] Overwrite password for csaf_matcher api with default"
 	fi
@@ -672,6 +683,7 @@ cleanup() {
 		info "--[CLE] NetBox API token detected:"
 		info "--[CLE] $token"
 		## set it in env
+		# shellcheck disable=SC2155  # works well without splitting
 		local LOCAL_SETTING_VAL=$(grep -E "^$LOCAL_SETTING=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2-)
 		if [ "$LOCAL_SETTING_VAL" == "true" ]; then
 			# Sets token always new in case it changes.
@@ -679,6 +691,7 @@ cleanup() {
 			info "--[CLE] NetBox API token set."
 		fi
 		# set JWT secret key
+		# shellcheck disable=SC2155  # works well without splitting
 		local JWT_KEY=$(grep -E "^$JWT=" "$ENV_FILE" | tail -n 1 | cut -d '=' -f 2-)
 		if [ "$JWT_KEY" == "false" ]; then
 			openssl rand -hex 32 | xargs -I{} printf "export JWT_SECRET_KEY={}\n" | tee -a .env dev/.env >/dev/null
@@ -687,7 +700,7 @@ cleanup() {
 		fi
 		set_workshop
 		# Start API
-		set_api_matcher	
+		set_api_matcher
 		local excess
 		if check_response "Do you want to start the apis right away? [Y/n]" "Y"; then
 			if check_response "Do you execute the APIs in separate windows each (Y) or all in this terminal (N) [Y/n]" "Y"; then

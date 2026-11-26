@@ -2,7 +2,6 @@
 
 KEYRING="/etc/apt/keyrings/docker.asc"
 SOURCES="/etc/apt/sources.list.d/docker.sources"
-GPG_URL="https://download.docker.com/linux/ubuntu/gpg"
 
 # Verify OS compatibility
 if [[ ! -f /etc/os-release ]]; then

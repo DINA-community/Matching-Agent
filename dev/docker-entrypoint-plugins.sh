@@ -2,6 +2,7 @@
 # Installs the NetBox plugins (CSAF and D3C) editable from the bind-mounts.
 
 set -euo pipefail
+# shellcheck disable=SC1091  # don't follow this script
 source /opt/netbox/venv/bin/activate
 
 echo "Installing NetBox plugins (editable) from mounted submodules..."

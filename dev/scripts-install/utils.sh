@@ -15,6 +15,7 @@
 
 info_api() { echo "[API]  $*" >&2; }
 
+# shellcheck disable=SC2016  # variables should not be expanded here
 TERMINAL_PAYLOAD='
   printf "\033]0;%s\007" "$1"
   export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
