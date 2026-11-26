@@ -96,5 +96,20 @@ git submodules status
 
 The + sign indicate a update in the submodule. In order to apply on the
 repository use `git add dev/isduba` for instance, since a new version is
-available. 
+available.
 
+CSAF documents are not imported
+-------------------------------
+
+The CSAF document import `currently ignores <https://github.com/DINA-community/Matching-Agent/issues/117>`__ all CSAF documents that were released before the last run.
+
+To reset the start date, run this command:
+
+.. code-block:: bash
+
+   s -c "
+   UPDATE \"cacheDB\".synchronizer_metadata
+   SET last_run = '1970-01-01 00:00:00'
+   WHERE origin_uri LIKE '%isduba%';"
+
+Adapt the ``WHERE`` clause the ISDUBA host does not include the string ``isduba``.
